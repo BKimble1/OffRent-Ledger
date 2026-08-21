@@ -299,14 +299,37 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
       - $CM_BUILD_DIR/*.log
 
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
-        # Deliberately absent: `submit_to_app_store`. Submission is a human decision and this
-        # repository does not make it.
-        #
-        # Also deliberately absent: any internal-testing-only restriction. A build limited that
-        # way cannot later be selected for App Store review, and that is discovered at the worst
-        # possible moment.
-        beta_groups: []
+    # NO `publishing:` BLOCK — deliberately, and this is not an oversight.
+    #
+    # `auth: integration` requires the workflow to name a configured App Store Connect
+    # integration, and Codemagic validates the *entire* file: a publishing block referring to an
+    # integration that does not exist rejects codemagic.yaml outright, which blocks
+    # `offrent-fast-verify` too. One aspirational workflow taking the whole config down with it
+    # is a bad trade, so this one archives and stops.
+    #
+    # The .ipa is in `artifacts` above, so it can be uploaded by hand in the meantime.
+    #
+    # To enable uploading, do BOTH of these together — neither works alone:
+    #
+    #   1. In Codemagic: Teams > Integrations > App Store Connect, add the API key and give the
+    #      integration a name.
+    #   2. Uncomment both stanzas below and replace <INTEGRATION_NAME> with that name.
+    #
+    # integrations:
+    #   app_store_connect: <INTEGRATION_NAME>
+    #
+    # publishing:
+    #   app_store_connect:
+    #     auth: integration
+    #     submit_to_testflight: true
+    #     # Deliberately absent even then: `submit_to_app_store`. Submission is a human
+    #     # decision and this repository does not make it.
+    #     #
+    #     # Also deliberately absent: any internal-testing-only restriction. A build limited
+    #     # that way cannot later be selected for App Store review, which is discovered at the
+    #     # worst possible moment.
+    #     beta_groups: []
+    #
+    # Codemagic reports the required path as `workflow -> integrations -> app_store_connect`.
+    # Check the current schema in Codemagic's docs before uncommenting: nothing in this
+    # repository can validate it, and the last attempt is what produced this comment.

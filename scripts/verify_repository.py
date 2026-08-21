@@ -655,6 +655,57 @@ def check_call_sites_resolve() -> None:
         fail("call-sites", "; ".join(detail[:6]) or result.stdout.strip()[-400:])
 
 
+def check_codemagic_config() -> None:
+    check("codemagic.yaml is internally consistent")
+    # Codemagic validates the whole file, so one bad workflow rejects the config and blocks every
+    # other workflow with it — including the fast-verify gate. That is how a publishing block for
+    # an integration nobody had configured stopped the project's first compile from running.
+    try:
+        import yaml  # noqa: PLC0415
+    except ImportError:
+        print("      (pyyaml not installed; skipping the parse)")
+        return
+
+    path = ROOT / "codemagic.yaml"
+    try:
+        config = yaml.safe_load(path.read_text())
+    except Exception as error:
+        fail("codemagic", f"codemagic.yaml does not parse: {error}")
+        return
+
+    workflows = (config or {}).get("workflows") or {}
+    if not workflows:
+        fail("codemagic", "no workflows defined")
+        return
+
+    for name, workflow in workflows.items():
+        publishing = workflow.get("publishing") or {}
+        app_store = publishing.get("app_store_connect") or {}
+
+        # `auth: integration` needs a named integration, or Codemagic rejects the file.
+        if app_store.get("auth") == "integration" and "app_store_connect" not in (
+            workflow.get("integrations") or {}
+        ):
+            fail(
+                "codemagic",
+                f"{name} uses `auth: integration` without `integrations.app_store_connect`; "
+                "this rejects the whole config, not just this workflow",
+            )
+
+        # Submission stays a human decision.
+        if app_store.get("submit_to_app_store"):
+            fail("codemagic", f"{name} would submit to the App Store automatically")
+
+        # A build restricted to internal testing cannot later be selected for App Store review.
+        if app_store.get("testFlightInternalTestingOnly"):
+            fail("codemagic", f"{name} restricts the build to internal testing only")
+
+    if "offrent-fast-verify" not in workflows:
+        fail("codemagic", "the fast-verify gate is missing")
+    if "triggering" not in workflows.get("offrent-fast-verify", {}):
+        fail("codemagic", "offrent-fast-verify has no trigger, so it would never run on its own")
+
+
 def check_docs_exist() -> None:
     check("The four required documents exist and are not stubs")
     for name in [
@@ -698,6 +749,7 @@ def main() -> int:
         check_swift_delimiters_balance,
         check_ocr_fixtures_exist,
         check_call_sites_resolve,
+        check_codemagic_config,
         check_docs_exist,
     ]:
         function()

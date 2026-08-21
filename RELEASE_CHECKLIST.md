@@ -96,7 +96,16 @@ Once this section is complete, the project is **locally complete**.
       - Localised display names and descriptions, and a review screenshot for each.
 - [ ] Create an App Store Connect API key and a distribution certificate; add them to Codemagic as
       the environment groups `offrent_appstore` and `offrent_signing`.
+- [ ] In Codemagic: **Teams › Integrations › App Store Connect**, add the API key and name the
+      integration. Then uncomment the `integrations:` and `publishing:` stanzas at the bottom of
+      the `offrent-testflight` workflow in `codemagic.yaml` and substitute that name.
+      **Both together, or neither.** `auth: integration` without a named integration rejects the
+      entire `codemagic.yaml`, which blocks `offrent-fast-verify` as well — that is not a
+      hypothetical, it is what happened on the first run.
+      `scripts/verify_repository.py` now fails on that combination.
 - [ ] Run `offrent-testflight`. Its preflight step will refuse until all of the above exists.
+      Until the publishing stanza is enabled the workflow archives and stops; the `.ipa` is in
+      its artifacts and can be uploaded by hand.
 
 After a successful signed archive, the app is **TestFlight-ready**.
 
