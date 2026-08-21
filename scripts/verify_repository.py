@@ -641,6 +641,20 @@ def check_ocr_fixtures_exist() -> None:
         fail("fixtures", "OCRFixtures/README.md must state that the fixtures are synthetic")
 
 
+def check_call_sites_resolve() -> None:
+    check("Initialiser and static-call sites match their declarations")
+    # The app layer has never been compiled. This is the nearest thing available to a type check
+    # of our own API surface: every `Type(...)` and `Type.staticFunc(...)` in the repository is
+    # matched against the signatures declared in it. See scripts/check_swift_call_sites.py.
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "check_swift_call_sites.py")],
+        capture_output=True, text=True, cwd=ROOT,
+    )
+    if result.returncode != 0:
+        detail = [line for line in result.stdout.splitlines() if line.strip().startswith(("Off", "Tests"))]
+        fail("call-sites", "; ".join(detail[:6]) or result.stdout.strip()[-400:])
+
+
 def check_docs_exist() -> None:
     check("The four required documents exist and are not stubs")
     for name in [
@@ -683,6 +697,7 @@ def main() -> int:
         check_file_validity,
         check_swift_delimiters_balance,
         check_ocr_fixtures_exist,
+        check_call_sites_resolve,
         check_docs_exist,
     ]:
         function()
