@@ -249,3 +249,37 @@ final class StatusTransitionTests: XCTestCase {
         ]
     }
 }
+
+/// Keeps the generated documentation honest.
+final class StatusTransitionDocTests: XCTestCase {
+
+    func testGeneratedDocumentationIsCommittedAndCurrent() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let url = root.appendingPathComponent("docs/STATUS_TRANSITIONS.md")
+        let contents = try String(contentsOf: url, encoding: .utf8)
+
+        // Every status must appear, so a new one cannot be added without regenerating the doc.
+        for status in RentalItemStatus.allCases {
+            XCTAssertTrue(
+                contents.contains("| \(status.displayName) |"),
+                "\(status.displayName) is missing from docs/STATUS_TRANSITIONS.md — run `swift run offrent-docgen`"
+            )
+        }
+        // And every declared edge.
+        for (from, destinations) in StatusTransitionService.allowedTransitions {
+            guard !destinations.isEmpty else { continue }
+            let row = try XCTUnwrap(
+                contents.components(separatedBy: "\n").first { $0.hasPrefix("| \(from.displayName) |") },
+                "no row for \(from.displayName)"
+            )
+            for destination in destinations {
+                XCTAssertTrue(
+                    row.contains(destination.displayName),
+                    "\(from.displayName) → \(destination.displayName) is missing from the generated table"
+                )
+            }
+        }
+        XCTAssertTrue(contents.contains("Do not edit by hand"))
+    }
+}

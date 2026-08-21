@@ -16,7 +16,8 @@ let package = Package(
     name: "OffRentDomain",
     platforms: [.macOS(.v13)],
     products: [
-        .library(name: "OffRentDomain", targets: ["OffRentDomain"])
+        .library(name: "OffRentDomain", targets: ["OffRentDomain"]),
+        .executable(name: "offrent-docgen", targets: ["DocGen"]),
     ],
     targets: [
         .target(
@@ -34,9 +35,15 @@ let package = Package(
                 "TEST_MATRIX.md", "RELEASE_CHECKLIST.md",
                 "OffRentLedger/App", "OffRentLedger/Configuration", "OffRentLedger/Features",
                 "OffRentLedger/Persistence", "OffRentLedger/Resources",
-                "OffRentLedger/Services", "OffRentLedger/SharedUI",
+                "OffRentLedger/Services", "OffRentLedger/SharedUI", "Tools",
             ],
             sources: ["OffRentLedger/Domain", "OffRentShared"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .executableTarget(
+            name: "DocGen",
+            dependencies: ["OffRentDomain"],
+            path: "Tools/DocGen",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
