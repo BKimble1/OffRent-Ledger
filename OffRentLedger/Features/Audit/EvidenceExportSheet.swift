@@ -132,7 +132,8 @@ struct EvidenceExportSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
             }
             .onAppear {
-                selectedAssetIDs = Set((item?.assets ?? []).map(\.id))
+                let assets: [EvidenceAsset] = item?.assets ?? []
+                selectedAssetIDs = Set(assets.map(\.id))
             }
         }
     }
@@ -143,9 +144,7 @@ struct EvidenceExportSheet: View {
         let confirmationEvent = events.last { $0.type == .vendorConfirmationRecorded }
         let pickupEvent = events.last { $0.type == .pickupRecorded }
 
-        let invoice = (agreement.invoices ?? [])
-            .filter { $0.primaryItemID == nil || $0.primaryItemID == item.id }
-            .max(by: { $0.attachedAt < $1.attachedAt })
+        let invoice: VendorInvoice? = item.latestInvoice
 
         var comparison: InvoiceComparison?
         if let invoice {
@@ -162,18 +161,63 @@ struct EvidenceExportSheet: View {
             )
         }
 
+        // Every non-trivial argument is hoisted into an annotated local. `EvidencePacket` takes
+        // twenty-five arguments; leaving `.map { .init(...) }` closures, a leading-dot nested
+        // initialiser and three chained collection calls inline made it one expression the type
+        // checker has to solve whole, which is exactly what produces "unable to type-check this
+        // expression in reasonable time".
+        let vendorSummary = EvidencePacket.PartySummary(
+            name: vendor.name, branch: vendor.branch, phone: vendor.phone,
+            email: vendor.email, link: vendor.link
+        )
+
+        var siteSummary: EvidencePacket.SiteSummary?
+        if let site = agreement.jobSite {
+            siteSummary = EvidencePacket.SiteSummary(
+                name: site.name, projectIdentifier: site.projectIdentifier, address: site.address
+            )
+        }
+
+        let estimate = RentalRateEngine.estimate(
+            terms: item.terms, asOf: dependencies.clock.now, calendar: dependencies.clock.calendar
+        )
+        let timeline: [EvidencePacket.TimelineEntry] = events.map(\.timelineEntry)
+
+        var confirmation: ConfirmationEvidence?
+        if let event = confirmationEvent {
+            confirmation = ConfirmationEvidence(
+                confirmationNumber: event.confirmationNumber,
+                vendorRepresentative: event.vendorRepresentative,
+                contactMethod: event.contactMethod ?? .other,
+                confirmedAt: event.timestamp,
+                notes: event.detail,
+                userAffirmedContact: true,
+                acknowledgedNoConfirmationNumber: event.confirmationNumber == nil
+            )
+        }
+
+        var pickup: PickupEvidence?
+        if let event = pickupEvent {
+            pickup = PickupEvidence(pickedUpAt: event.timestamp, notes: event.detail)
+        }
+
+        let allAssets: [EvidenceAsset] = item.assets ?? []
+        var selectedAssets: [EvidencePacket.AssetSummary] = []
+        for asset in allAssets where selectedAssetIDs.contains(asset.id) {
+            selectedAssets.append(asset.summary)
+        }
+
+        let disclaimer = EvidencePacketBuilder.disclaimer(
+            appName: AppConfiguration.displayName, companyName: AppConfiguration.companyName
+        )
+
         return EvidencePacket(
             generatedAt: dependencies.clock.now,
             appDisplayName: AppConfiguration.displayName,
             appVersion: AppConfiguration.versionAndBuild,
             companyName: AppConfiguration.companyName,
-            vendor: .init(
-                name: vendor.name, branch: vendor.branch, phone: vendor.phone,
-                email: vendor.email, link: vendor.link
-            ),
-            jobSite: agreement.jobSite.map {
-                .init(name: $0.name, projectIdentifier: $0.projectIdentifier, address: $0.address)
-            },
+            vendor: vendorSummary,
+            jobSite: siteSummary,
             agreementNumber: agreement.agreementNumber,
             agreementStartDate: agreement.startDate,
             agreementScheduledEndDate: agreement.scheduledEndDate,
@@ -183,32 +227,16 @@ struct EvidenceExportSheet: View {
             serialNumber: item.serialNumber,
             status: item.status,
             terms: item.terms,
-            estimate: RentalRateEngine.estimate(
-                terms: item.terms, asOf: dependencies.clock.now, calendar: dependencies.clock.calendar
-            ),
-            timeline: events.map(\.timelineEntry),
-            confirmation: confirmationEvent.map { event in
-                ConfirmationEvidence(
-                    confirmationNumber: event.confirmationNumber,
-                    vendorRepresentative: event.vendorRepresentative,
-                    contactMethod: event.contactMethod ?? .other,
-                    confirmedAt: event.timestamp,
-                    notes: event.detail,
-                    userAffirmedContact: true,
-                    acknowledgedNoConfirmationNumber: event.confirmationNumber == nil
-                )
-            },
-            pickup: pickupEvent.map { PickupEvidence(pickedUpAt: $0.timestamp, notes: $0.detail) },
+            estimate: estimate,
+            timeline: timeline,
+            confirmation: confirmation,
+            pickup: pickup,
             meterUnit: item.meterUnit,
-            selectedAssets: (item.assets ?? [])
-                .filter { selectedAssetIDs.contains($0.id) }
-                .map(\.summary),
+            selectedAssets: selectedAssets,
             invoice: invoice?.value,
             comparison: comparison,
             userNotes: userNotes.nilIfBlank,
-            disclaimer: EvidencePacketBuilder.disclaimer(
-                appName: AppConfiguration.displayName, companyName: AppConfiguration.companyName
-            )
+            disclaimer: disclaimer
         )
     }
 

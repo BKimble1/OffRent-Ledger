@@ -296,7 +296,34 @@ enum OffRentSchemaV1: VersionedSchema {
         }
 
         var sortedEvents: [RentalEventModel] {
-            (events ?? []).sorted { $0.timestamp < $1.timestamp }
+            let unsorted: [RentalEventModel] = events ?? []
+            return unsorted.sorted { $0.timestamp < $1.timestamp }
+        }
+
+        /// The invoice this item's audit, reminders and evidence packet are about, or nil if
+        /// none has been attached yet.
+        ///
+        /// One definition, because four call sites had grown four copies of it — and one of
+        /// them ordered by a different date, so the CSV export could name a different invoice
+        /// than the screen it was exported from. `attachedAt` is the order used here: the
+        /// export exists to back up what the user is looking at.
+        ///
+        /// An invoice with no `primaryItemID` covers the whole agreement and therefore covers
+        /// this item too; one naming a different item does not.
+        var latestInvoice: VendorInvoiceModel? {
+            let candidates: [VendorInvoiceModel] = agreement?.invoices ?? []
+            var latest: VendorInvoiceModel?
+            for candidate in candidates {
+                guard candidate.primaryItemID == nil || candidate.primaryItemID == id else {
+                    continue
+                }
+                guard let current = latest else {
+                    latest = candidate
+                    continue
+                }
+                if current.attachedAt < candidate.attachedAt { latest = candidate }
+            }
+            return latest
         }
     }
 

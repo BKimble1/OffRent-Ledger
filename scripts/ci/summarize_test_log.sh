@@ -22,6 +22,25 @@ echo "--- Compile errors ---"
 # code-signing) do not. Missing the second kind is how a build "fails with no errors".
 grep -aE '\.swift:[0-9]+(:[0-9]+)?: (error|warning: .*will never be executed)' "$LOG" \
   | head -n 40 || echo "(none with a source location)"
+echo "--- Slow type-checking (Debug diagnostic flags) ---"
+# The Debug configuration passes -warn-long-expression-type-checking=300 and
+# -warn-long-function-bodies=300, so an expression heading for the compiler's hard
+# "unable to type-check this expression in reasonable time" error shows up here first, with a
+# file and a line, on the build *before* it becomes fatal. Slowest first.
+#
+# Captured into a variable rather than piped straight to head: `grep ... | head` reports head's
+# exit status, so a `|| echo "(none)"` on the pipeline would never fire and an empty section
+# would be indistinguishable from a section that was never reached.
+SLOW=$(grep -aE '\.swift:[0-9]+:[0-9]+: warning: .*took [0-9]+ms to type-check' "$LOG" \
+  | sed -E 's|^.*/([^/]+\.swift:)|\1|' \
+  | sort -u \
+  | awk '{ ms = 0
+           if (match($0, /[0-9]+ms to type-check/)) ms = substr($0, RSTART, RLENGTH - 16) + 0
+           print ms "\t" $0 }' \
+  | sort -rn \
+  | cut -f2- \
+  | head -n 25)
+if [ -n "$SLOW" ]; then echo "$SLOW"; else echo "(none over the 300ms threshold)"; fi
 echo "--- Other errors ---"
 grep -aE '^(error|.*: error:)' "$LOG" \
   | grep -avE 'CoreData: error|error: unable to attach DB' \

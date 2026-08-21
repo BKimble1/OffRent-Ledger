@@ -567,6 +567,27 @@ def check_pbxproj_integrity() -> None:
         fail("pbxproj", "OffRentShared is not a member of both the app and the widget targets")
 
 
+def check_slow_type_check_warnings_enabled() -> None:
+    check("Debug builds warn about slow type-checking before it becomes fatal")
+    # When the Swift type checker gives up it emits a hard error — "unable to type-check this
+    # expression in reasonable time" — and stops that file. Found that way, each such expression
+    # costs a full CI round. These two frontend flags turn the same condition into a located
+    # warning at 300ms, so one build lists every candidate at once. They are the early-warning
+    # system for a failure mode this project has already hit, so losing them silently is the
+    # thing worth catching.
+    source = (ROOT / "OffRentLedger.xcodeproj" / "project.pbxproj").read_text()
+    for flag in ["-warn-long-expression-type-checking=300", "-warn-long-function-bodies=300"]:
+        if flag not in source:
+            fail("slow-typecheck", f"the Debug configuration no longer passes {flag}")
+
+    summariser = (ROOT / "scripts" / "ci" / "summarize_test_log.sh").read_text()
+    if "took [0-9]+ms to type-check" not in summariser:
+        fail(
+            "slow-typecheck",
+            "summarize_test_log.sh no longer reports the warnings, so nobody would read them",
+        )
+
+
 def check_scheme_is_shared() -> None:
     check("The scheme is shared and runs both test bundles")
     path = ROOT / "OffRentLedger.xcodeproj" / "xcshareddata" / "xcschemes" / "OffRentLedger.xcscheme"
@@ -886,6 +907,7 @@ def main() -> int:
         check_no_colour_only_status,
         check_generated_project_is_current,
         check_pbxproj_integrity,
+        check_slow_type_check_warnings_enabled,
         check_scheme_is_shared,
         check_file_validity,
         check_swift_delimiters_balance,

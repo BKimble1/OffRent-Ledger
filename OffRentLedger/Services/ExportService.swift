@@ -28,20 +28,34 @@ struct ExportService {
         let events = items.flatMap { $0.sortedEvents }
         let discrepancies = invoices.flatMap { $0.discrepancies ?? [] }
 
+        // Each list is hoisted into an annotated local rather than mapped inline in the
+        // initialiser call. Eight generic `map`/`compactMap` calls in a single expression is the
+        // shape that makes the type checker give up ("unable to type-check in reasonable time");
+        // annotating each result leaves it nothing to solve for.
+        //
+        // `compactMap`: a record whose parent relationship is nil cannot be expressed in the
+        // archive and is dropped rather than exported with a fabricated parent.
+        let vendorRecords: [VendorRecord] = vendors.map(\.record)
+        let jobSiteRecords: [JobSiteRecord] = sites.map(\.record)
+        let agreementRecords: [AgreementRecord] = agreements.compactMap(\.record)
+        let itemRecords: [RentalItemRecord] = items.compactMap(\.record)
+        let eventRecords: [RentalEventRecord] = events.compactMap(\.record)
+        let assetRecords: [EvidenceAssetRecord] = assets.map(\.record)
+        let invoiceRecords: [InvoiceRecord] = invoices.compactMap(\.record)
+        let discrepancyRecords: [DiscrepancyRecord] = discrepancies.compactMap(\.record)
+
         return BackupArchive(
             generatedAt: clock.now,
             appVersion: AppConfiguration.versionAndBuild,
             includesEvidenceFiles: includeEvidenceFiles,
-            vendors: vendors.map(\.record),
-            jobSites: sites.map(\.record),
-            // `compactMap`: a record whose parent relationship is nil cannot be expressed in the
-            // archive and is dropped rather than exported with a fabricated parent.
-            agreements: agreements.compactMap(\.record),
-            items: items.compactMap(\.record),
-            events: events.compactMap(\.record),
-            assets: assets.map(\.record),
-            invoices: invoices.compactMap(\.record),
-            discrepancies: discrepancies.compactMap(\.record)
+            vendors: vendorRecords,
+            jobSites: jobSiteRecords,
+            agreements: agreementRecords,
+            items: itemRecords,
+            events: eventRecords,
+            assets: assetRecords,
+            invoices: invoiceRecords,
+            discrepancies: discrepancyRecords
         )
     }
 
@@ -68,9 +82,7 @@ struct ExportService {
         )
         let confirmation = item.sortedEvents.last { $0.type == .vendorConfirmationRecorded }
         let pickup = item.sortedEvents.last { $0.type == .pickupRecorded }
-        let invoice = (agreement?.invoices ?? [])
-            .filter { $0.primaryItemID == nil || $0.primaryItemID == item.id }
-            .max(by: { $0.receivedDate < $1.receivedDate })
+        let invoice: VendorInvoice? = item.latestInvoice
 
         var variance: Decimal?
         var openCount = 0
@@ -122,17 +134,42 @@ struct ExportService {
     // MARK: - Import
 
     func existingIdentifiers() throws -> ExistingIdentifiers {
+        // Fetches and identifier sets are separate annotated steps for the same reason as
+        // `buildArchive` above: eight `Set(...).map(\.id)` conversions inside one initialiser
+        // call is a type-checker blowup waiting to happen, and `try` inside an argument list
+        // reads worse than it does on its own line.
+        let vendors = try context.fetch(StoreQueries.allVendors())
+        let sites = try context.fetch(StoreQueries.allJobSites())
+        let agreements = try context.fetch(StoreQueries.allAgreements())
         let items = try context.fetch(StoreQueries.allItems())
         let invoices = try context.fetch(StoreQueries.allInvoices())
+        let assets = try context.fetch(StoreQueries.allAssets())
+
+        var eventIDs: Set<UUID> = []
+        for item in items {
+            for event in item.sortedEvents { eventIDs.insert(event.id) }
+        }
+        var discrepancyIDs: Set<UUID> = []
+        for invoice in invoices {
+            for discrepancy in invoice.discrepancies ?? [] { discrepancyIDs.insert(discrepancy.id) }
+        }
+
+        let vendorIDs: Set<UUID> = Set(vendors.map(\.id))
+        let jobSiteIDs: Set<UUID> = Set(sites.map(\.id))
+        let agreementIDs: Set<UUID> = Set(agreements.map(\.id))
+        let itemIDs: Set<UUID> = Set(items.map(\.id))
+        let invoiceIDs: Set<UUID> = Set(invoices.map(\.id))
+        let assetIDs: Set<UUID> = Set(assets.map(\.id))
+
         return ExistingIdentifiers(
-            vendors: Set(try context.fetch(StoreQueries.allVendors()).map(\.id)),
-            jobSites: Set(try context.fetch(StoreQueries.allJobSites()).map(\.id)),
-            agreements: Set(try context.fetch(StoreQueries.allAgreements()).map(\.id)),
-            items: Set(items.map(\.id)),
-            events: Set(items.flatMap { $0.sortedEvents }.map(\.id)),
-            invoices: Set(invoices.map(\.id)),
-            discrepancies: Set(invoices.flatMap { $0.discrepancies ?? [] }.map(\.id)),
-            assets: Set(try context.fetch(StoreQueries.allAssets()).map(\.id))
+            vendors: vendorIDs,
+            jobSites: jobSiteIDs,
+            agreements: agreementIDs,
+            items: itemIDs,
+            events: eventIDs,
+            invoices: invoiceIDs,
+            discrepancies: discrepancyIDs,
+            assets: assetIDs
         )
     }
 

@@ -112,12 +112,23 @@ struct RootView: View {
             dependencies.snapshotPublisher.clear()
             return
         }
-        let inputs = items.map { item in
-            SnapshotItemInput(
-                status: item.status,
-                terms: item.terms,
-                hasInvoiceAwaitingReview: (item.agreement?.invoices ?? [])
-                    .contains { $0.reviewStatus == .notReviewed || $0.reviewStatus == .inReview }
+        var inputs: [SnapshotItemInput] = []
+        for item in items {
+            let invoices: [VendorInvoice] = item.agreement?.invoices ?? []
+            var awaitingReview = false
+            for invoice in invoices {
+                let status: InvoiceReviewStatus = invoice.reviewStatus
+                if status == .notReviewed || status == .inReview {
+                    awaitingReview = true
+                    break
+                }
+            }
+            inputs.append(
+                SnapshotItemInput(
+                    status: item.status,
+                    terms: item.terms,
+                    hasInvoiceAwaitingReview: awaitingReview
+                )
             )
         }
         dependencies.snapshotPublisher.publish(
@@ -164,20 +175,31 @@ extension ReminderContext {
     /// Builds the planner's input from a stored item.
     init(item: RentalItem) {
         let events = item.sortedEvents
-        let invoice = (item.agreement?.invoices ?? [])
-            .filter { $0.primaryItemID == nil || $0.primaryItemID == item.id }
-            .max(by: { $0.attachedAt < $1.attachedAt })
+        let invoice: VendorInvoice? = item.latestInvoice
+
+        // Each timestamp is its own annotated local rather than a `.last { }?.timestamp` inside
+        // the argument list: three trailing-closure searches plus an optional `.map` in one
+        // initialiser call is the shape the type checker gives up on.
+        let markedDoneAt: Date? = events.last { $0.type == .equipmentMarkedDone }?.timestamp
+        let confirmedAt: Date? = events.last { $0.type == .vendorConfirmationRecorded }?.timestamp
+        let pickedUpAt: Date? = events.last { $0.type == .pickupRecorded }?.timestamp
+
+        var invoiceReviewed = false
+        if let invoice {
+            let status: InvoiceReviewStatus = invoice.reviewStatus
+            invoiceReviewed = status == .accepted || status == .followUpRecorded
+        }
 
         self.init(
             itemID: item.id,
             equipmentName: item.equipmentName,
             status: item.status,
             terms: item.terms,
-            markedDoneAt: events.last { $0.type == .equipmentMarkedDone }?.timestamp,
-            confirmationRecordedAt: events.last { $0.type == .vendorConfirmationRecorded }?.timestamp,
-            pickupRecordedAt: events.last { $0.type == .pickupRecorded }?.timestamp,
+            markedDoneAt: markedDoneAt,
+            confirmationRecordedAt: confirmedAt,
+            pickupRecordedAt: pickedUpAt,
             invoiceAttachedAt: invoice?.attachedAt,
-            invoiceReviewed: invoice.map { $0.reviewStatus == .accepted || $0.reviewStatus == .followUpRecorded } ?? false,
+            invoiceReviewed: invoiceReviewed,
             disputeWindowDaysOverride: item.agreement?.disputeWindowDaysOverride
         )
     }

@@ -109,10 +109,7 @@ struct RentalsView: View {
                     Spacer(minLength: 8)
                     StatusChip(status: item.status, compact: true)
                 }
-                Text(
-                    [item.agreement?.vendor?.name, item.agreement?.jobSite?.name]
-                        .compactMap { $0 }.joined(separator: " · ")
-                )
+                Text(subtitle(for: item))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -158,13 +155,22 @@ struct RentalsView: View {
         vendorFilter != nil || jobSiteFilter != nil || statusFilter != nil || !search.isEmpty
     }
 
+    /// Vendor and jobsite, whichever of them are known.
+    private func subtitle(for item: RentalItem) -> String {
+        let parts: [String?] = [item.agreement?.vendor?.name, item.agreement?.jobSite?.name]
+        return parts.compactMap { $0 }.joined(separator: " · ")
+    }
+
     private var filtered: [RentalItem] {
         items.filter { item in
             if let vendorFilter, item.agreement?.vendor?.id != vendorFilter { return false }
             if let jobSiteFilter, item.agreement?.jobSite?.id != jobSiteFilter { return false }
             if let statusFilter, item.status != statusFilter { return false }
             guard !search.isEmpty else { return true }
-            let haystack = [
+            // `[String?]` is spelled out. Without it the type checker has to unify seven
+            // elements — some `String`, some `String?` — before it can even start on the
+            // `compactMap` closure, in an expression nested three closures deep.
+            let fields: [String?] = [
                 item.equipmentName,
                 item.equipmentClass,
                 item.vendorEquipmentIdentifier,
@@ -172,7 +178,8 @@ struct RentalsView: View {
                 item.agreement?.agreementNumber,
                 item.agreement?.vendor?.name,
                 item.agreement?.jobSite?.name,
-            ].compactMap { $0 }.joined(separator: " ")
+            ]
+            let haystack: String = fields.compactMap { $0 }.joined(separator: " ")
             return haystack.localizedCaseInsensitiveContains(search)
         }
     }

@@ -204,7 +204,17 @@ struct TodayView: View {
     private var accruing: [RentalItem] { allItems.filter { $0.status.accruesRent } }
 
     private var totalRunning: Decimal {
-        MoneyMath.sum(accruing.compactMap { $0.cachedEstimateIsComplete ? $0.cachedEstimatedRunningCost : nil })
+        // Written as an explicit loop with annotated locals rather than a `compactMap` whose
+        // closure is a ternary yielding `Decimal?`. The chained form makes the type checker
+        // solve for the element type, the closure result, and the `nil` literal's type at
+        // once, and it is the same shape that blew up in `invoicesToReview` below.
+        var amounts: [Decimal] = []
+        for item in accruing {
+            guard item.cachedEstimateIsComplete else { continue }
+            guard let amount: Decimal = item.cachedEstimatedRunningCost else { continue }
+            amounts.append(amount)
+        }
+        return MoneyMath.sum(amounts)
     }
 
     private var incompleteEstimateCount: Int {
@@ -220,13 +230,33 @@ struct TodayView: View {
     }
 
     private var invoicesToReview: [VendorInvoice] {
-        let invoices = allItems
-            .compactMap(\.agreement)
-            .flatMap { $0.invoices ?? [] }
-            .filter { $0.reviewStatus == .notReviewed || $0.reviewStatus == .inReview }
-        // The same agreement appears once per item, so the same invoice can arrive several times.
+        // Deliberately an explicit loop. The chained form —
+        //
+        //     allItems.compactMap(\.agreement)
+        //             .flatMap { $0.invoices ?? [] }
+        //             .filter { $0.reviewStatus == .notReviewed || $0.reviewStatus == .inReview }
+        //
+        // fails to compile with "the compiler is unable to type-check this expression in
+        // reasonable time". Each link is generic over its element type, the `?? []` forces the
+        // empty-array literal to be solved rather than known, and `==` against two leading-dot
+        // enum members adds two more unresolved bases — so the solver explores a large space
+        // for a chain that reads as trivial. Annotated locals give it nothing to search.
+        //
+        // The dedupe is part of the same pass: the same agreement is reached once per item on
+        // it, so without `seen` the same invoice would be listed several times.
         var seen: Set<UUID> = []
-        return invoices.filter { seen.insert($0.id).inserted }
+        var result: [VendorInvoice] = []
+        for item in allItems {
+            guard let agreement: RentalAgreement = item.agreement else { continue }
+            guard let invoices: [VendorInvoice] = agreement.invoices else { continue }
+            for invoice in invoices {
+                let status: InvoiceReviewStatus = invoice.reviewStatus
+                guard status == .notReviewed || status == .inReview else { continue }
+                guard seen.insert(invoice.id).inserted else { continue }
+                result.append(invoice)
+            }
+        }
+        return result
     }
 
     private struct RolloverEntry {

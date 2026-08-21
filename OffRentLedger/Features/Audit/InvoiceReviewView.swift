@@ -39,11 +39,13 @@ struct InvoiceReviewView: View {
     private var comparison: InvoiceComparison? {
         guard let invoice, let item else { return nil }
         let events = item.sortedEvents
+        let confirmedAt: Date? = events.last { $0.type == .vendorConfirmationRecorded }?.timestamp
+        let pickedUpAt: Date? = events.last { $0.type == .pickupRecorded }?.timestamp
         return InvoiceComparisonEngine.compare(
             InvoiceComparisonInput(
                 terms: item.terms,
-                confirmationDate: events.last { $0.type == .vendorConfirmationRecorded }?.timestamp,
-                pickupDate: events.last { $0.type == .pickupRecorded }?.timestamp,
+                confirmationDate: confirmedAt,
+                pickupDate: pickedUpAt,
                 invoice: invoice.value,
                 expectedRentalSubtotalOverride: invoice.expectedRentalSubtotalOverride,
                 calendar: dependencies.clock.calendar,

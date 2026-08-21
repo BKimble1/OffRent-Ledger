@@ -179,6 +179,22 @@ PROJECT_DEBUG = COMMON_WARNINGS + [
     ("ONLY_ACTIVE_ARCH", "YES"),
     ("SWIFT_ACTIVE_COMPILATION_CONDITIONS", "DEBUG $(inherited)"),
     ("SWIFT_OPTIMIZATION_LEVEL", "-Onone"),
+    # Debug-only diagnostics. When the type checker gives up on an expression it reports
+    # "unable to type-check this expression in reasonable time" as a hard error, one file at a
+    # time, so each one costs a whole CI round to find. These flags make every expression or
+    # function body over 300ms a *warning* with a file and line, so the next build lists all of
+    # them at once instead of stopping at the first. Warnings only — nothing here fails a build,
+    # and the thresholds are deliberately well under the compiler's own give-up point.
+    (
+        "OTHER_SWIFT_FLAGS",
+        [
+            "$(inherited)",
+            "-Xfrontend",
+            "-warn-long-function-bodies=300",
+            "-Xfrontend",
+            "-warn-long-expression-type-checking=300",
+        ],
+    ),
 ]
 
 PROJECT_RELEASE = COMMON_WARNINGS + [

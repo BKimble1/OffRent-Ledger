@@ -232,9 +232,18 @@ actor AppFileStore: FileStoring {
     /// Keeps a filename to a safe alphabet and prevents traversal.
     nonisolated static func sanitise(_ component: String) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_./"))
-        var cleaned = component.unicodeScalars
-            .map { allowed.contains($0) ? Character($0) : "-" }
-            .reduce(into: "") { $0.append($1) }
+        // An explicit loop, not `map { ... ? Character($0) : "-" }.reduce(into: "")`. In the
+        // chained form the type checker has to decide that the `"-"` literal is a `Character`
+        // from the other arm of a ternary, inside a closure whose result type it is also
+        // solving for — the kind of expression it can spend an unbounded amount of time on.
+        var cleaned = ""
+        for scalar in component.unicodeScalars {
+            if allowed.contains(scalar) {
+                cleaned.append(Character(scalar))
+            } else {
+                cleaned.append("-")
+            }
+        }
         while cleaned.contains("..") { cleaned = cleaned.replacingOccurrences(of: "..", with: "-") }
         while cleaned.hasPrefix("/") { cleaned.removeFirst() }
         return cleaned.isEmpty ? UUID().uuidString : cleaned

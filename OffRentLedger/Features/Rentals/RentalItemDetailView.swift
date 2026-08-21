@@ -371,9 +371,7 @@ struct RentalItemDetailView: View {
     }
 
     private func latestInvoice(for item: RentalItem) -> VendorInvoice? {
-        (item.agreement?.invoices ?? [])
-            .filter { $0.primaryItemID == nil || $0.primaryItemID == item.id }
-            .max(by: { $0.attachedAt < $1.attachedAt })
+        item.latestInvoice
     }
 }
 

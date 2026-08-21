@@ -131,12 +131,16 @@ extension InvoiceLine {
 
 extension VendorInvoice {
     var value: InvoiceValue {
-        InvoiceValue(
+        let stored: [InvoiceLine] = lines ?? []
+        let orderedLines: [InvoiceLineValue] = stored
+            .sorted { $0.sortIndex < $1.sortIndex }
+            .map(\.value)
+        return InvoiceValue(
             id: id,
             invoiceNumber: invoiceNumber,
             receivedDate: receivedDate,
             billedThroughDate: billedThroughDate,
-            lines: (lines ?? []).sorted { $0.sortIndex < $1.sortIndex }.map(\.value),
+            lines: orderedLines,
             invoiceTotal: invoiceTotal,
             reviewStatus: reviewStatus,
             notes: notes
