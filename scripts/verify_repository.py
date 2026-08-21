@@ -360,6 +360,28 @@ def check_tests_import_foundation() -> None:
                 fail("test-imports", f"{relative} does not import Foundation")
 
 
+def check_decimal_parsing_pins_the_locale() -> None:
+    check("Every Decimal built from a string pins en_US_POSIX")
+    # `Decimal(string:)` and `Decimal(string:locale:)` are not the same function. With no locale
+    # the string is read through whatever locale the *device* is set to, so "285.00" on a device
+    # set to German is 28500 — a rate card off by a factor of a hundred, from a line that reads
+    # correctly. `MoneyMath.parse` pins en_US_POSIX on the path a user's typing takes; nothing
+    # else may take a different one, fixtures and placeholders included.
+    pattern = re.compile(r"Decimal\(\s*string:\s*([^)]*)\)")
+    for path in swift_files(APP_SOURCES, SHARED_SOURCES, WIDGET_SOURCES, *TESTS):
+        source = without_comments(path.read_text())
+        relative = path.relative_to(ROOT).as_posix()
+        for match in pattern.finditer(source):
+            if "locale:" in match.group(1):
+                continue
+            line = source[: match.start()].count("\n") + 1
+            fail(
+                "money-locale",
+                f"{relative}:{line} builds a Decimal from a string without a locale; "
+                "use MoneyMath.parse, or pass locale: Locale(identifier: \"en_US_POSIX\")",
+            )
+
+
 def check_no_unsafe_unwraps() -> None:
     check("No force-try or force-cast on production paths")
     for path in swift_files(APP_SOURCES, SHARED_SOURCES, WIDGET_SOURCES):
@@ -991,6 +1013,7 @@ def main() -> int:
         check_display_name_is_centralised,
         check_app_intents_metadata_is_literal,
         check_tests_import_foundation,
+        check_decimal_parsing_pins_the_locale,
         check_no_unsafe_unwraps,
         check_fatal_error_is_confined,
         check_no_print,

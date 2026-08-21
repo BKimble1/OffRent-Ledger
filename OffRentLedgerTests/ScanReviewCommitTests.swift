@@ -59,8 +59,9 @@ struct ScanReviewCommitTests {
         model.selection.insert(.dailyRate)
         model.edits[.dailyRate] = "310.00"
 
+        // `.money` takes a `Decimal`, and `Decimal(string:)` returns `Decimal?`.
         let accepted = model.acceptedValues()
-        #expect(accepted[.dailyRate] == .money(Decimal(string: "310.00")))
+        #expect(accepted[.dailyRate] == .money(money("310.00")))
     }
 
     @Test func untickedFieldsAreNotAccepted() async throws {

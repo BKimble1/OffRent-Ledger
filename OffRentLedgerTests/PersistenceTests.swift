@@ -36,12 +36,12 @@ struct PersistenceTests {
         var terms = item.terms
         terms.billingBasis = .weekly
         terms.nextRolloverDate = clock.now
-        terms.expectedNextIncrement = Decimal(string: "985.00")
+        terms.expectedNextIncrement = money("985.00")
         item.terms = terms
 
         #expect(item.billingBasisRaw == "weekly")
         #expect(item.terms.billingBasis == .weekly)
-        #expect(item.terms.expectedNextIncrement == Decimal(string: "985.00"))
+        #expect(item.terms.expectedNextIncrement == money("985.00"))
     }
 
     @Test func anUnknownStatusRawDegradesRatherThanCrashing() throws {

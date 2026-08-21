@@ -64,7 +64,8 @@ struct RentalSummarySnapshot: Codable, Sendable, Equatable {
             generatedAt: now,
             openItemCount: 3,
             accruingItemCount: 2,
-            estimatedRentRunning: Decimal(string: "1284.50") ?? .zero,
+            estimatedRentRunning: Decimal(string: "1284.50", locale: Locale(identifier: "en_US_POSIX"))
+                ?? .zero,
             awaitingPickupCount: 1,
             invoicesAwaitingReviewCount: 1,
             nextRateChangeDate: now.addingTimeInterval(60 * 60 * 36)

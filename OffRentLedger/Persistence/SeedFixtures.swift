@@ -77,14 +77,14 @@ enum SeedFixtures {
             terms: RentalTerms(
                 deliveryDate: delivery,
                 rateCard: RateCard(
-                    daily: Decimal(string: "285.00"),
-                    weekly: Decimal(string: "985.00"),
-                    fourWeek: Decimal(string: "2450.00")
+                    daily: MoneyMath.parse("285.00"),
+                    weekly: MoneyMath.parse("985.00"),
+                    fourWeek: MoneyMath.parse("2450.00")
                 ),
                 billingBasis: .daily,
                 rolloverMode: .manual,
                 nextRolloverDate: clock.calendar.addingDaysPreservingTimeOfDay(7, to: delivery),
-                expectedNextIncrement: Decimal(string: "285.00"),
+                expectedNextIncrement: MoneyMath.parse("285.00"),
                 includedUsageNotes: "8 hrs/day, 40 hrs/week included. Excess billed at 1/8 of day rate."
             ),
             meterUnit: .hours,
