@@ -51,9 +51,13 @@ struct RentalsView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Rentals")
         .accessibilityIdentifier(A11yID.Rentals.root)
+        .navigationTitle("Rentals")
         .searchable(text: $search, prompt: "Equipment, vendor, jobsite or agreement")
+        // The identifier goes on the searchable container: `.searchable` builds the field
+        // itself, so there is no view for the test to address without this.
+        .accessibilityIdentifier(A11yID.Rentals.searchField)
+        .searchPresentationToolbarBehavior(.avoidHidingContent)
         .navigationDestination(for: RentalDestination.self) { destination in
             switch destination {
             case let .item(id): RentalItemDetailView(itemID: id)

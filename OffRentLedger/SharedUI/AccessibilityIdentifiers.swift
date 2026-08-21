@@ -25,8 +25,9 @@ enum A11yID {
     }
 
     enum Rentals {
+        /// The List itself is the screen root here, so there is one identifier rather
+        /// than a `root` and a `list` addressing the same view.
         static let root = "rentals.root"
-        static let list = "rentals.list"
         static let addRental = "rentals.addRental"
         static let searchField = "rentals.search"
         static let filterMenu = "rentals.filterMenu"

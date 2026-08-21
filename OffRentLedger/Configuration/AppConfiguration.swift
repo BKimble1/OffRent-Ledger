@@ -10,9 +10,12 @@ enum AppConfiguration {
 
     // MARK: - Identity
 
-    static let displayName = "OffRent Ledger"
-    static let companyName = "Idlery Services LLC"
-    static let companyShortName = "Idlery"
+    /// Re-exported from `SharedBranding` so app code has one obvious place to reach for it.
+    /// The literal itself lives in `OffRentShared/SharedBranding.swift`, which the widget
+    /// and the portable domain package can also see.
+    static let displayName = SharedBranding.displayName
+    static let companyName = SharedBranding.companyName
+    static let companyShortName = SharedBranding.companyShortName
 
     /// Shown once, in About. The product is OffRent Ledger; the company is a footnote, not a
     /// co-brand running through the workflow.

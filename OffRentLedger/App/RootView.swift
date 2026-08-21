@@ -38,9 +38,13 @@ struct RootView: View {
         }
         .task { await prepare() }
         .onChange(of: scenePhase) { _, phase in
-            // Refreshed on foreground because an estimate is a function of "now": a phone left in
-            // a truck overnight comes back showing yesterday's figure otherwise.
-            if phase == .active { Task { await refresh() } }
+            guard phase == .active else { return }
+            // An App Intent is constructed outside the SwiftUI environment, so it parks its
+            // destination in IntentRouter and this picks it up once the app is on screen.
+            if let pending = IntentRouter.shared.consume() { router.handle(pending) }
+            // Estimates are a function of "now": a phone left in a truck overnight comes back
+            // showing yesterday's figure unless this runs.
+            Task { await refresh() }
         }
     }
 
@@ -92,6 +96,7 @@ struct RootView: View {
         try? context.save()
 
         publishSnapshot(items: items)
+        publishIntentIndex(items: items)
         await rescheduleReminders(items: items)
     }
 
@@ -115,6 +120,21 @@ struct RootView: View {
             SnapshotBuilder.build(
                 items: inputs, now: dependencies.clock.now, calendar: dependencies.clock.calendar
             )
+        )
+    }
+
+    /// Publishes the open-item list Shortcuts picks from. Machine and vendor only.
+    private func publishIntentIndex(items: [RentalItem]) {
+        let open = items.filter(\.status.isOpen)
+        guard !open.isEmpty else { return IntentItemIndex.clear() }
+        IntentItemIndex.publish(
+            open.map {
+                IntentItemIndex.Entry(
+                    id: $0.id,
+                    equipmentName: $0.equipmentName,
+                    vendorName: $0.agreement?.vendor?.name ?? "Rental company"
+                )
+            }
         )
     }
 

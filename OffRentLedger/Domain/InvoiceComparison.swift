@@ -214,7 +214,7 @@ enum InvoiceComparisonEngine {
             expected = nil
             basis = """
                 No \(input.terms.billingBasis.shortName) rate is confirmed for this item, so \
-                OffRent Ledger cannot form an expected rental amount. Review the invoice against \
+                \(SharedBranding.displayName) cannot form an expected rental amount. Review the invoice against \
                 your contract directly.
                 """
         }

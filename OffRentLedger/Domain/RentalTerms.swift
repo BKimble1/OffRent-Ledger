@@ -129,9 +129,9 @@ enum RolloverMode: String, CaseIterable, Codable, Sendable {
     var explanation: String {
         switch self {
         case .manual:
-            "OffRent Ledger will not guess when your rate changes. You enter the next change date and what it adds."
+            "\(SharedBranding.displayName) will not guess when your rate changes. You enter the next change date and what it adds."
         case .simpleSchedule:
-            "OffRent Ledger projects the next change at a fixed interval from delivery. You can confirm or override every one."
+            "\(SharedBranding.displayName) projects the next change at a fixed interval from delivery. You can confirm or override every one."
         }
     }
 }

@@ -584,7 +584,9 @@ enum OffRentSchemaV1: VersionedSchema {
         var invoicedAmount: Decimal?
         var difference: Decimal?
         var explanation: String = ""
-        var statusRaw: String = DiscrepancyStatus.open.rawValue
+        /// Named distinctly from RentalItemModel.statusRaw so that the "only the workflow
+        /// service assigns rental status" invariant can be checked without ambiguity.
+        var discrepancyStatusRaw: String = DiscrepancyStatus.open.rawValue
         var resolutionNotes: String?
         var createdAt: Date = Date()
         var resolvedAt: Date?
@@ -614,7 +616,7 @@ enum OffRentSchemaV1: VersionedSchema {
             self.invoicedAmount = invoicedAmount
             self.difference = difference
             self.explanation = explanation
-            self.statusRaw = status.rawValue
+            self.discrepancyStatusRaw = status.rawValue
             self.resolutionNotes = resolutionNotes
             self.createdAt = createdAt
             self.resolvedAt = resolvedAt
@@ -622,7 +624,7 @@ enum OffRentSchemaV1: VersionedSchema {
         }
 
         var type: DiscrepancyType { DiscrepancyType(rawValue: typeRaw) ?? .rentalSubtotalDiffers }
-        var status: DiscrepancyStatus { DiscrepancyStatus(rawValue: statusRaw) ?? .open }
+        var status: DiscrepancyStatus { DiscrepancyStatus(rawValue: discrepancyStatusRaw) ?? .open }
     }
 }
 

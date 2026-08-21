@@ -206,7 +206,7 @@ enum ReminderPlanner {
             return make(
                 kind: kind, context: context, fireDate: fire,
                 title: "No confirmation recorded for \(context.equipmentName)",
-                body: "You marked this done. OffRent Ledger does not contact the rental company — call the vendor and record its confirmation number.",
+                body: "You marked this done. \(SharedBranding.displayName) does not contact the rental company — call the vendor and record its confirmation number.",
                 link: .recordConfirmation(itemID: context.itemID)
             )
 

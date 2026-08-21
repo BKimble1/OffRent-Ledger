@@ -300,7 +300,7 @@ struct ProGate<Content: View>: View {
             }
             .buttonStyle(.plain)
             .minimumTapTarget()
-            .accessibilityHint("\(feature.displayName) is part of OffRent Ledger Pro. Opens the subscription options.")
+            .accessibilityHint("\(feature.displayName) is part of \(AppConfiguration.displayName) Pro. Opens the subscription options.")
         }
     }
 }

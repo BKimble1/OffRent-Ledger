@@ -77,10 +77,10 @@ enum BackupImportFailure: Error, Sendable, Equatable {
     var message: String {
         switch self {
         case .notJSON:
-            "That file is not an OffRent Ledger backup."
+            "That file is not an \(SharedBranding.displayName) backup."
         case let .unsupportedFormatVersion(found, supported):
             found > supported
-                ? "That backup was written by a newer version of OffRent Ledger (format \(found)). Update the app and try again."
+                ? "That backup was written by a newer version of \(SharedBranding.displayName) (format \(found)). Update the app and try again."
                 : "That backup uses an old format (\(found)) this version cannot read."
         case let .corrupt(detail):
             "That backup could not be read: \(detail)"

@@ -335,7 +335,7 @@ final class DeepLinkTests: XCTestCase {
 
     func testForeignSchemesAreRejected() {
         XCTAssertNil(DeepLink(url: URL(string: "https://example.com/today")!))
-        XCTAssertNil(DeepLink(url: URL(string: "corecredit://today")!))
+        XCTAssertNil(DeepLink(url: URL(string: "someotherapp://today")!))
     }
 
     func testUnknownHostsAndMalformedIdentifiersAreRejected() {

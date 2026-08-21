@@ -120,7 +120,7 @@ enum EntitlementBlock: Error, Sendable, Equatable {
                 ? "The free plan tracks one open rental at a time. Resolve or archive the one you have, or subscribe to Pro for unlimited open rentals."
                 : "The free plan tracks \(limit) open rentals at a time. Resolve or archive one, or subscribe to Pro."
         case let .featureRequiresPro(feature):
-            "\(feature.displayName) is part of OffRent Ledger Pro."
+            "\(feature.displayName) is part of \(SharedBranding.displayName) Pro."
         }
     }
 }

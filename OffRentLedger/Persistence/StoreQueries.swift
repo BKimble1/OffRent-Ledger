@@ -88,7 +88,7 @@ enum StoreQueries {
     static func openDiscrepancies() -> FetchDescriptor<Discrepancy> {
         let open = [DiscrepancyStatus.open.rawValue, DiscrepancyStatus.followUpRecorded.rawValue]
         return FetchDescriptor<Discrepancy>(
-            predicate: #Predicate { open.contains($0.statusRaw) },
+            predicate: #Predicate { open.contains($0.discrepancyStatusRaw) },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
     }

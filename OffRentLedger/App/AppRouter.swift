@@ -159,7 +159,7 @@ enum PaywallReason: String, Hashable {
         case .widget: "The widget is part of Pro"
         case .advancedReminders: "These reminders are part of Pro"
         case .historyExport: "Full history export is part of Pro"
-        case .settings: "OffRent Ledger Pro"
+        case .settings: "\(AppConfiguration.displayName) Pro"
         }
     }
 }
