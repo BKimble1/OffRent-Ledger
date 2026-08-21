@@ -61,7 +61,7 @@ struct AuditView: View {
                     title: "No invoices yet",
                     message: """
                         When a final invoice arrives, attach it to the rental it belongs to. \
-X
+                        \(AppConfiguration.displayName) will lay it out next to the terms you \
                         confirmed so you can see anything worth a second look.
                         """
                 )

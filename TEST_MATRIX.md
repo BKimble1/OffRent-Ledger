@@ -46,7 +46,7 @@ not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SW
 
 | Check | Result |
 |---|---|
-| `python3 scripts/verify_repository.py` | ✅ 31 invariant checks, 0 problems |
+| `python3 scripts/verify_repository.py` | ✅ 32 invariant checks, 0 problems |
 | `python3 scripts/check_swift_call_sites.py` | ✅ 91 types with initialisers and 117 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
@@ -54,6 +54,7 @@ not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SW
 | YAML parse of `codemagic.yaml` | ✅ valid; asserts no automatic App Store submission, and no `auth: integration` without a named integration |
 | plist / entitlements / .storekit / .xcscheme / asset-catalog JSON parse | ✅ all valid |
 | Swift delimiter balance across every source file | ✅ balanced |
+| Multi-line string indentation (Swift's own rule, on the targets `swift test` cannot compile) | ✅ clean |
 
 ### What the call-site checker is, and is not
 

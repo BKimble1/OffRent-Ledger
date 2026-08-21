@@ -630,6 +630,58 @@ def check_swift_delimiters_balance() -> None:
                 )
 
 
+def check_multiline_string_indentation() -> None:
+    check("Multi-line string literals satisfy Swift's indentation rule")
+    # Swift requires every line inside a `"""` literal to be indented at least as far as the
+    # closing delimiter. `swift test` enforces this for Domain and OffRentShared, which it
+    # compiles — but the app layer, the widget and the test targets are compiled only by Xcode,
+    # so nothing here checked them.
+    #
+    # This check exists because a stray `sed` in this repository's own history replaced a string
+    # continuation line with a bare `X` at column 0, and every other gate passed: it balanced,
+    # it resolved, it was inside a string so no symbol was missing. The first thing to notice was
+    # the Xcode build, forty minutes of CI later.
+    for path in swift_files(APP_SOURCES, SHARED_SOURCES, WIDGET_SOURCES, *TESTS):
+        lines = path.read_text().splitlines()
+        inside = False
+        opened_at = 0
+        body: list[tuple[int, str]] = []
+
+        for number, line in enumerate(lines, start=1):
+            if not inside:
+                # An opening delimiter ends the line; anything after it would be a single-line
+                # literal, which this rule does not apply to.
+                if line.rstrip().endswith('"""') and line.count('"""') % 2 == 1:
+                    inside = True
+                    opened_at = number
+                    body = []
+                continue
+
+            if line.strip().startswith('"""'):
+                closing_indent = len(line) - len(line.lstrip())
+                for body_number, body_line in body:
+                    if not body_line.strip():
+                        continue
+                    indent = len(body_line) - len(body_line.lstrip())
+                    if indent < closing_indent:
+                        fail(
+                            "string-indentation",
+                            f"{path.relative_to(ROOT)}:{body_number} is indented {indent}, "
+                            f"less than the closing delimiter at {closing_indent} "
+                            f"(literal opened at line {opened_at})",
+                        )
+                inside = False
+                continue
+
+            body.append((number, line))
+
+        if inside:
+            fail(
+                "string-indentation",
+                f"{path.relative_to(ROOT)}: unterminated multi-line literal opened at {opened_at}",
+            )
+
+
 def check_ocr_fixtures_exist() -> None:
     check("OCR fixtures are present and synthetic")
     folder = APP_SOURCES / "Resources" / "OCRFixtures"
@@ -747,6 +799,7 @@ def main() -> int:
         check_scheme_is_shared,
         check_file_validity,
         check_swift_delimiters_balance,
+        check_multiline_string_indentation,
         check_ocr_fixtures_exist,
         check_call_sites_resolve,
         check_codemagic_config,
