@@ -5,8 +5,14 @@ import UIKit
 import Vision
 
 /// Turns an image or a PDF into recognised text. On device, always.
+///
+/// Takes encoded image `Data`, not `UIImage`. `UIImage` is not `Sendable`, and the implementation
+/// is an actor — so handing it one is a non-Sendable value crossing an isolation boundary, which
+/// the compiler rejects. `Data` is `Sendable`, it is the form the bytes already arrive in from
+/// PhotosPicker and from disk, and it avoids carrying a decoded bitmap around: a 12MP frame is
+/// ~4 MB encoded and ~48 MB decoded, so the encoded form is the cheaper thing to move.
 protocol DocumentTextRecognizing: Sendable {
-    func recognize(images: [UIImage], source: DocumentSource) async throws -> RecognizedDocument
+    func recognize(imageData: [Data], source: DocumentSource) async throws -> RecognizedDocument
     func recognize(pdf data: Data) async throws -> RecognizedDocument
 }
 
@@ -34,20 +40,27 @@ actor VisionTextRecognizer: DocumentTextRecognizing {
     /// frame, and the memory does not.
     private let maxDimension: CGFloat = 2_400
 
-    func recognize(images: [UIImage], source: DocumentSource) async throws -> RecognizedDocument {
-        guard !images.isEmpty else { throw TextRecognitionError.noPages }
+    func recognize(imageData: [Data], source: DocumentSource) async throws -> RecognizedDocument {
+        guard !imageData.isEmpty else { throw TextRecognitionError.noPages }
 
         var lines: [String] = []
         var confidences: [Double] = []
 
-        for image in images {
+        for data in imageData {
             try Task.checkCancellation()
+            // Decoded here, inside the actor. The bitmap is created and consumed within this
+            // isolation domain and never crosses a boundary.
+            guard let image = UIImage(data: data) else {
+                throw TextRecognitionError.recognitionFailed("unreadable image data")
+            }
             let page = try recognizeOne(image.downscaled(toMaxDimension: maxDimension))
             lines.append(contentsOf: page.lines)
             confidences.append(contentsOf: page.confidences)
         }
 
-        return makeDocument(lines: lines, confidences: confidences, pageCount: images.count, source: source)
+        return makeDocument(
+            lines: lines, confidences: confidences, pageCount: imageData.count, source: source
+        )
     }
 
     func recognize(pdf data: Data) async throws -> RecognizedDocument {
@@ -175,7 +188,7 @@ struct StubTextRecognizer: DocumentTextRecognizing {
         )
     }
 
-    func recognize(images: [UIImage], source: DocumentSource) async throws -> RecognizedDocument {
+    func recognize(imageData: [Data], source: DocumentSource) async throws -> RecognizedDocument {
         document
     }
 

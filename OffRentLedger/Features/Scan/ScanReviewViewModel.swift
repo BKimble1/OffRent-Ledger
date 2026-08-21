@@ -36,7 +36,11 @@ final class ScanReviewViewModel {
     let kind: DocumentKind
     private let recognizer: any DocumentTextRecognizing
     private let calendar: Calendar
-    private var task: Task<Void, Never>?
+
+    /// `@ObservationIgnored` because the in-flight task is not UI state — and, more to the point,
+    /// because `@Observable` turns an unmarked stored property into a computed one, which cannot
+    /// be touched from a `deinit` on a `@MainActor` type.
+    @ObservationIgnored private var task: Task<Void, Never>?
 
     init(kind: DocumentKind, recognizer: any DocumentTextRecognizing, calendar: Calendar) {
         self.kind = kind
@@ -44,12 +48,14 @@ final class ScanReviewViewModel {
         self.calendar = calendar
     }
 
-    deinit { task?.cancel() }
+    // No `deinit { task?.cancel() }`. `deinit` is nonisolated, this type is `@MainActor`, and
+    // reaching isolated state from there does not compile. `ScanReviewView` cancels in
+    // `.onDisappear`, which is also the moment that actually matters: the sheet closing.
 
     // MARK: - Pipeline
 
-    func recognise(images: [UIImage], source: DocumentSource) {
-        run { [recognizer] in try await recognizer.recognize(images: images, source: source) }
+    func recognise(imageData: [Data], source: DocumentSource) {
+        run { [recognizer] in try await recognizer.recognize(imageData: imageData, source: source) }
     }
 
     func recognise(pdf data: Data) {

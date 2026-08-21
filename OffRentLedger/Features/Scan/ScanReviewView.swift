@@ -44,6 +44,10 @@ struct ScanReviewView: View {
             }
             .navigationTitle("Check what was read")
             .navigationBarTitleDisplayMode(.inline)
+            // Replaces what used to be the view model's `deinit`. This is the better hook anyway:
+            // it fires when the sheet closes, whichever way the user closed it, rather than
+            // whenever the object happens to be released.
+            .onDisappear { model.cancel() }
             .accessibilityIdentifier(A11yID.Scan.reviewRoot)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

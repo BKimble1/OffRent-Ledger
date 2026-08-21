@@ -9,7 +9,9 @@ protocol FileStoring: Sendable {
     var evidenceRoot: URL { get }
 
     func url(forRelativePath path: String) -> URL
-    func writeImage(_ image: UIImage, ownerFolder: String, basename: String) async throws -> StoredFile
+    /// Takes encoded image `Data` rather than a `UIImage`: the store is an actor and `UIImage`
+    /// is not `Sendable`, so a bitmap cannot cross into it. Decoding happens inside.
+    func writeImage(_ imageData: Data, ownerFolder: String, basename: String) async throws -> StoredFile
     func writeData(_ data: Data, ownerFolder: String, filename: String) async throws -> StoredFile
     func delete(relativePath: String) async
     /// Removes any file under the evidence root that no record refers to.
@@ -68,8 +70,11 @@ actor AppFileStore: FileStoring {
     // MARK: - Writing
 
     func writeImage(
-        _ image: UIImage, ownerFolder: String, basename: String
+        _ imageData: Data, ownerFolder: String, basename: String
     ) async throws -> StoredFile {
+        guard let image = UIImage(data: imageData) else {
+            throw FileStoreError.couldNotEncodeImage
+        }
         // Downscaled before encoding. A 12MP camera frame is ~4 MB of JPEG and decodes to ~48 MB
         // in memory; a hundred of them in a scrolling list is how an app gets jettisoned.
         let scaled = image.downscaled(toMaxDimension: AppConfiguration.evidenceImageMaxDimension)

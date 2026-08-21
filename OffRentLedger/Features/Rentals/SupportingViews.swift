@@ -441,9 +441,9 @@ struct EvidenceManagerView: View {
         }
         .fullScreenCover(isPresented: $showingCamera) {
             DocumentScannerView(
-                onFinish: { images in
+                onFinish: { pages in
                     showingCamera = false
-                    Task { await save(images: images) }
+                    Task { await save(imageData: pages) }
                 },
                 onCancel: { showingCamera = false },
                 onError: { _ in showingCamera = false }
@@ -455,24 +455,26 @@ struct EvidenceManagerView: View {
     private func importPhotos(_ selected: [PhotosPickerItem]) async {
         isImporting = true
         defer { isImporting = false; photoItems = [] }
-        var images: [UIImage] = []
+        var pages: [Data] = []
         for item in selected {
-            guard let data = try? await item.loadTransferable(type: Data.self),
-                  let image = UIImage(data: data) else { continue }
-            images.append(image)
+            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            pages.append(data)
         }
-        await save(images: images)
+        await save(imageData: pages)
     }
 
-    private func save(images: [UIImage]) async {
-        guard let item = items.first, !images.isEmpty else { return }
+    /// Takes encoded data, not bitmaps: `AppFileStore` is an actor and `UIImage` is not
+    /// `Sendable`. The picker hands back data anyway, so decoding here only to re-encode inside
+    /// the store was wasted work as well as an illegal crossing.
+    private func save(imageData: [Data]) async {
+        guard let item = items.first, !imageData.isEmpty else { return }
         isImporting = true
         defer { isImporting = false }
 
-        for (index, image) in images.enumerated() {
+        for (index, data) in imageData.enumerated() {
             let basename = "\(Int(dependencies.clock.now.timeIntervalSince1970))-\(index)"
             guard let stored = try? await dependencies.fileStore.writeImage(
-                image, ownerFolder: item.id.uuidString, basename: basename
+                data, ownerFolder: item.id.uuidString, basename: basename
             ) else { continue }
 
             let asset = EvidenceAsset(
@@ -487,7 +489,7 @@ struct EvidenceManagerView: View {
             context.insert(asset)
         }
         RentalWorkflowService(context: context, clock: dependencies.clock)
-            .append(event: .conditionCaptured, to: item, detail: "\(images.count) photo(s) attached.")
+            .append(event: .conditionCaptured, to: item, detail: "\(imageData.count) photo(s) attached.")
         try? context.save()
     }
 

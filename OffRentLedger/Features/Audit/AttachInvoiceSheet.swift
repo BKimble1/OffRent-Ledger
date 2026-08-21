@@ -154,9 +154,9 @@ struct AttachInvoiceSheet: View {
             }
             .fullScreenCover(isPresented: $showingCamera) {
                 DocumentScannerView(
-                    onFinish: { images in
+                    onFinish: { pages in
                         showingCamera = false
-                        startScan { $0.recognise(images: images, source: .documentCamera) }
+                        startScan { $0.recognise(imageData: pages, source: .documentCamera) }
                     },
                     onCancel: { showingCamera = false },
                     onError: { error in
@@ -184,12 +184,11 @@ struct AttachInvoiceSheet: View {
                 guard let newItem else { return }
                 Task {
                     defer { photoItem = nil }
-                    guard let data = try? await newItem.loadTransferable(type: Data.self),
-                          let image = UIImage(data: data) else {
+                    guard let data = try? await newItem.loadTransferable(type: Data.self) else {
                         scanError = "That photo could not be read."
                         return
                     }
-                    startScan { $0.recognise(images: [image], source: .photoLibrary) }
+                    startScan { $0.recognise(imageData: [data], source: .photoLibrary) }
                 }
             }
             .alert(

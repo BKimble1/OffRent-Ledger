@@ -22,7 +22,7 @@ struct ScanReviewCommitTests {
         let before = try context.fetch(StoreQueries.allItems()).count
 
         var model: ScanReviewViewModel? = makeModel()
-        model?.recognise(images: [], source: .documentCamera)
+        model?.recognise(imageData: [], source: .documentCamera)
         try await Task.sleep(for: .milliseconds(200))
         model = nil
 
@@ -40,7 +40,7 @@ struct ScanReviewCommitTests {
 
     @Test func onlyConfidentSuggestionsArrivePreselected() async throws {
         let model = makeModel()
-        model.recognise(images: [], source: .documentCamera)
+        model.recognise(imageData: [], source: .documentCamera)
         try await Task.sleep(for: .milliseconds(200))
 
         #expect(model.phase == .reviewing)
@@ -52,7 +52,7 @@ struct ScanReviewCommitTests {
 
     @Test func acceptedValuesReflectUserEditsRatherThanTheParsedValue() async throws {
         let model = makeModel()
-        model.recognise(images: [], source: .documentCamera)
+        model.recognise(imageData: [], source: .documentCamera)
         try await Task.sleep(for: .milliseconds(200))
 
         model.selection.insert(.dailyRate)
@@ -64,7 +64,7 @@ struct ScanReviewCommitTests {
 
     @Test func untickedFieldsAreNotAccepted() async throws {
         let model = makeModel()
-        model.recognise(images: [], source: .documentCamera)
+        model.recognise(imageData: [], source: .documentCamera)
         try await Task.sleep(for: .milliseconds(200))
 
         model.selection.removeAll()
@@ -73,7 +73,7 @@ struct ScanReviewCommitTests {
 
     @Test func anEditThatCannotBeParsedIsDroppedRatherThanSavedAsGarbage() async throws {
         let model = makeModel()
-        model.recognise(images: [], source: .documentCamera)
+        model.recognise(imageData: [], source: .documentCamera)
         try await Task.sleep(for: .milliseconds(200))
 
         model.selection.insert(.dailyRate)
@@ -83,8 +83,8 @@ struct ScanReviewCommitTests {
 
     @Test func aSecondScanCancelsTheFirst() async throws {
         let model = makeModel()
-        model.recognise(images: [], source: .documentCamera)
-        model.recognise(images: [], source: .photoLibrary)
+        model.recognise(imageData: [], source: .documentCamera)
+        model.recognise(imageData: [], source: .photoLibrary)
         try await Task.sleep(for: .milliseconds(250))
         #expect(model.phase == .reviewing)
     }

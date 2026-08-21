@@ -120,7 +120,9 @@ final class StoreKitSubscriptionService: SubscriptionProviding {
         self.entitlement = Self.loadCachedEntitlement(from: defaults) ?? .free
     }
 
-    deinit { updatesTask?.cancel() }
+    // No `deinit`. `deinit` is nonisolated and this type is `@MainActor`, so it cannot touch
+    // isolated state. Nothing is lost: the service is owned by `AppDependencies`, which lives for
+    // the process, so the transaction listener is meant to run for the app's lifetime anyway.
 
     // MARK: - Lifecycle
 

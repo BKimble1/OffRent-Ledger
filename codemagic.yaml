@@ -70,6 +70,8 @@ workflows:
       - name: Build app and widget for the simulator
         script: |
           set -o pipefail
+          STATUS=0
+          LOG="$CM_BUILD_DIR/xcodebuild.log"
           xcodebuild clean build \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -77,7 +79,12 @@ workflows:
             -sdk iphonesimulator \
             -destination "generic/platform=iOS Simulator" \
             CODE_SIGNING_ALLOWED=NO \
-            | tee "$CM_BUILD_DIR/xcodebuild.log"
+            | tee "$LOG" || STATUS=$?
+          # Summarise on failure too. Without this a failed build ends with pages of clang
+          # invocations and the `error:` lines are thousands of lines up, out of the CI view —
+          # which is exactly what happened on the first two runs of this workflow.
+          bash scripts/ci/summarize_test_log.sh "$LOG"
+          exit $STATUS
 
       - name: Unit tests
         script: |
@@ -195,6 +202,8 @@ workflows:
       - name: Release configuration build (simulator, unsigned)
         script: |
           set -o pipefail
+          STATUS=0
+          LOG="$CM_BUILD_DIR/xcodebuild-release.log"
           xcodebuild clean build \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -202,7 +211,9 @@ workflows:
             -sdk iphonesimulator \
             -destination "generic/platform=iOS Simulator" \
             CODE_SIGNING_ALLOWED=NO \
-            | tee "$CM_BUILD_DIR/xcodebuild-release.log"
+            | tee "$LOG" || STATUS=$?
+          bash scripts/ci/summarize_test_log.sh "$LOG"
+          if [ "$STATUS" != "0" ]; then exit $STATUS; fi
           echo ""
           echo "NOTE: that was a Release-configuration SIMULATOR build."
           echo "It is not an archive, it is not signed, and it is not a TestFlight candidate."

@@ -101,9 +101,9 @@ struct AddRentalView: View {
             }
             .fullScreenCover(isPresented: $showingCamera) {
                 DocumentScannerView(
-                    onFinish: { images in
+                    onFinish: { pages in
                         showingCamera = false
-                        startScan { $0.recognise(images: images, source: .documentCamera) }
+                        startScan { $0.recognise(imageData: pages, source: .documentCamera) }
                     },
                     onCancel: { showingCamera = false },
                     onError: { error in
@@ -324,12 +324,14 @@ struct AddRentalView: View {
 
     private func handlePhoto(_ item: PhotosPickerItem) async {
         defer { photoItem = nil }
-        guard let data = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage(data: data) else {
+        // The picker already hands back encoded data, which is exactly what the recogniser wants.
+        // Decoding to a UIImage here only to re-encode downstream was wasted work as well as a
+        // non-Sendable value crossing into an actor.
+        guard let data = try? await item.loadTransferable(type: Data.self) else {
             scanError = "That photo could not be read."
             return
         }
-        startScan { $0.recognise(images: [image], source: .photoLibrary) }
+        startScan { $0.recognise(imageData: [data], source: .photoLibrary) }
     }
 
     private func handleFileImport(_ result: Result<[URL], Error>) {

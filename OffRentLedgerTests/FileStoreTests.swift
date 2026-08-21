@@ -16,17 +16,20 @@ struct FileStoreTests {
         )
     }
 
-    private func makeImage(_ size: CGSize) -> UIImage {
-        UIGraphicsImageRenderer(size: size).image { context in
+    /// Returns encoded JPEG data, because that is what the store takes: it is an actor, and
+    /// `UIImage` is not `Sendable`.
+    private func makeImageData(_ size: CGSize) -> Data {
+        let image = UIGraphicsImageRenderer(size: size).image { context in
             UIColor.orange.setFill()
             context.fill(CGRect(origin: .zero, size: size))
         }
+        return image.jpegData(compressionQuality: 1.0) ?? Data()
     }
 
     @Test func writingAnImageProducesAFileAThumbnailAndADigest() async throws {
         let store = makeStore()
         let stored = try await store.writeImage(
-            makeImage(CGSize(width: 3_000, height: 2_000)), ownerFolder: "item", basename: "meter"
+            makeImageData(CGSize(width: 3_000, height: 2_000)), ownerFolder: "item", basename: "meter"
         )
         #expect(stored.relativePath == "item/meter.jpg")
         #expect(stored.thumbnailRelativePath == "item/meter-thumb.jpg")
@@ -39,7 +42,7 @@ struct FileStoreTests {
         // app gets jettisoned by the OS.
         let store = makeStore()
         let stored = try await store.writeImage(
-            makeImage(CGSize(width: 4_032, height: 3_024)), ownerFolder: "item", basename: "big"
+            makeImageData(CGSize(width: 4_032, height: 3_024)), ownerFolder: "item", basename: "big"
         )
         let data = try #require(try? Data(contentsOf: store.url(forRelativePath: stored.relativePath)))
         let image = try #require(UIImage(data: data))
@@ -50,8 +53,8 @@ struct FileStoreTests {
         // The direction that matters. Removing something a record still points at turns a
         // tidy-up into data loss.
         let store = makeStore()
-        let kept = try await store.writeImage(makeImage(CGSize(width: 100, height: 100)), ownerFolder: "a", basename: "kept")
-        let orphan = try await store.writeImage(makeImage(CGSize(width: 100, height: 100)), ownerFolder: "a", basename: "orphan")
+        let kept = try await store.writeImage(makeImageData(CGSize(width: 100, height: 100)), ownerFolder: "a", basename: "kept")
+        let orphan = try await store.writeImage(makeImageData(CGSize(width: 100, height: 100)), ownerFolder: "a", basename: "orphan")
 
         let removed = await store.reconcile(referencedPaths: [kept.relativePath])
 
@@ -63,7 +66,7 @@ struct FileStoreTests {
     @Test func reconcileKeepsTheThumbnailOfAReferencedFile() async throws {
         let store = makeStore()
         let stored = try await store.writeImage(
-            makeImage(CGSize(width: 400, height: 400)), ownerFolder: "a", basename: "photo"
+            makeImageData(CGSize(width: 400, height: 400)), ownerFolder: "a", basename: "photo"
         )
         let removed = await store.reconcile(referencedPaths: [stored.relativePath])
         #expect(removed.isEmpty, "a thumbnail whose original is referenced is itself referenced")
@@ -81,7 +84,7 @@ struct FileStoreTests {
 
     @Test func deletingAllEvidenceLeavesNothingBehind() async throws {
         let store = makeStore()
-        _ = try await store.writeImage(makeImage(CGSize(width: 60, height: 60)), ownerFolder: "a", basename: "one")
+        _ = try await store.writeImage(makeImageData(CGSize(width: 60, height: 60)), ownerFolder: "a", basename: "one")
         #expect(await store.totalBytesOnDisk() > 0)
 
         try await store.deleteAllEvidence()

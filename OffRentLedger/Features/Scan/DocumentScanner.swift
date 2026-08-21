@@ -9,7 +9,9 @@ import VisionKit
 /// without one.
 struct DocumentScannerView: UIViewControllerRepresentable {
 
-    let onFinish: ([UIImage]) -> Void
+    /// Hands back encoded JPEG data, not `UIImage`. Everything downstream — the recogniser and
+    /// the file store — is an actor, and a bitmap cannot cross into one.
+    let onFinish: ([Data]) -> Void
     let onCancel: () -> Void
     let onError: (Error) -> Void
 
@@ -25,17 +27,22 @@ struct DocumentScannerView: UIViewControllerRepresentable {
         Coordinator(onFinish: onFinish, onCancel: onCancel, onError: onError)
     }
 
+    /// Quality for the scanned page handed downstream. High, because this is the input to text
+    /// recognition: JPEG artefacts around 8pt invoice type cost real accuracy, and the file store
+    /// re-encodes at its own quality afterwards anyway.
+    static let scanEncodingQuality: CGFloat = 0.95
+
     /// Whether the document camera is available at all. The simulator has no camera, and a UI
     /// test must be able to reach the review sheet without one.
     static var isSupported: Bool { VNDocumentCameraViewController.isSupported }
 
     final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
-        let onFinish: ([UIImage]) -> Void
+        let onFinish: ([Data]) -> Void
         let onCancel: () -> Void
         let onError: (Error) -> Void
 
         init(
-            onFinish: @escaping ([UIImage]) -> Void,
+            onFinish: @escaping ([Data]) -> Void,
             onCancel: @escaping () -> Void,
             onError: @escaping (Error) -> Void
         ) {
@@ -48,8 +55,10 @@ struct DocumentScannerView: UIViewControllerRepresentable {
             _ controller: VNDocumentCameraViewController,
             didFinishWith scan: VNDocumentCameraScan
         ) {
-            let images = (0..<scan.pageCount).map { scan.imageOfPage(at: $0) }
-            onFinish(images)
+            let pages = (0..<scan.pageCount).compactMap {
+                scan.imageOfPage(at: $0).jpegData(compressionQuality: DocumentScannerView.scanEncodingQuality)
+            }
+            onFinish(pages)
         }
 
         func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
