@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support · OffRent Ledger</title>
+<meta name="description" content="Support for OffRent Ledger.">
+<style>
+:root {
+  color-scheme: light dark;
+  --ink: #1a1c22;
+  --muted: #5b6270;
+  --bg: #fbfaf7;
+  --card: #ffffff;
+  --accent: #d86616;
+  --rule: #e3e0d9;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #eceef2; --muted: #a2aab8; --bg: #16181c;
+    --card: #1e2126; --accent: #f28a36; --rule: #313640;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 0;
+  background: var(--bg); color: var(--ink);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.wrap { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+header { border-bottom: 1px solid var(--rule); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+.mark { display: flex; align-items: center; gap: .65rem; }
+.mark svg { width: 34px; height: 34px; flex: none; }
+.mark strong { font-size: 1.1rem; letter-spacing: -0.01em; }
+.mark span { color: var(--muted); font-size: .85rem; }
+nav { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 1.1rem; font-size: .9rem; }
+nav a { color: var(--accent); text-decoration: none; }
+nav a:hover { text-decoration: underline; }
+h1 { font-size: 1.75rem; letter-spacing: -0.02em; margin: 0 0 .5rem; }
+h2 { font-size: 1.15rem; margin: 2.2rem 0 .6rem; letter-spacing: -0.01em; }
+h3 { font-size: 1rem; margin: 1.5rem 0 .4rem; }
+p, li { color: var(--ink); }
+ul { padding-left: 1.2rem; }
+li { margin: .3rem 0; }
+strong { font-weight: 650; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.5rem 0; }
+.note {
+  background: var(--card); border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px; padding: 1rem 1.15rem; margin: 1.5rem 0;
+}
+.note p { margin: 0; }
+footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: .85rem; }
+footer a { color: var(--accent); }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="mark">
+    <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M30 6 H70 L94 30 V70 L70 94 H30 L6 70 V30 Z" fill="none" stroke="var(--accent)" stroke-width="11" stroke-linejoin="round"/><circle cx="50" cy="55" r="6" fill="var(--ink)"/><path d="M50 55 L70 34" stroke="var(--ink)" stroke-width="8" stroke-linecap="round"/></svg>
+    <div>
+      <strong>OffRent Ledger</strong><br>
+      <span>Idlery Services LLC</span>
+    </div>
+  </div>
+  <nav>
+    <a href="./">Overview</a>
+    <a href="./privacy.html">Privacy</a>
+    <a href="./terms.html">Terms</a>
+    <a href="./support.html">Support</a>
+  </nav>
+</header>
+
+<h1>Support</h1>
+<p>Email <a href="mailto:support@idlery.com">support@idlery.com</a>. OffRent Ledger collects no diagnostics
+of its own, so please describe what you were doing and what happened.</p>
+
+<h2>Does OffRent Ledger contact my rental company?</h2>
+<p>No. It never has. It helps you record what you did, reminds you to get a confirmation number,
+and keeps the evidence together. Calling the yard is still your job.</p>
+
+<h2>Are the amounts what I owe?</h2>
+<p>No. They are estimates built from the rates and dates you entered. Your invoice and your rental
+agreement are what count.</p>
+
+<h2>Does a possible mismatch mean I was overcharged?</h2>
+<p>No. It means an invoice differs from the terms you told the app about. That could be the
+vendor, your entry, or a term the app cannot see.</p>
+
+<h2>Where is my data?</h2>
+<p>On your iPhone. There is no account and no server. Export from Settings before deleting the app
+— we hold no copy and cannot recover anything for you.</p>
+
+<h2>What happens if I cancel Pro?</h2>
+<p>Nothing you have is removed or hidden. You keep editing, resolving, exporting and deleting
+everything. You just cannot open a new rental beyond the free limit.</p>
+
+<footer>
+  <p>OffRent Ledger is a record-keeping tool. It does not contact rental companies and does not end
+  rentals.</p>
+  <p>Idlery Services LLC · <a href="mailto:support@idlery.com">support@idlery.com</a></p>
+</footer>
+</div>
+</body>
+</html>

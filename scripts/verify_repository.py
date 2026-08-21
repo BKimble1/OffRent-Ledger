@@ -474,6 +474,26 @@ def check_accessibility_identifiers_are_used() -> None:
             fail("a11y-unused", f"A11yID …{name} is declared but never set on a view")
 
 
+def check_ui_test_identifiers_match() -> None:
+    check("The UI suite's identifier copy matches the app's")
+    # The UI test target drives the app as a black box and cannot @testable import it, so it
+    # keeps its own copy of the identifier strings. Without this check a rename in the app turns
+    # into a UI test that times out looking for an element that no longer has that identifier —
+    # a failure that reads like a broken feature rather than a stale constant.
+    def literals(path: pathlib.Path) -> set[str]:
+        return set(re.findall(r'static let \w+ = "([^"]+)"', path.read_text()))
+
+    app = literals(APP_SOURCES / "SharedUI" / "AccessibilityIdentifiers.swift")
+    ui = literals(ROOT / "OffRentLedgerUITests" / "A11yUI.swift")
+
+    missing = ui - app
+    if missing:
+        fail(
+            "a11y-drift",
+            f"the UI suite expects identifiers the app does not declare: {sorted(missing)}",
+        )
+
+
 def check_no_colour_only_status() -> None:
     check("Status is never communicated by colour alone")
     chip = (APP_SOURCES / "SharedUI" / "Components.swift").read_text()
@@ -622,6 +642,7 @@ def main() -> int:
         check_privacy_posture,
         check_legal_urls_not_claimed_live,
         check_accessibility_identifiers_are_used,
+        check_ui_test_identifiers_match,
         check_no_colour_only_status,
         check_generated_project_is_current,
         check_pbxproj_integrity,

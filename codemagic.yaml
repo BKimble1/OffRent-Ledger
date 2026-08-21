@@ -1,0 +1,312 @@
+# OffRent Ledger — Codemagic workflows.
+#
+# Four workflows, separated by what they cost and by what they are allowed to do:
+#
+#   offrent-fast-verify   Every push and pull request. Repository invariants, portable domain
+#                         tests, simulator build, unit tests. Signs nothing, publishes nothing.
+#   offrent-targeted-ui   Manual. The critical UI scenarios only, named individually so that
+#                         adding a slow test later cannot silently turn this into the full suite.
+#   offrent-full-release  Manual. Everything, plus a Release-configuration build. Publishes
+#                         nothing, and says out loud that a simulator build is not an archive.
+#   offrent-testflight    Manual. The only workflow that signs and uploads. It refuses to start
+#                         until the credentials and App Store Connect records actually exist.
+#
+# No secret appears in this file. Every credential is a Codemagic environment group.
+#
+# The shared shell lives in scripts/ci/ rather than in YAML anchors: a discovery snippet with an
+# embedded interpreter inside a block scalar is a quoting trap, and a file can be run and linted.
+
+workflows:
+
+  # ---------------------------------------------------------------------------------------------
+  offrent-fast-verify:
+    name: OffRent Ledger — Fast verification
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+
+    # A gate that only runs when somebody remembers to press it is not a gate.
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: '*'
+          include: true
+          source: true
+      cancel_previous_builds: true
+
+    environment:
+      xcode: latest
+      vars:
+        XCODE_SCHEME: OffRentLedger
+        XCODE_PROJECT: OffRentLedger.xcodeproj
+
+    scripts:
+      # First, because it costs seconds and catches the class of mistake that would otherwise be
+      # found twenty minutes later by a failing UI test, or not at all: a drifted accessibility
+      # identifier, a hardcoded product name, a placeholder legal URL marked live, a rental status
+      # assigned outside the workflow service, a phrase claiming the app contacted a vendor.
+      - name: Repository invariants
+        script: python3 scripts/verify_repository.py
+
+      # The portable layer carries the money, the dates, the state machine and the parsers, and it
+      # needs no simulator. It runs before anything slow so that a broken rate engine fails in
+      # thirty seconds rather than in twenty minutes.
+      - name: Portable domain tests
+        script: |
+          set -o pipefail
+          swift test --package-path . 2>&1 | tee "$CM_BUILD_DIR/swift-test.log"
+
+      - name: Generated artefacts are current
+        script: |
+          python3 scripts/generate_xcodeproj.py --check
+          swift run --package-path . offrent-docgen . --check
+
+      - name: Show the project Xcode sees
+        script: xcodebuild -list -project "$XCODE_PROJECT"
+
+      # Building the app scheme also builds the widget: the app depends on it and embeds the
+      # .appex, so a widget compile error fails this step.
+      - name: Build app and widget for the simulator
+        script: |
+          set -o pipefail
+          xcodebuild clean build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee "$CM_BUILD_DIR/xcodebuild.log"
+
+      - name: Unit tests
+        script: |
+          set -o pipefail
+          STATUS=0
+          LOG="$CM_BUILD_DIR/xcodebuild-tests.log"
+          # `generic/platform=iOS Simulator` is a build-only destination and cannot run a bundle.
+          DEVICE_ID=$(bash scripts/ci/find_simulator.sh)
+          echo "Running on simulator $DEVICE_ID"
+          xcodebuild test \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$DEVICE_ID" \
+            -only-testing:OffRentLedgerTests \
+            -resultBundlePath "$CM_BUILD_DIR/OffRentLedgerTests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee "$LOG" || STATUS=$?
+          bash scripts/ci/summarize_test_log.sh "$LOG"
+          exit $STATUS
+
+    artifacts:
+      - $CM_BUILD_DIR/*.log
+      - $CM_BUILD_DIR/*.xcresult
+
+  # ---------------------------------------------------------------------------------------------
+  offrent-targeted-ui:
+    name: OffRent Ledger — Targeted UI tests (manual)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      xcode: latest
+      vars:
+        XCODE_SCHEME: OffRentLedger
+        XCODE_PROJECT: OffRentLedger.xcodeproj
+
+    scripts:
+      - name: Repository invariants
+        script: python3 scripts/verify_repository.py
+
+      - name: Critical UI scenarios
+        script: |
+          set -o pipefail
+          STATUS=0
+          LOG="$CM_BUILD_DIR/xcodebuild-uitests.log"
+          DEVICE_ID=$(bash scripts/ci/find_simulator.sh)
+          echo "Running on simulator $DEVICE_ID"
+          # Named class by class, on purpose. `-only-testing:OffRentLedgerUITests` would quietly
+          # absorb every future test, and this workflow's whole value is that it stays short.
+          xcodebuild test \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$DEVICE_ID" \
+            -only-testing:OffRentLedgerUITests/CoreWorkflowUITests \
+            -only-testing:OffRentLedgerUITests/MismatchUITests \
+            -only-testing:OffRentLedgerUITests/EntitlementUITests \
+            -only-testing:OffRentLedgerUITests/AccessibilityUITests \
+            -resultBundlePath "$CM_BUILD_DIR/OffRentLedgerUITests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee "$LOG" || STATUS=$?
+          bash scripts/ci/summarize_test_log.sh "$LOG"
+          exit $STATUS
+
+    artifacts:
+      - $CM_BUILD_DIR/*.log
+      - $CM_BUILD_DIR/*.xcresult
+
+  # ---------------------------------------------------------------------------------------------
+  offrent-full-release:
+    name: OffRent Ledger — Full pre-release gate (manual, publishes nothing)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      xcode: latest
+      vars:
+        XCODE_SCHEME: OffRentLedger
+        XCODE_PROJECT: OffRentLedger.xcodeproj
+
+    scripts:
+      - name: Repository invariants
+        script: python3 scripts/verify_repository.py
+
+      - name: Portable domain tests
+        script: |
+          set -o pipefail
+          swift test --package-path .
+
+      - name: Full simulator suite
+        script: |
+          set -o pipefail
+          STATUS=0
+          LOG="$CM_BUILD_DIR/xcodebuild-all.log"
+          DEVICE_ID=$(bash scripts/ci/find_simulator.sh)
+          xcodebuild test \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$DEVICE_ID" \
+            -resultBundlePath "$CM_BUILD_DIR/All.xcresult" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee "$LOG" || STATUS=$?
+          bash scripts/ci/summarize_test_log.sh "$LOG"
+          exit $STATUS
+
+      # A Release *simulator* build. It compiles with optimisation and the Release build settings,
+      # which catches the errors a Debug build hides. It is explicitly not an archive: reporting
+      # "the release build passed" on the strength of a simulator build is the exact
+      # misrepresentation this step's closing message exists to prevent.
+      - name: Release configuration build (simulator, unsigned)
+        script: |
+          set -o pipefail
+          xcodebuild clean build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee "$CM_BUILD_DIR/xcodebuild-release.log"
+          echo ""
+          echo "NOTE: that was a Release-configuration SIMULATOR build."
+          echo "It is not an archive, it is not signed, and it is not a TestFlight candidate."
+          echo "See RELEASE_CHECKLIST.md sections 3 and 4."
+
+    artifacts:
+      - $CM_BUILD_DIR/*.log
+      - $CM_BUILD_DIR/*.xcresult
+
+  # ---------------------------------------------------------------------------------------------
+  offrent-testflight:
+    name: OffRent Ledger — TestFlight archive (manual, PUBLISHES)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      xcode: latest
+      groups:
+        # Both groups must exist in Codemagic before this workflow can run. Nothing is stored here.
+        #   offrent_appstore  → APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER,
+        #                       APP_STORE_CONNECT_PRIVATE_KEY, APP_APPLE_ID
+        #   offrent_signing   → CERTIFICATE_PRIVATE_KEY
+        - offrent_appstore
+        - offrent_signing
+      vars:
+        XCODE_SCHEME: OffRentLedger
+        XCODE_PROJECT: OffRentLedger.xcodeproj
+        BUNDLE_ID: com.idlery.offrent
+        WIDGET_BUNDLE_ID: com.idlery.offrent.widget
+
+    scripts:
+      # Refuses to start rather than failing two thirds of the way through with a signing error
+      # that reads like a code problem.
+      - name: Preflight — credentials and records must already exist
+        script: |
+          missing=0
+          for name in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER \
+                      APP_STORE_CONNECT_PRIVATE_KEY CERTIFICATE_PRIVATE_KEY APP_APPLE_ID; do
+            eval "value=\${$name:-}"
+            if [ -z "$value" ]; then
+              echo "MISSING: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            echo ""
+            echo "This workflow signs and uploads. It will not run until the App Store Connect"
+            echo "API key and the signing certificate exist in Codemagic, and until the app"
+            echo "record and both App IDs have been created in App Store Connect:"
+            echo ""
+            echo "  com.idlery.offrent          (App Groups capability)"
+            echo "  com.idlery.offrent.widget   (App Groups capability)"
+            echo "  group.com.idlery.offrent"
+            echo ""
+            echo "See RELEASE_CHECKLIST.md section 3. Nothing here creates them."
+            exit 1
+          fi
+          echo "Credentials present."
+
+      - name: Repository invariants
+        script: python3 scripts/verify_repository.py
+
+      - name: Portable domain tests
+        script: swift test --package-path .
+
+      # The widget needs its own profile. Fetching only the app's is the classic way an archive
+      # succeeds locally and then fails at export with an unhelpful message.
+      - name: Fetch signing files for the app and the widget
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          app-store-connect fetch-signing-files "$WIDGET_BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain initialize
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Set the build number from App Store Connect
+        script: |
+          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_APPLE_ID" 2>/dev/null || echo 0)
+          NEXT=$((LATEST + 1))
+          echo "Building $NEXT"
+          agvtool new-version -all "$NEXT"
+
+      - name: Archive
+        script: |
+          set -o pipefail
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME" \
+            --config Release \
+            | tee "$CM_BUILD_DIR/xcodebuild-archive.log"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $CM_BUILD_DIR/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # Deliberately absent: `submit_to_app_store`. Submission is a human decision and this
+        # repository does not make it.
+        #
+        # Also deliberately absent: any internal-testing-only restriction. A build limited that
+        # way cannot later be selected for App Store review, and that is discovered at the worst
+        # possible moment.
+        beta_groups: []
