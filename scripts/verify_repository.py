@@ -682,6 +682,40 @@ def check_multiline_string_indentation() -> None:
             )
 
 
+def check_app_icon() -> None:
+    check("The app icon meets Apple's marketing-icon requirements")
+    # Both of these are outright App Store rejections, and both are invisible until upload:
+    # a marketing icon that is not exactly 1024x1024, or one carrying an alpha channel.
+    import struct
+
+    icon = (
+        APP_SOURCES / "Resources" / "Assets.xcassets" / "AppIcon.appiconset" / "AppIcon-1024.png"
+    )
+    if not icon.exists():
+        fail("app-icon", "AppIcon-1024.png is missing")
+        return
+
+    data = icon.read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        fail("app-icon", "AppIcon-1024.png is not a PNG")
+        return
+
+    width, height, _, colour_type = struct.unpack(">IIBB", data[16:26])
+    if (width, height) != (1024, 1024):
+        fail("app-icon", f"the icon is {width}x{height}; Apple requires exactly 1024x1024")
+    if colour_type in (4, 6):
+        fail("app-icon", "the icon has an alpha channel, which the App Store rejects")
+
+    master = ROOT / "marketing" / "AppIcon" / "OffRentLedger-AppIcon-master.png"
+    if not master.exists():
+        fail("app-icon", "the master artwork is missing from marketing/AppIcon/")
+
+    # The generator must never overwrite real artwork again.
+    generator = (ROOT / "scripts" / "generate_assets.py").read_text()
+    if "AppIcon-1024.png" in generator and "write_png" in generator:
+        fail("app-icon", "generate_assets.py can still draw over the app icon")
+
+
 def check_ocr_fixtures_exist() -> None:
     check("OCR fixtures are present and synthetic")
     folder = APP_SOURCES / "Resources" / "OCRFixtures"
@@ -800,6 +834,7 @@ def main() -> int:
         check_file_validity,
         check_swift_delimiters_balance,
         check_multiline_string_indentation,
+        check_app_icon,
         check_ocr_fixtures_exist,
         check_call_sites_resolve,
         check_codemagic_config,

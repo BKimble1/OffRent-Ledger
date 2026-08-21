@@ -43,7 +43,7 @@ have; the environment just made the cost of getting it wrong visible.
 
 ```
 swift test                                   # 163 tests, ~0.5s
-python3 scripts/verify_repository.py         # 32 repository invariants
+python3 scripts/verify_repository.py         # 33 repository invariants
 python3 scripts/check_swift_call_sites.py    # every call site vs. its declaration
 ```
 
