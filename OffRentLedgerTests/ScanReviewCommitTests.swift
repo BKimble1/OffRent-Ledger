@@ -24,7 +24,7 @@ struct ScanReviewCommitTests {
 
         var model: ScanReviewViewModel? = makeModel()
         model?.recognise(imageData: [], source: .documentCamera)
-        try await Task.sleep(for: .milliseconds(200))
+        await model?.awaitPendingWork()
         model = nil
 
         #expect(try context.fetch(StoreQueries.allItems()).count == before)
@@ -42,7 +42,7 @@ struct ScanReviewCommitTests {
     @Test func onlyConfidentSuggestionsArrivePreselected() async throws {
         let model = makeModel()
         model.recognise(imageData: [], source: .documentCamera)
-        try await Task.sleep(for: .milliseconds(200))
+        await model.awaitPendingWork()
 
         #expect(model.phase == .reviewing)
         for field in model.selection {
@@ -54,7 +54,7 @@ struct ScanReviewCommitTests {
     @Test func acceptedValuesReflectUserEditsRatherThanTheParsedValue() async throws {
         let model = makeModel()
         model.recognise(imageData: [], source: .documentCamera)
-        try await Task.sleep(for: .milliseconds(200))
+        await model.awaitPendingWork()
 
         model.selection.insert(.dailyRate)
         model.edits[.dailyRate] = "310.00"
@@ -67,7 +67,7 @@ struct ScanReviewCommitTests {
     @Test func untickedFieldsAreNotAccepted() async throws {
         let model = makeModel()
         model.recognise(imageData: [], source: .documentCamera)
-        try await Task.sleep(for: .milliseconds(200))
+        await model.awaitPendingWork()
 
         model.selection.removeAll()
         #expect(model.acceptedValues().isEmpty)
@@ -76,7 +76,7 @@ struct ScanReviewCommitTests {
     @Test func anEditThatCannotBeParsedIsDroppedRatherThanSavedAsGarbage() async throws {
         let model = makeModel()
         model.recognise(imageData: [], source: .documentCamera)
-        try await Task.sleep(for: .milliseconds(200))
+        await model.awaitPendingWork()
 
         model.selection.insert(.dailyRate)
         model.edits[.dailyRate] = "not a number"
@@ -87,7 +87,7 @@ struct ScanReviewCommitTests {
         let model = makeModel()
         model.recognise(imageData: [], source: .documentCamera)
         model.recognise(imageData: [], source: .photoLibrary)
-        try await Task.sleep(for: .milliseconds(250))
+        await model.awaitPendingWork()
         #expect(model.phase == .reviewing)
     }
 }

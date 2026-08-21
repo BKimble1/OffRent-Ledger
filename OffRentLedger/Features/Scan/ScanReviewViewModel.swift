@@ -94,6 +94,21 @@ final class ScanReviewViewModel {
         phase = .idle
     }
 
+    /// Awaits the in-flight recognition, if there is one.
+    ///
+    /// The view never needs this: it observes `phase` and redraws when the pipeline finishes.
+    /// A test has no observer, so without this it can only sleep for a plausible interval and
+    /// hope — and that is exactly how `ScanReviewCommitTests` failed. Six `Task.sleep(200ms)`
+    /// calls passed on an idle CI machine and failed on a loaded one, reporting four different
+    /// symptoms that were all one thing: the assertion ran before the work finished.
+    ///
+    /// Awaiting the task is deterministic. It returns when the work is done, however long the
+    /// machine takes to do it.
+    func awaitPendingWork() async {
+        guard let task else { return }
+        await task.value
+    }
+
     private static func message(for error: Error) -> String {
         switch error {
         case TextRecognitionError.noPages:

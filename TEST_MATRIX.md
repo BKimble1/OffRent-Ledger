@@ -52,7 +52,7 @@ not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SW
 
 | Check | Result |
 |---|---|
-| `python3 scripts/verify_repository.py` | ✅ 39 invariant checks, 0 problems |
+| `python3 scripts/verify_repository.py` | ✅ 40 invariant checks, 0 problems |
 | `python3 scripts/check_swift_call_sites.py` | ✅ 91 types with initialisers and 117 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
@@ -107,15 +107,18 @@ Run by `offrent-fast-verify` step 7, `xcodebuild test -only-testing:OffRentLedge
 the iOS 26.4 simulator. These need SwiftData, UIKit, UserNotifications and a bundle, so this
 machine cannot run them; CI can.
 
-**First run: 45 tests, 44 passed, 1 failed.** The one failure was real, and is the reason this
-section exists at all — see below.
+**Run 1: 45 tests, 44 passed, 1 failed** — a real defect in the file store (below).
+**Run 2: 45 tests, 41 passed, 4 failed** — the file-store fix held, and four tests that had
+passed in run 1 failed in run 2 without any change to the code they cover. They waited on the
+clock rather than on the condition; run 2's machine was slower (309s vs 200s for the same step)
+and 200ms was no longer enough. Also below.
 
 | Suite | Tests | Result | Covers |
 |---|---:|---|---|
 | `PersistenceTests` | 8 | ✅ pass | SwiftData relationships, cascade vs nullify, unknown-status degradation, archive round trip, additive import |
 | `WorkflowServiceTests` | 8 | ✅ pass | Accrual stops on done and backdates to the vendor's time; refused transitions write no event; reopen restarts accrual; estimate cache |
 | `FileStoreTests` | 7 | ⚠️ 6 pass, 1 failed | Downscaling, digests, **reconcile never removes a referenced file**, path traversal refused |
-| `ScanReviewCommitTests` | 7 | ✅ pass | **Running the whole scan pipeline and discarding it writes nothing** |
+| `ScanReviewCommitTests` | 7 | ⚠️ run 1 pass, run 2 flaked | **Running the whole scan pipeline and discarding it writes nothing** |
 | `EntitlementBehaviourTests` | 4 | ✅ pass | Free limit against a real store; resolving frees the slot; lapsed Pro keeps everything working |
 | `NotificationSchedulerTests` | 5 | ✅ pass | Add/cancel diffing; no authorisation request from synchronising |
 | `CopyTests` + `FixtureParityTests` | 6 | ✅ pass | Required copy present, banned copy absent, stub matches the committed fixture |
@@ -137,6 +140,26 @@ checks the destination as well as the directory.
 The point worth keeping: this defect survived a code review, a call-site checker and 163 passing
 tests. It was in the one layer nothing here could execute, and it stayed there until something
 finally executed it.
+
+### The second failure, and why it is not a flake
+
+Run 2 reported four failures in `ScanReviewCommitTests`, in tests that had passed in run 1
+against identical code. Two said the phase was `.recognising` where `.reviewing` was expected;
+two said an accepted value was `.text("310.00")` where `.money(310)` was expected.
+
+All four were one cause. The tests started recognition, slept 200ms, and asserted. Recognition
+runs in a `Task`; when it has not finished, `result` is nil, so `suggestion(for:)` returns nil
+and `acceptedValues()` falls through to its no-suggestion branch — which is exactly `.text`. Run
+2's machine was slower, Swift Testing runs suites in parallel, and 200ms stopped being enough.
+
+Calling that a flake and re-running would have been the wrong call twice over: it is a real
+defect in the tests, and a test that fails when the machine is busy rather than when the code is
+wrong trains everybody to ignore it. `ScanReviewViewModel` now exposes `awaitPendingWork()`, the
+six sleeps are gone, and a repository check fails any `Task.sleep` in a test target.
+
+Worth recording: the *product* invariant held throughout. `apply(scanned:)` matches on
+`(field, value)` pairs, so a `.text` value for a money field hits `default: break` and is
+discarded. The tests were wrong about when to look, not about what the app does.
 
 **Not yet observed:** the re-run. The fix is verified by `SafePathTests` and by compiling and
 running the real sanitiser standalone against the failing inputs; the simulator suite has not

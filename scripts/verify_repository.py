@@ -382,6 +382,28 @@ def check_decimal_parsing_pins_the_locale() -> None:
             )
 
 
+def check_tests_do_not_sleep_for_a_result() -> None:
+    check("No test waits on the clock for an async result")
+    # `Task.sleep` in a test is a guess about how fast the machine is. Six of them in
+    # ScanReviewCommitTests passed on an idle CI machine and failed on a loaded one, reporting
+    # four different symptoms that were all the same thing: the assertion ran before the work
+    # finished. A test that sleeps does not fail when the code is wrong — it fails when the
+    # machine is busy, which is worse than useless, because it trains everybody to re-run it.
+    #
+    # The fix is an awaitable completion point on the type under test, not a longer sleep.
+    for directory in TESTS:
+        for path in swift_files(directory):
+            source = without_comments(path.read_text())
+            relative = path.relative_to(ROOT).as_posix()
+            for match in re.finditer(r"Task\.sleep", source):
+                line = source[: match.start()].count("\n") + 1
+                fail(
+                    "test-sleep",
+                    f"{relative}:{line} sleeps instead of awaiting; a sleep is a guess about "
+                    "how fast the machine is, and it fails on the machine that is busy",
+                )
+
+
 def check_no_unsafe_unwraps() -> None:
     check("No force-try or force-cast on production paths")
     for path in swift_files(APP_SOURCES, SHARED_SOURCES, WIDGET_SOURCES):
@@ -1013,6 +1035,7 @@ def main() -> int:
         check_display_name_is_centralised,
         check_app_intents_metadata_is_literal,
         check_tests_import_foundation,
+        check_tests_do_not_sleep_for_a_result,
         check_decimal_parsing_pins_the_locale,
         check_no_unsafe_unwraps,
         check_fatal_error_is_confined,
