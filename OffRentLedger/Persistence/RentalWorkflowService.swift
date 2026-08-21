@@ -213,6 +213,9 @@ struct RentalWorkflowService {
     ///
     /// Free-tier enforcement happens in the caller, before this is reached, so that the block is
     /// reported with a paywall rather than as a failed save.
+    /// `@discardableResult`: the tests assert on the item they get back, the add-rental screen
+    /// only needs it to have been written.
+    @discardableResult
     func createItem(
         equipmentName: String,
         equipmentClass: String?,

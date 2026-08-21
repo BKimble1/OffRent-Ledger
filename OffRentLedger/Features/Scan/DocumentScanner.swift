@@ -30,7 +30,14 @@ struct DocumentScannerView: UIViewControllerRepresentable {
     /// Quality for the scanned page handed downstream. High, because this is the input to text
     /// recognition: JPEG artefacts around 8pt invoice type cost real accuracy, and the file store
     /// re-encodes at its own quality afterwards anyway.
-    static let scanEncodingQuality: CGFloat = 0.95
+    ///
+    /// `nonisolated` because `UIViewControllerRepresentable` is `@MainActor`, which isolates this
+    /// constant to the main actor by inheritance — and its only reader is the VisionKit delegate
+    /// callback on `Coordinator`, which is not. An immutable `CGFloat` has no isolation to
+    /// protect, so opting it out is the honest fix; the alternative, claiming the delegate is
+    /// main-actor isolated, would be asserting something about VisionKit that is not in its
+    /// signature.
+    nonisolated static let scanEncodingQuality: CGFloat = 0.95
 
     /// Whether the document camera is available at all. The simulator has no camera, and a UI
     /// test must be able to reach the review sheet without one.

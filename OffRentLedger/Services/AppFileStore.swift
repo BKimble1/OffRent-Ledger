@@ -158,7 +158,12 @@ actor AppFileStore: FileStoring {
         var removed: [String] = []
         let rootPath = evidenceRoot.standardizedFileURL.path
 
-        for case let fileURL as URL in enumerator {
+        // `while let ... = enumerator.nextObject()` rather than `for case let ... in`:
+        // `NSEnumerator.makeIterator()` is unavailable from an asynchronous context (it is
+        // an error in the Swift 6 language mode), because a `for-in` over it would block the
+        // cooperative thread inside the iterator. `nextObject()` is the supported form.
+        while let entry = enumerator.nextObject() {
+            guard let fileURL = entry as? URL else { continue }
             guard (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true
             else { continue }
 
@@ -196,7 +201,12 @@ actor AppFileStore: FileStoring {
         ) else { return [] }
         let rootPath = evidenceRoot.standardizedFileURL.path
         var paths: Set<String> = []
-        for case let fileURL as URL in enumerator {
+        // `while let ... = enumerator.nextObject()` rather than `for case let ... in`:
+        // `NSEnumerator.makeIterator()` is unavailable from an asynchronous context (it is
+        // an error in the Swift 6 language mode), because a `for-in` over it would block the
+        // cooperative thread inside the iterator. `nextObject()` is the supported form.
+        while let entry = enumerator.nextObject() {
+            guard let fileURL = entry as? URL else { continue }
             guard (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true
             else { continue }
             var relative = String(fileURL.standardizedFileURL.path.dropFirst(rootPath.count))
@@ -211,7 +221,12 @@ actor AppFileStore: FileStoring {
             at: evidenceRoot, includingPropertiesForKeys: [.fileSizeKey]
         ) else { return 0 }
         var total: Int64 = 0
-        for case let fileURL as URL in enumerator {
+        // `while let ... = enumerator.nextObject()` rather than `for case let ... in`:
+        // `NSEnumerator.makeIterator()` is unavailable from an asynchronous context (it is
+        // an error in the Swift 6 language mode), because a `for-in` over it would block the
+        // cooperative thread inside the iterator. `nextObject()` is the supported form.
+        while let entry = enumerator.nextObject() {
+            guard let fileURL = entry as? URL else { continue }
             let size = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
             total += Int64(size)
         }

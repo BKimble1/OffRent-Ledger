@@ -145,20 +145,36 @@ final class RecordingNotificationScheduler: NotificationScheduling, @unchecked S
 
     func authorizationStatus() async -> UNAuthorizationStatus { status }
 
-    func requestAuthorization() async -> Bool {
+    // Each `async` requirement below is a thin wrapper over a *synchronous* locked helper.
+    //
+    // `NSLock.lock()` is unavailable from an asynchronous context — an error in the Swift 6
+    // language mode — precisely because taking a lock in an `async` function invites holding it
+    // across a suspension point, which deadlocks the cooperative pool. Doing the locked work in
+    // a synchronous function makes that structurally impossible: there is no `await` that could
+    // be added between the `lock()` and the `defer`.
+
+    func requestAuthorization() async -> Bool { recordAuthorizationRequest() }
+
+    private func recordAuthorizationRequest() -> Bool {
         lock.lock(); defer { lock.unlock() }
         authorizationRequestCount += 1
         status = .authorized
         return true
     }
 
-    func pendingIdentifiers() async -> Set<String> {
+    func pendingIdentifiers() async -> Set<String> { currentPending() }
+
+    private func currentPending() -> Set<String> {
         lock.lock(); defer { lock.unlock() }
         return pending
     }
 
     @discardableResult
     func synchronise(to planned: [PlannedReminder]) async -> ScheduleOutcome {
+        record(plan: planned)
+    }
+
+    private func record(plan planned: [PlannedReminder]) -> ScheduleOutcome {
         lock.lock(); defer { lock.unlock() }
         lastPlan = planned
         guard status == .authorized else { pending = []; return .empty }
@@ -173,7 +189,9 @@ final class RecordingNotificationScheduler: NotificationScheduling, @unchecked S
         return outcome
     }
 
-    func cancelAll() async {
+    func cancelAll() async { clearPending() }
+
+    private func clearPending() {
         lock.lock(); defer { lock.unlock() }
         pending = []
     }
