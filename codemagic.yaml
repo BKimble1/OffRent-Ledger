@@ -229,118 +229,70 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m2
 
+    # Reuse the same team-level App Store Connect integration that already signs and publishes
+    # CoreCredit. The integration is not app-specific; OffRent keeps its own identifiers below.
+    integrations:
+      app_store_connect: "CoreCredit App Store"
+
     environment:
-      xcode: latest
-      groups:
-        # Both groups must exist in Codemagic before this workflow can run. Nothing is stored here.
-        #   offrent_appstore  → APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER,
-        #                       APP_STORE_CONNECT_PRIVATE_KEY, APP_APPLE_ID
-        #   offrent_signing   → CERTIFICATE_PRIVATE_KEY
-        - offrent_appstore
-        - offrent_signing
+      xcode: 26.4
+      # Codemagic-managed App Store signing. The main bundle identifier also matches the widget
+      # prefix; the explicit widget fetch below guarantees its extension profile is installed.
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.idlery.offrent
       vars:
         XCODE_SCHEME: OffRentLedger
         XCODE_PROJECT: OffRentLedger.xcodeproj
         BUNDLE_ID: com.idlery.offrent
         WIDGET_BUNDLE_ID: com.idlery.offrent.widget
+        APP_STORE_APPLE_ID: "6804070266"
 
     scripts:
-      # Refuses to start rather than failing two thirds of the way through with a signing error
-      # that reads like a code problem.
-      - name: Preflight — credentials and records must already exist
-        script: |
-          missing=0
-          for name in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER \
-                      APP_STORE_CONNECT_PRIVATE_KEY CERTIFICATE_PRIVATE_KEY APP_APPLE_ID; do
-            eval "value=\${$name:-}"
-            if [ -z "$value" ]; then
-              echo "MISSING: $name"
-              missing=1
-            fi
-          done
-          if [ "$missing" = "1" ]; then
-            echo ""
-            echo "This workflow signs and uploads. It will not run until the App Store Connect"
-            echo "API key and the signing certificate exist in Codemagic, and until the app"
-            echo "record and both App IDs have been created in App Store Connect:"
-            echo ""
-            echo "  com.idlery.offrent          (App Groups capability)"
-            echo "  com.idlery.offrent.widget   (App Groups capability)"
-            echo "  group.com.idlery.offrent"
-            echo ""
-            echo "See RELEASE_CHECKLIST.md section 3. Nothing here creates them."
-            exit 1
-          fi
-          echo "Credentials present."
-
       - name: Repository invariants
-        script: python3 scripts/verify_repository.py
+        script: |
+          set -e
+          python3 scripts/verify_repository.py
 
       - name: Portable domain tests
-        script: swift test --package-path .
-
-      # The widget needs its own profile. Fetching only the app's is the classic way an archive
-      # succeeds locally and then fails at export with an unhelpful message.
-      - name: Fetch signing files for the app and the widget
         script: |
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
-          app-store-connect fetch-signing-files "$WIDGET_BUNDLE_ID" --type IOS_APP_STORE --create
-          keychain initialize
-          keychain add-certificates
+          set -e
+          swift test --package-path .
+
+      # Managed signing installs the distribution certificate and main app profile before scripts
+      # run. Fetch the embedded widget's separate App Store profile into that same keychain.
+      - name: Fetch the widget provisioning profile
+        script: |
+          set -e
+          app-store-connect fetch-signing-files "$WIDGET_BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+
+      - name: Apply App Store signing
+        script: |
+          set -e
           xcode-project use-profiles
 
-      - name: Set the build number from App Store Connect
+      - name: Set unique build number
         script: |
-          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_APPLE_ID" 2>/dev/null || echo 0)
-          NEXT=$((LATEST + 1))
-          echo "Building $NEXT"
-          agvtool new-version -all "$NEXT"
+          set -e
+          agvtool new-version -all "$PROJECT_BUILD_NUMBER"
 
-      - name: Archive
+      - name: Build signed IPA
         script: |
-          set -o pipefail
+          set -e
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME" \
-            --config Release \
-            | tee "$CM_BUILD_DIR/xcodebuild-archive.log"
+            --scheme "$XCODE_SCHEME"
 
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - $CM_BUILD_DIR/*.log
 
-    # NO `publishing:` BLOCK — deliberately, and this is not an oversight.
-    #
-    # `auth: integration` requires the workflow to name a configured App Store Connect
-    # integration, and Codemagic validates the *entire* file: a publishing block referring to an
-    # integration that does not exist rejects codemagic.yaml outright, which blocks
-    # `offrent-fast-verify` too. One aspirational workflow taking the whole config down with it
-    # is a bad trade, so this one archives and stops.
-    #
-    # The .ipa is in `artifacts` above, so it can be uploaded by hand in the meantime.
-    #
-    # To enable uploading, do BOTH of these together — neither works alone:
-    #
-    #   1. In Codemagic: Teams > Integrations > App Store Connect, add the API key and give the
-    #      integration a name.
-    #   2. Uncomment both stanzas below and replace <INTEGRATION_NAME> with that name.
-    #
-    # integrations:
-    #   app_store_connect: <INTEGRATION_NAME>
-    #
-    # publishing:
-    #   app_store_connect:
-    #     auth: integration
-    #     submit_to_testflight: true
-    #     # Deliberately absent even then: `submit_to_app_store`. Submission is a human
-    #     # decision and this repository does not make it.
-    #     #
-    #     # Also deliberately absent: any internal-testing-only restriction. A build limited
-    #     # that way cannot later be selected for App Store review, which is discovered at the
-    #     # worst possible moment.
-    #     beta_groups: []
-    #
-    # Codemagic reports the required path as `workflow -> integrations -> app_store_connect`.
-    # Check the current schema in Codemagic's docs before uncommenting: nothing in this
-    # repository can validate it, and the last attempt is what produced this comment.
+    # Upload the normal App Store-signed IPA to App Store Connect without automated App Review,
+    # beta-group assignment, or an internal-only export restriction. The owner manually assigns
+    # the processed build to internal TestFlight testers.
+    publishing:
+      app_store_connect:
+        auth: integration
