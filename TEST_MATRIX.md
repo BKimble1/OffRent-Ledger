@@ -46,13 +46,29 @@ not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SW
 
 | Check | Result |
 |---|---|
-| `python3 scripts/verify_repository.py` | ✅ 28 invariant checks, 0 problems |
+| `python3 scripts/verify_repository.py` | ✅ 30 invariant checks, 0 problems |
+| `python3 scripts/check_swift_call_sites.py` | ✅ 91 types with initialisers and 117 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
 | `python3 scripts/generate_website.py --check` | ✅ website matches the bundled legal Markdown |
 | YAML parse of `codemagic.yaml` | ✅ valid; asserts no automatic App Store submission |
 | plist / entitlements / .storekit / .xcscheme / asset-catalog JSON parse | ✅ all valid |
 | Swift delimiter balance across every source file | ✅ balanced |
+
+### What the call-site checker is, and is not
+
+It is the nearest thing to a type check this environment can run over the app layer. It matches
+every `Type(...)` and `Type.staticFunc(...)` against the signatures declared in this repository —
+so a stale argument label or a missing argument, the likeliest defect in never-compiled code that
+calls into a compiled library, fails the build.
+
+It says **nothing** about Apple's APIs, about whether a SwiftUI body type-checks, or about
+anything the Swift compiler would catch beyond our own API surface. It was negative-tested:
+planting a renamed label and a missing required argument makes it fail. Two of its rules were
+established by compiling fixtures with the real Swift compiler rather than by reasoning about
+Swift's memberwise-initialiser behaviour.
+
+Section 1 of `RELEASE_CHECKLIST.md` — open it in Xcode and build — remains the real gate.
 
 ### What §19 actually verified
 

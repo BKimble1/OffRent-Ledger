@@ -42,9 +42,15 @@ That is not a workaround for the environment. It is the architecture a testable 
 have; the environment just made the cost of getting it wrong visible.
 
 ```
-swift test                              # 163 tests, ~0.3s
-python3 scripts/verify_repository.py    # 28 repository invariants
+swift test                                   # 163 tests, ~0.5s
+python3 scripts/verify_repository.py         # 30 repository invariants
+python3 scripts/check_swift_call_sites.py    # every call site vs. its declaration
 ```
+
+The app layer still has no compiler anywhere in this environment. The closest substitute is
+`check_swift_call_sites.py`, which matches every `Type(...)` and `Type.staticFunc(...)` against
+the signatures declared here — 91 types, 117 static functions, zero findings. It says nothing
+about Apple's APIs. `RELEASE_CHECKLIST.md` §1 is still the real gate.
 
 ---
 
