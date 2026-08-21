@@ -1,0 +1,160 @@
+import SwiftData
+import SwiftUI
+
+struct RootView: View {
+
+    @Environment(AppDependencies.self) private var dependencies
+    @Environment(AppRouter.self) private var router
+    @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some View {
+        @Bindable var router = router
+
+        TabView(selection: $router.selectedTab) {
+            Tab(AppTab.today.title, systemImage: AppTab.today.symbolName, value: AppTab.today) {
+                NavigationStack(path: router.path(for: .today)) { TodayView() }
+            }
+            .accessibilityIdentifier(A11yID.Tab.today)
+
+            Tab(AppTab.rentals.title, systemImage: AppTab.rentals.symbolName, value: AppTab.rentals) {
+                NavigationStack(path: router.path(for: .rentals)) { RentalsView() }
+            }
+            .accessibilityIdentifier(A11yID.Tab.rentals)
+
+            Tab(AppTab.audit.title, systemImage: AppTab.audit.symbolName, value: AppTab.audit) {
+                NavigationStack(path: router.path(for: .audit)) { AuditView() }
+            }
+            .accessibilityIdentifier(A11yID.Tab.audit)
+
+            Tab(AppTab.settings.title, systemImage: AppTab.settings.symbolName, value: AppTab.settings) {
+                NavigationStack(path: router.path(for: .settings)) { SettingsView() }
+            }
+            .accessibilityIdentifier(A11yID.Tab.settings)
+        }
+        .tint(Palette.accent)
+        .sheet(item: $router.presentedSheet) { sheet in
+            sheetContent(for: sheet)
+        }
+        .task { await prepare() }
+        .onChange(of: scenePhase) { _, phase in
+            // Refreshed on foreground because an estimate is a function of "now": a phone left in
+            // a truck overnight comes back showing yesterday's figure otherwise.
+            if phase == .active { Task { await refresh() } }
+        }
+    }
+
+    @ViewBuilder
+    private func sheetContent(for sheet: AppSheet) -> some View {
+        switch sheet {
+        case .addRental:
+            AddRentalView()
+        case let .recordConfirmation(itemID):
+            RecordConfirmationSheet(itemID: itemID)
+        case let .recordPickup(itemID):
+            RecordPickupSheet(itemID: itemID)
+        case let .attachInvoice(itemID):
+            AttachInvoiceSheet(itemID: itemID)
+        case let .paywall(reason):
+            PaywallView(reason: reason)
+        }
+    }
+
+    // MARK: - Lifecycle work
+
+    private func prepare() async {
+        seedIfRequested()
+        await refresh()
+    }
+
+    private func seedIfRequested() {
+        #if DEBUG
+        let overrides = AppDependencies.testOverrides()
+        guard overrides.wantsSeeding else { return }
+        // Only ever into a store the test asked to be fresh, so a seed cannot land on top of a
+        // real user's rentals.
+        guard overrides.useInMemoryStore || overrides.resetState else { return }
+        if overrides.seedWalkthrough || overrides.seedFreeLimit {
+            SeedFixtures.seedWalkthrough(context: context, clock: dependencies.clock)
+            try? context.save()
+        }
+        #endif
+    }
+
+    /// Recomputes the cached estimates, republishes the widget snapshot and re-plans reminders.
+    ///
+    /// All three are derived state. Recomputing them from scratch on foreground and after every
+    /// mutation is what keeps them from drifting; there is no incremental path to get wrong.
+    private func refresh() async {
+        let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
+        guard let items = try? context.fetch(StoreQueries.allItems()) else { return }
+        workflow.refreshEstimates(for: items)
+        try? context.save()
+
+        publishSnapshot(items: items)
+        await rescheduleReminders(items: items)
+    }
+
+    private func publishSnapshot(items: [RentalItem]) {
+        let entitlement = dependencies.effectiveEntitlement
+        // The widget is a Pro feature, so a free user's snapshot is cleared rather than published
+        // — the widget then shows its "Pro" placeholder instead of stale real numbers.
+        guard EntitlementPolicy.isAllowed(.widget, entitlement: entitlement) else {
+            dependencies.snapshotPublisher.clear()
+            return
+        }
+        let inputs = items.map { item in
+            SnapshotItemInput(
+                status: item.status,
+                terms: item.terms,
+                hasInvoiceAwaitingReview: (item.agreement?.invoices ?? [])
+                    .contains { $0.reviewStatus == .notReviewed || $0.reviewStatus == .inReview }
+            )
+        }
+        dependencies.snapshotPublisher.publish(
+            SnapshotBuilder.build(
+                items: inputs, now: dependencies.clock.now, calendar: dependencies.clock.calendar
+            )
+        )
+    }
+
+    private func rescheduleReminders(items: [RentalItem]) async {
+        let settings = dependencies.reminderSettings
+        guard !settings.enabledKinds.isEmpty else {
+            await dependencies.notifications.cancelAll()
+            return
+        }
+        let contexts = items.map { ReminderContext(item: $0) }
+        let planned = ReminderPlanner.plan(
+            contexts: contexts,
+            settings: settings,
+            entitlement: dependencies.effectiveEntitlement,
+            now: dependencies.clock.now,
+            calendar: dependencies.clock.calendar
+        )
+        await dependencies.notifications.synchronise(to: planned)
+    }
+}
+
+extension ReminderContext {
+    /// Builds the planner's input from a stored item.
+    init(item: RentalItem) {
+        let events = item.sortedEvents
+        let invoice = (item.agreement?.invoices ?? [])
+            .filter { $0.primaryItemID == nil || $0.primaryItemID == item.id }
+            .max(by: { $0.attachedAt < $1.attachedAt })
+
+        self.init(
+            itemID: item.id,
+            equipmentName: item.equipmentName,
+            status: item.status,
+            terms: item.terms,
+            markedDoneAt: events.last { $0.type == .equipmentMarkedDone }?.timestamp,
+            confirmationRecordedAt: events.last { $0.type == .vendorConfirmationRecorded }?.timestamp,
+            pickupRecordedAt: events.last { $0.type == .pickupRecorded }?.timestamp,
+            invoiceAttachedAt: invoice?.attachedAt,
+            invoiceReviewed: invoice.map { $0.reviewStatus == .accepted || $0.reviewStatus == .followUpRecorded } ?? false,
+            disputeWindowDaysOverride: item.agreement?.disputeWindowDaysOverride
+        )
+    }
+}

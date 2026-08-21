@@ -1,0 +1,131 @@
+{
+  "identifier" : "A1B2C3D4-0000-4000-8000-0FF000000001",
+  "nonRenewingSubscriptions" : [
+  ],
+  "products" : [
+  ],
+  "settings" : {
+    "_applicationInternalID" : "0000000000",
+    "_developerTeamID" : "7GNFT94A9L",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 0,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21489001",
+      "localizations" : [
+        {
+          "description" : "Everything in OffRent Ledger, without limits.",
+          "displayName" : "OffRent Ledger Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "OffRent Ledger Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+          ],
+          "codeOffers" : [
+          ],
+          "displayPrice" : "14.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21489011",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited open rentals, invoice audit, evidence packet PDFs, the Home Screen widget, advanced reminders and full history export.",
+              "displayName" : "Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.idlery.offrent.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "OffRent Ledger Pro Monthly",
+          "subscriptionGroupID" : "21489001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+          ]
+        },
+        {
+          "adHocOffers" : [
+          ],
+          "codeOffers" : [
+          ],
+          "displayPrice" : "119.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21489012",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited open rentals, invoice audit, evidence packet PDFs, the Home Screen widget, advanced reminders and full history export. Billed once a year.",
+              "displayName" : "Pro Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.idlery.offrent.pro.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "OffRent Ledger Pro Annual",
+          "subscriptionGroupID" : "21489001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
