@@ -682,6 +682,62 @@ def check_multiline_string_indentation() -> None:
             )
 
 
+def check_swiftui_section_forms() -> None:
+    check("No Section combines a string title with a header or footer closure")
+    # `Section(_ titleKey:content:)` has no header/footer variant, so
+    # `Section("Title") { } footer: { }` does not compile — and it fails with three misleading
+    # errors ("generic parameter 'Content' could not be inferred") that point at the Section
+    # rather than at the footer. Cheap to detect, expensive to diagnose.
+    for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
+        lines = path.read_text().splitlines()
+        for index, line in enumerate(lines):
+            if not re.search(r'\bSection\(\s*"', line):
+                continue
+            depth = 0
+            for offset in range(index, min(index + 120, len(lines))):
+                depth += lines[offset].count("{") - lines[offset].count("}")
+                if offset > index and depth <= 0:
+                    break
+                if offset > index and re.match(r"\s*\}\s*(footer|header):\s*\{", lines[offset]):
+                    fail(
+                        "swiftui-section",
+                        f"{path.relative_to(ROOT)}:{index + 1} gives Section a string title and "
+                        f"a {lines[offset].strip().split(':')[0].lstrip('} ')} closure; use "
+                        "`Section { } header: { Text(...) } footer: { }`",
+                    )
+                    break
+
+
+def check_sequence_map_on_strings() -> None:
+    check("No `.map` applied to a non-optional String property")
+    # `someOptional?.name.map { ... }` where `name` is a non-optional String binds to
+    # `Sequence.map` — mapping over the characters — and yields `[String]`, not `String?`. It is
+    # visually identical to the optional-map idiom beside it. Detected by name, using the
+    # non-optional String properties this repository actually declares.
+    declarations = "\n".join(
+        p.read_text() for p in swift_files(APP_SOURCES / "Persistence", DOMAIN, SHARED_SOURCES)
+    )
+    non_optional_strings = set(
+        re.findall(r"\bvar\s+(\w+)\s*:\s*String\s*(?:=|$)", declarations, re.M)
+    ) | set(re.findall(r"\blet\s+(\w+)\s*:\s*String\s*(?:=|$)", declarations, re.M))
+    # Anything also declared as String? somewhere is ambiguous; leave those alone.
+    optional_strings = set(re.findall(r"\b(?:var|let)\s+(\w+)\s*:\s*String\?", declarations))
+    candidates = non_optional_strings - optional_strings
+    if not candidates:
+        return
+
+    pattern = re.compile(r"\.(" + "|".join(sorted(re.escape(c) for c in candidates)) + r")\.map\s*\{")
+    for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
+        source = without_comments(path.read_text())
+        for match in pattern.finditer(source):
+            line = source[: match.start()].count("\n") + 1
+            fail(
+                "sequence-map",
+                f"{path.relative_to(ROOT)}:{line} calls .map on `{match.group(1)}`, a "
+                "non-optional String — that is Sequence.map over its characters, not Optional.map",
+            )
+
+
 def check_app_icon() -> None:
     check("The app icon meets Apple's marketing-icon requirements")
     # Both of these are outright App Store rejections, and both are invisible until upload:
@@ -834,6 +890,8 @@ def main() -> int:
         check_file_validity,
         check_swift_delimiters_balance,
         check_multiline_string_indentation,
+        check_swiftui_section_forms,
+        check_sequence_map_on_strings,
         check_app_icon,
         check_ocr_fixtures_exist,
         check_call_sites_resolve,

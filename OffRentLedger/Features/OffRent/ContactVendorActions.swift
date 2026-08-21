@@ -148,21 +148,37 @@ struct ContactVendorActions: View {
         var components = URLComponents()
         components.scheme = "mailto"
         components.path = email
-        let agreement = item.agreement?.agreementNumber.map { " (agreement \($0))" } ?? ""
-        components.queryItems = [
-            URLQueryItem(name: "subject", value: "Off-rent request: \(item.equipmentName)\(agreement)"),
-            URLQueryItem(
-                name: "body",
-                value: """
-                    Please take the following equipment off rent and send a confirmation number.
+        // Built as explicit locals rather than inline in the interpolation.
+        //
+        // `jobSite?.name` is a *non-optional* String reached through an optional chain, so
+        // `.name.map { }` binds to `Sequence.map` — mapping over the characters — and yields
+        // `[String]?`, not `String?`. It reads identically to the optional-map two lines above
+        // it and means something completely different. Naming the intermediate values makes the
+        // type obvious at the declaration instead of hiding it inside a string.
+        let agreementSuffix: String =
+            item.agreement?.agreementNumber.map { " (agreement \($0))" } ?? ""
+        let unitLine: String =
+            item.vendorEquipmentIdentifier.map { "Unit: \($0)\n" } ?? ""
+        let agreementLine: String =
+            item.agreement?.agreementNumber.map { "Agreement: \($0)\n" } ?? ""
 
-                    Equipment: \(item.equipmentName)
-                    \(item.vendorEquipmentIdentifier.map { "Unit: \($0)\n" } ?? "")\
-                    \(item.agreement?.agreementNumber.map { "Agreement: \($0)\n" } ?? "")\
-                    \(item.agreement?.jobSite?.name.map { "Jobsite: \($0)\n" } ?? "")
-                    Thank you.
-                    """
+        let jobSite: JobSite? = item.agreement?.jobSite
+        let jobSiteLine: String = jobSite.map { "Jobsite: \($0.name)\n" } ?? ""
+
+        let body = """
+            Please take the following equipment off rent and send a confirmation number.
+
+            Equipment: \(item.equipmentName)
+            \(unitLine)\(agreementLine)\(jobSiteLine)
+            Thank you.
+            """
+
+        components.queryItems = [
+            URLQueryItem(
+                name: "subject",
+                value: "Off-rent request: \(item.equipmentName)\(agreementSuffix)"
             ),
+            URLQueryItem(name: "body", value: body),
         ]
         return components.url
     }

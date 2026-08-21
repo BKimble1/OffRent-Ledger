@@ -49,7 +49,10 @@ struct RecordConfirmationSheet: View {
                         .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                 }
 
-                Section("The vendor's confirmation") {
+                // `Section("Title") { } footer: { }` does not exist: the string-title
+                // initialiser is `Section(_:content:)` and has no footer variant. A header
+                // closure is the form that takes both.
+                Section {
                     TextField("Confirmation number", text: $confirmationNumber)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
@@ -78,6 +81,8 @@ struct RecordConfirmationSheet: View {
                         displayedComponents: [.date, .hourAndMinute]
                     )
                     .accessibilityIdentifier(A11yID.Confirmation.confirmedAt)
+                } header: {
+                    Text("The vendor's confirmation")
                 } footer: {
                     Text("""
                         Rent is estimated up to this moment, not up to pickup. If the vendor \

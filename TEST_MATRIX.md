@@ -46,7 +46,7 @@ not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SW
 
 | Check | Result |
 |---|---|
-| `python3 scripts/verify_repository.py` | ✅ 33 invariant checks, 0 problems |
+| `python3 scripts/verify_repository.py` | ✅ 35 invariant checks, 0 problems |
 | `python3 scripts/check_swift_call_sites.py` | ✅ 91 types with initialisers and 117 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
