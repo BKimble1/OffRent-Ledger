@@ -1,0 +1,20 @@
+# Risk register
+
+Ordered by expected damage. "Mitigation" means something in the repository actually does it.
+
+| # | Risk | Likelihood | Impact | Mitigation | Residual |
+|---|---|---|---|---|---|
+| R1 | A user believes the app told the vendor, keeps getting billed, blames the app | Medium | **Severe** (legal, reviews, refunds) | Disclosure is a required render on every Contact-Vendor screen; status cannot advance without explicit user affirmation; banned phrasing is build-enforced; `StatusTransitionTests` proves the shortcut is impossible | Copy can still be misread. Needs one real user test. |
+| R2 | The Xcode project does not open or build, because no `xcodebuild` existed to verify it | **High** | High (blocks everything) | Modelled byte-for-byte on the owner's existing working project shape; file-system-synchronized groups mean no per-file references to get wrong; `scripts/verify_repository.py` parses the pbxproj and asserts structural invariants; CI's first step is `xcodebuild -list` | **Unmitigated in substance.** First macOS run may need fixes. |
+| R3 | SwiftUI/SwiftData/StoreKit code does not compile (never type-checked) | **High** | High | Conservative, well-trodden API use only; Swift 5 language mode with `complete` concurrency checking so concurrency problems are warnings, not errors, on first build; all the hard logic lives in the layer that *was* compiled | **Unmitigated in substance.** |
+| R4 | Rate estimate is wrong across a DST boundary or a time-zone change | Medium | High (money) | Calendar-day arithmetic, never 86 400-second arithmetic; explicit spring-forward/fall-back tests that were executed | Low |
+| R5 | Money rounding drift | Low | High | `Decimal` everywhere, one rounding function, banker's rounding, executed tests including accumulation over 400 periods | Low |
+| R6 | OCR mis-parse silently corrupts a record | Medium | High | Parser cannot write; review sheet is unconditional; only ≥0.80 confidence preselected; provenance retained; `ScanReviewCommitTests` | Low by construction |
+| R7 | Entitlement loss destroys or hides user data | Low | **Severe** | `EntitlementPolicy` gates *creation only*; executed tests assert edit/resolve/delete/view all remain permitted at every entitlement state | Low |
+| R8 | Notification storm / duplicates / stale reminders after edit | Medium | Medium | `ReminderPlanner` is pure and produces a deterministic set with stable identifiers; scheduler diffs desired vs pending and cancels obsolete | Delivery itself unverified |
+| R9 | Asset orphaning or deletion of a referenced file | Medium | Medium | `reconcile(referencedPaths:)` only removes files not in the referenced set; executed test covers the dangerous direction | Low |
+| R10 | Migration breaks an existing store | Medium | High | Versioned schema from v1 with a `SchemaMigrationPlan` in place before release | Untested against a real store |
+| R11 | Bundle ID / app name already taken; team ID wrong | Medium | Medium | Everything centralized in one xcconfig; documented as unverified | External gate |
+| R12 | Legal URLs 404 at review time | Medium | Medium | `AppConfiguration.legalURLsAreLive = false`; app renders bundled Markdown; `verify_repository.py` fails if a placeholder URL is presented as live | Low |
+| R13 | Widget leaks sensitive detail on the lock screen | Low | Medium | Widget reads only a summary snapshot (counts, one aggregate estimate, one date) — never vendor, jobsite, equipment or invoice detail; snapshot type is structurally incapable of carrying them | Low |
+| R14 | Trademark conflict on "OffRent Ledger" | Unknown | High | Name centralized to one constant | External gate |

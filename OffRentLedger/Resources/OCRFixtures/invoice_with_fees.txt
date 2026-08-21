@@ -1,0 +1,15 @@
+TIMBERLINE MACHINERY CO
+
+Invoice # TM-INV-5512
+Billed Through: 12/13/2026
+
+Equipment Rental       $5,504.00
+Delivery Charge          $225.00
+Pickup Charge            $225.00
+Fuel Surcharge           $148.60
+Cleaning Fee              $95.00
+Damage Waiver            $412.80
+Environmental Recovery    $38.00
+Taxes                    $549.32
+
+GRAND TOTAL:           $7,197.72
