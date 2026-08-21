@@ -14,9 +14,11 @@ an evidence tool. It opens your phone dialler, it reminds you to get a confirmat
 keeps what you recorded together — you make the call. That sentence is a product invariant, not a
 disclaimer: it is enforced in the copy, in the state machine, and in a build-time check.
 
-**The app in this repository has never been compiled.** It was built on Linux, with no macOS, no
-Xcode and no iOS SDK. See [`TEST_MATRIX.md`](TEST_MATRIX.md) for exactly what was executed and
-what was not, and [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) §1 for the first thing to do.
+**The app was written on Linux, with no macOS, no Xcode and no iOS SDK.** It compiles: the app
+and the widget build clean on Xcode 26.4 in CI, and the simulator unit tests run there. It has
+never been launched, on a simulator or a device, and no UI test has run.
+[`TEST_MATRIX.md`](TEST_MATRIX.md) says exactly what was executed, where, and what was not;
+[`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) §1 is the first thing to do.
 
 ---
 
@@ -33,7 +35,7 @@ a standalone SwiftPM module via the root `Package.swift`:
 The *same files* the Xcode app target compiles. No copy, no vendoring, no sync step. Language mode
 pinned to v5 to match the project's `SWIFT_VERSION`.
 
-The consequence: **163 tests covering the rate engine, the state machine, the invoice comparison,
+The consequence: **168 tests covering the rate engine, the state machine, the invoice comparison,
 the OCR parser, the reminder planner, the entitlement policy and the export codecs ran and passed
 on a machine with no Xcode at all.** Everything requiring Apple frameworks is a thin adapter over
 that core, which keeps the unverifiable surface as small and as obvious as possible.
@@ -42,8 +44,8 @@ That is not a workaround for the environment. It is the architecture a testable 
 have; the environment just made the cost of getting it wrong visible.
 
 ```
-swift test                                   # 163 tests, ~0.5s
-python3 scripts/verify_repository.py         # 35 repository invariants
+swift test                                   # 168 tests, ~0.5s
+python3 scripts/verify_repository.py         # 39 repository invariants
 python3 scripts/check_swift_call_sites.py    # every call site vs. its declaration
 ```
 
@@ -68,7 +70,7 @@ OffRentLedger/
   Resources/       asset catalog, bundled legal text, OCR fixtures
 OffRentShared/     types the app and the widget must agree on exactly
 OffRentLedgerWidget/
-Tests/OffRentDomainTests/    ← the 163 that ran
+Tests/OffRentDomainTests/    ← the 168 that ran
 OffRentLedgerTests/          ← written, needs Xcode
 OffRentLedgerUITests/        ← written, needs a simulator
 Website/          generated from the same Markdown the app bundles. Not deployed.

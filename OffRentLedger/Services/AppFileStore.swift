@@ -103,11 +103,18 @@ actor AppFileStore: FileStoring {
     private func writeDataSynchronously(
         _ data: Data, ownerFolder: String, filename: String
     ) throws -> StoredFile {
-        let safeFolder = Self.sanitise(ownerFolder)
-        let safeName = Self.sanitise(filename)
+        let safeFolder = SafePath.component(ownerFolder)
+        let safeName = SafePath.component(filename)
         let directory = evidenceRoot.appendingPathComponent(safeFolder, isDirectory: true)
+        let destination = directory.appendingPathComponent(safeName)
 
-        guard directory.standardizedFileURL.path.hasPrefix(evidenceRoot.standardizedFileURL.path) else {
+        // Both are checked, not just the directory. `SafePath.component` guarantees each is a single
+        // component, so neither can climb out — but this is the assertion that says so, and it
+        // is what would catch a future change to it that quietly let a separator back in.
+        let root = evidenceRoot.standardizedFileURL.path
+        guard directory.standardizedFileURL.path.hasPrefix(root),
+              destination.standardizedFileURL.path.hasPrefix(root)
+        else {
             throw FileStoreError.pathEscapesRoot(ownerFolder)
         }
 
@@ -117,7 +124,6 @@ actor AppFileStore: FileStoring {
             throw FileStoreError.couldNotCreateDirectory(directory.lastPathComponent)
         }
 
-        let destination = directory.appendingPathComponent(safeName)
         do {
             // `completeUntilFirstUserAuthentication` rather than `complete`: the widget's snapshot
             // refresh and any future background work run before the user unlocks, and files that
@@ -242,26 +248,6 @@ actor AppFileStore: FileStoring {
     /// chain of custody, and the UI says so wherever it appears.
     nonisolated static func digest(of data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-    }
-
-    /// Keeps a filename to a safe alphabet and prevents traversal.
-    nonisolated static func sanitise(_ component: String) -> String {
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_./"))
-        // An explicit loop, not `map { ... ? Character($0) : "-" }.reduce(into: "")`. In the
-        // chained form the type checker has to decide that the `"-"` literal is a `Character`
-        // from the other arm of a ternary, inside a closure whose result type it is also
-        // solving for — the kind of expression it can spend an unbounded amount of time on.
-        var cleaned = ""
-        for scalar in component.unicodeScalars {
-            if allowed.contains(scalar) {
-                cleaned.append(Character(scalar))
-            } else {
-                cleaned.append("-")
-            }
-        }
-        while cleaned.contains("..") { cleaned = cleaned.replacingOccurrences(of: "..", with: "-") }
-        while cleaned.hasPrefix("/") { cleaned.removeFirst() }
-        return cleaned.isEmpty ? UUID().uuidString : cleaned
     }
 }
 

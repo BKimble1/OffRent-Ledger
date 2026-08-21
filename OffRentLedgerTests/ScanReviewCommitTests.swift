@@ -5,7 +5,7 @@ import Testing
 
 /// The property that makes scanning safe: **a scan cannot write anything.**
 ///
-/// NOT EXECUTED — no Xcode in the build environment. The parser half of this behaviour *was*
+/// Executed on the simulator by the `offrent-fast-verify` workflow. The parser half of this behaviour *was*
 /// executed, in Tests/OffRentDomainTests/DocumentTextParserTests.swift. See TEST_MATRIX.md.
 @MainActor
 struct ScanReviewCommitTests {

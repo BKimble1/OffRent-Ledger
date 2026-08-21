@@ -8,7 +8,7 @@ import UserNotifications
 /// This covers the *logic*, not delivery. Whether iOS shows a banner is a device gate and is
 /// recorded as unverified in TEST_MATRIX.md.
 ///
-/// NOT EXECUTED — no Xcode in the build environment.
+/// Executed on the simulator by the `offrent-fast-verify` workflow.
 struct NotificationSchedulerTests {
 
     private func plan(_ ids: [String]) -> [PlannedReminder] {

@@ -6,7 +6,7 @@ import UIKit
 /// The evidence store. Every test writes into a fresh temporary directory, so none of them can
 /// reach a real user's files.
 ///
-/// NOT EXECUTED — no Xcode in the build environment. See TEST_MATRIX.md.
+/// Executed on the simulator by the `offrent-fast-verify` workflow. See TEST_MATRIX.md.
 struct FileStoreTests {
 
     private func makeStore() -> AppFileStore {

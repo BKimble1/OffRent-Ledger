@@ -10,9 +10,14 @@ Three columns, and the distinction between them is the whole point of this docum
 
 A test that is written but not executed proves nothing. This document never conflates the two.
 
-**Environment:** Ubuntu 24.04 x86_64. `Swift version 6.0.3 (swift-6.0.3-RELEASE)`.
-No macOS, no Xcode, no iOS SDK, no simulator, no device. `xcodebuild` does not exist here and
-cannot be installed.
+**Environments.** Two, and every row below says which one it ran in.
+
+| | |
+|---|---|
+| **This machine** | Ubuntu 24.04 x86_64, `Swift 6.0.3`. No macOS, no Xcode, no iOS SDK, no simulator, no device. `xcodebuild` does not exist here and cannot be installed. |
+| **CI** | Codemagic `mac_mini_m2`, Xcode 26.4, iOS Simulator 26.4, `offrent-fast-verify`. Reached first on 2026-08-21 after four rounds of compile fixes. |
+
+Everything in section A runs in both. Section B runs only in CI. Section D runs in neither.
 
 ---
 
@@ -22,7 +27,7 @@ Run with `swift test` against the root `Package.swift`, which compiles
 `OffRentLedger/Domain` and `OffRentShared` — **the same files the Xcode app target compiles**,
 not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SWIFT_VERSION`.
 
-**163 tests. 163 passed. 0 failed.**
+**168 tests. 168 passed. 0 failed.**
 
 | Suite | Tests | Result | What it covers |
 |---|---:|---|---|
@@ -40,13 +45,14 @@ not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SW
 | `DateTextParserTests` | 4 | ✅ pass | US paperwork formats; noon anchoring; implausible years rejected |
 | `DeepLinkTests` | 4 | ✅ pass | Round trip of every case; foreign schemes and malformed IDs rejected |
 | `FinancialWalkthroughTests` | 2 | ✅ pass | **§19 of the specification, both paths**, end to end through the engines |
+| `SafePathTests` | 5 | ✅ pass | Filename sanitisation: traversal contained to one component, ordinary names unmangled, no input yields an unusable name |
 | `StatusTransitionDocTests` | 1 | ✅ pass | The generated transition table matches the code |
 
 ### Also executed and passed
 
 | Check | Result |
 |---|---|
-| `python3 scripts/verify_repository.py` | ✅ 35 invariant checks, 0 problems |
+| `python3 scripts/verify_repository.py` | ✅ 39 invariant checks, 0 problems |
 | `python3 scripts/check_swift_call_sites.py` | ✅ 91 types with initialisers and 117 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
@@ -88,35 +94,69 @@ Both walkthrough paths ran as executed tests against the real engines:
 | Follow-up recorded; recomputation after "relaunch" yields the identical result | ✅ |
 
 The **persistence** half of steps 14–15 — that the record survives process termination — is in
-`OffRentLedgerTests` and `OffRentLedgerUITests` and was **not executed**. What was proved here
-is that the comparison is a pure function of stored values, so a correctly persisted store
-reproduces it exactly.
+`OffRentLedgerTests` and `OffRentLedgerUITests`. The `OffRentLedgerTests` half has since run on
+the simulator (section B); the relaunch half is in the UI suite and has not (section C). What
+section A proves on its own is that the comparison is a pure function of stored values, so a
+correctly persisted store reproduces it exactly.
 
 ---
 
-## B. Written, NOT executed — needs Xcode
+## B. Executed on the simulator — the app-target suite
 
-**56 tests: 45 XCTest cases and 11 UI test methods. None were run.**
+Run by `offrent-fast-verify` step 7, `xcodebuild test -only-testing:OffRentLedgerTests` against
+the iOS 26.4 simulator. These need SwiftData, UIKit, UserNotifications and a bundle, so this
+machine cannot run them; CI can.
 
-45 XCTest cases in `OffRentLedgerTests/` and 11 UI test methods in
-`OffRentLedgerUITests/`. They compile against Apple frameworks that do not exist on this machine.
+**First run: 45 tests, 44 passed, 1 failed.** The one failure was real, and is the reason this
+section exists at all — see below.
+
+| Suite | Tests | Result | Covers |
+|---|---:|---|---|
+| `PersistenceTests` | 8 | ✅ pass | SwiftData relationships, cascade vs nullify, unknown-status degradation, archive round trip, additive import |
+| `WorkflowServiceTests` | 8 | ✅ pass | Accrual stops on done and backdates to the vendor's time; refused transitions write no event; reopen restarts accrual; estimate cache |
+| `FileStoreTests` | 7 | ⚠️ 6 pass, 1 failed | Downscaling, digests, **reconcile never removes a referenced file**, path traversal refused |
+| `ScanReviewCommitTests` | 7 | ✅ pass | **Running the whole scan pipeline and discarding it writes nothing** |
+| `EntitlementBehaviourTests` | 4 | ✅ pass | Free limit against a real store; resolving frees the slot; lapsed Pro keeps everything working |
+| `NotificationSchedulerTests` | 5 | ✅ pass | Add/cancel diffing; no authorisation request from synchronising |
+| `CopyTests` + `FixtureParityTests` | 6 | ✅ pass | Required copy present, banned copy absent, stub matches the committed fixture |
+
+### The failure, and what it found
+
+`FileStoreTests.pathTraversalIsRefused` failed with `writeFailed("-/-/-/etc/passwd")`.
+
+The sanitiser allowed `/` in its alphabet. It neutralised `..` correctly, but the separators
+survived, so `sanitise("../../../etc/passwd")` returned `-/-/-/etc/passwd` — a *path* three
+directories deep, not a filename. It could not climb above the evidence root, so nothing could
+escape; what it did do was aim a write at folders nobody had created, and the write threw.
+
+The fix moved the logic out of `AppFileStore` and into `OffRentLedger/Domain/SafePathComponent.swift`,
+where the portable suite can execute it on any machine, and dropped `/` from the allowed set.
+`SafePathTests` in section A is the cover. The containment guard in `writeDataSynchronously` now
+checks the destination as well as the directory.
+
+The point worth keeping: this defect survived a code review, a call-site checker and 163 passing
+tests. It was in the one layer nothing here could execute, and it stayed there until something
+finally executed it.
+
+**Not yet observed:** the re-run. The fix is verified by `SafePathTests` and by compiling and
+running the real sanitiser standalone against the failing inputs; the simulator suite has not
+been run again since.
+
+---
+
+## C. Written, NOT executed — the UI suite
+
+**11 UI test methods.** They need a booted simulator running the app, which is the
+`offrent-targeted-ui` workflow, and that has not been run.
 
 | Suite | Tests | Status | Covers |
 |---|---:|---|---|
-| `PersistenceTests` | 8 | ⛔ not executed | SwiftData relationships, cascade vs nullify, unknown-status degradation, archive round trip, additive import |
-| `WorkflowServiceTests` | 8 | ⛔ not executed | Accrual stops on done and backdates to the vendor's time; refused transitions write no event; reopen restarts accrual; estimate cache |
-| `FileStoreTests` | 7 | ⛔ not executed | Downscaling, digests, **reconcile never removes a referenced file**, path traversal refused |
-| `ScanReviewCommitTests` | 7 | ⛔ not executed | **Running the whole scan pipeline and discarding it writes nothing** |
-| `EntitlementBehaviourTests` | 4 | ⛔ not executed | Free limit against a real store; resolving frees the slot; lapsed Pro keeps everything working |
-| `NotificationSchedulerTests` | 5 | ⛔ not executed | Add/cancel diffing; no authorisation request from synchronising |
-| `CopyTests` + `FixtureParityTests` | 6 | ⛔ not executed | Required copy present, banned copy absent, stub matches the committed fixture |
 | `CoreWorkflowUITests` | 2 | ⛔ not executed | Manual creation + relaunch; full workflow to resolution with zero variance |
 | `MismatchUITests` | 2 | ⛔ not executed | Extra-day mismatch survives relaunch; **scan review never saves without confirmation** |
 | `EntitlementUITests` | 3 | ⛔ not executed | Free limit, Pro unlock via the StoreKit test configuration, entitlement loss |
 | `AccessibilityUITests` | 4 | ⛔ not executed | Tabs labelled, estimate spoken as an estimate, disclosure readable, status spoken |
 
-To execute: run the `offrent-fast-verify` and `offrent-targeted-ui` Codemagic workflows, or on
-a Mac:
+To execute: run the `offrent-targeted-ui` Codemagic workflow, or on a Mac:
 
 ```
 xcodebuild test -project OffRentLedger.xcodeproj -scheme OffRentLedger \
@@ -125,14 +165,16 @@ xcodebuild test -project OffRentLedger.xcodeproj -scheme OffRentLedger \
 
 ---
 
-## C. Not verifiable anywhere in this environment
+## D. Not verified anywhere yet
 
-Nothing in this repository is evidence for any of these. Every one is a human or device gate.
+Every one of these is a human or device gate. Nothing in this repository is evidence for any
+of them.
 
 | Gate | Status |
 |---|---|
-| The Xcode project opens and builds | ⛔ **unverified** — the highest-risk item in the project; `docs/RISK_REGISTER.md` R2 |
-| The SwiftUI / SwiftData / StoreKit code compiles | ⛔ **unverified** — never type-checked anywhere; `docs/RISK_REGISTER.md` R3 |
+| The Xcode project builds | ✅ **verified in CI** — `xcodebuild clean build`, app and widget, Xcode 26.4 |
+| The SwiftUI / SwiftData / StoreKit code compiles | ✅ **verified in CI** — zero errors; `docs/RISK_REGISTER.md` R2 and R3 are closed |
+| The Xcode project opens in the Xcode UI | ⛔ unverified — CI drives `xcodebuild`, which is not the same thing |
 | Simulator run of the app | ⛔ unverified |
 | Release archive, signing, export | ⛔ unverified |
 | Live document camera | ⛔ unverified |

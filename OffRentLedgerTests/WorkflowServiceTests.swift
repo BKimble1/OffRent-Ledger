@@ -5,7 +5,7 @@ import Testing
 
 /// The workflow service: transitions, events, accrual, and the estimate cache.
 ///
-/// NOT EXECUTED — no Xcode in the build environment. See TEST_MATRIX.md.
+/// Executed on the simulator by the `offrent-fast-verify` workflow. See TEST_MATRIX.md.
 @MainActor
 struct WorkflowServiceTests {
 

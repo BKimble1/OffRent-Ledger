@@ -264,7 +264,7 @@ struct EvidenceExportSheet: View {
             }
             let name = "OffRentLedger-\(item.equipmentName.replacingOccurrences(of: " ", with: "-")).pdf"
             let destination = URL(fileURLWithPath: NSTemporaryDirectory())
-                .appendingPathComponent(AppFileStore.sanitise(name))
+                .appendingPathComponent(SafePath.component(name))
             try data.write(to: destination, options: .atomic)
             generated = destination
 

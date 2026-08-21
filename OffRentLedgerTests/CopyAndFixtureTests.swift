@@ -4,7 +4,7 @@ import Testing
 
 /// Copy that is a product requirement rather than a style choice, and the fixture-parity check.
 ///
-/// NOT EXECUTED — no Xcode in the build environment.
+/// Executed on the simulator by the `offrent-fast-verify` workflow.
 struct CopyTests {
 
     @Test func theDisclosureSaysBothRequiredThings() {

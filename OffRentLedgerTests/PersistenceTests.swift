@@ -5,7 +5,7 @@ import Testing
 
 /// SwiftData behaviour: relationships, cascades, and the round trip through the record types.
 ///
-/// NOT EXECUTED — no Xcode in the build environment. See TEST_MATRIX.md.
+/// Executed on the simulator by the `offrent-fast-verify` workflow. See TEST_MATRIX.md.
 @MainActor
 struct PersistenceTests {
 

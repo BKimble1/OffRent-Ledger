@@ -6,7 +6,7 @@ import Testing
 /// Entitlement behaviour against the store: the free limit, and — more importantly — everything
 /// that entitlement must never take away.
 ///
-/// NOT EXECUTED — no Xcode in the build environment. The policy itself *was* executed, in
+/// Executed on the simulator by the `offrent-fast-verify` workflow. The policy itself *was* executed, in
 /// Tests/OffRentDomainTests/EntitlementPolicyTests.swift. See TEST_MATRIX.md.
 @MainActor
 struct EntitlementBehaviourTests {
