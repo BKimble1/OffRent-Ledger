@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 /// Scenario 1 and 2 of the required end-to-end set.

@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 /// A short accessibility smoke pass. Not a substitute for the manual VoiceOver walkthrough in

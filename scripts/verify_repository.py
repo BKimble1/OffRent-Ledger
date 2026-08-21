@@ -341,6 +341,25 @@ def _metadata_region(source: str, start: int) -> str:
     return source[begin:]
 
 
+def check_tests_import_foundation() -> None:
+    check("Every test file imports Foundation explicitly")
+    # `@testable import OffRentLedger` does not re-export Foundation, and neither does
+    # `import Testing` or `import SwiftData`. A test file that happens to use only inferred
+    # types compiles anyway; the moment somebody writes `Date()`, `Decimal(string:)` or
+    # `Bundle.main` it fails with "cannot find 'Date' in scope".
+    #
+    # That is a nasty failure to find, because the Xcode test bundle only compiles on a Mac —
+    # so the mistake is a full CI round away from whoever made it, and it lands in a file that
+    # looks identical to the six around it that happen to still build. One unconditional import
+    # removes the class of problem.
+    for directory in TESTS:
+        for path in swift_files(directory):
+            source = path.read_text()
+            if not re.search(r"^import Foundation$", source, re.M):
+                relative = path.relative_to(ROOT).as_posix()
+                fail("test-imports", f"{relative} does not import Foundation")
+
+
 def check_no_unsafe_unwraps() -> None:
     check("No force-try or force-cast on production paths")
     for path in swift_files(APP_SOURCES, SHARED_SOURCES, WIDGET_SOURCES):
@@ -971,6 +990,7 @@ def main() -> int:
         check_status_assignment_is_confined,
         check_display_name_is_centralised,
         check_app_intents_metadata_is_literal,
+        check_tests_import_foundation,
         check_no_unsafe_unwraps,
         check_fatal_error_is_confined,
         check_no_print,

@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 /// Scenarios 4 and 5: the free limit, the Pro unlock, and what survives losing Pro.

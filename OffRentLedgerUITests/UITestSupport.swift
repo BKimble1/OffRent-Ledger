@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 /// Shared launch and navigation helpers.

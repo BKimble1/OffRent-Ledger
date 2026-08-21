@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 /// Scenario 3: an invoice with an extra day leaves an open follow-up that survives a relaunch.
