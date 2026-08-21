@@ -48,87 +48,110 @@ struct AttachInvoiceSheet: View {
         var appearedInContract = false
     }
 
+    // The form's six sections are separate properties rather than one 150-line `body`.
+    //
+    // A result builder is type-checked as a single expression, so every section's constraints
+    // are solved together: this body was the only one in the app still over the 300ms
+    // -warn-long-function-bodies threshold, at 534ms. Split, each section is an independent and
+    // much smaller problem — and the sections are individually readable, which matters more.
+
+    private var scanSection: some View {
+        Section {
+            if DocumentScannerView.isSupported {
+                Button { showingCamera = true } label: {
+                    Label("Scan the invoice", systemImage: "doc.viewfinder")
+                }
+                .minimumTapTarget()
+            }
+            PhotosPicker(selection: $photoItem, matching: .images) {
+                Label("Choose a photo", systemImage: "photo.on.rectangle")
+            }
+            .minimumTapTarget()
+            Button { showingFileImporter = true } label: {
+                Label("Import a PDF", systemImage: "doc")
+            }
+            .minimumTapTarget()
+        } header: {
+            Text("Start from the invoice (optional)")
+        } footer: {
+            Text(AppCopy.scanReviewExplanation)
+        }
+    }
+
+    private var invoiceSection: some View {
+        Section("Invoice") {
+            TextField("Invoice number", text: $invoiceNumber)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+            DatePicker("Received", selection: $receivedDate, displayedComponents: .date)
+            OptionalDatePicker(title: "Billed through", date: $billedThroughDate)
+            CurrencyField(title: "Invoice total", value: $invoiceTotal)
+        }
+    }
+
+    private var linesSection: some View {
+        Section {
+            ForEach($lines) { $line in
+                VStack(alignment: .leading, spacing: 6) {
+                    Picker("Category", selection: $line.category) {
+                        ForEach(InvoiceCategory.allCases, id: \.self) { category in
+                            Label(category.displayName, systemImage: category.symbolName)
+                                .tag(category)
+                        }
+                    }
+                    TextField("Description (optional)", text: $line.detail)
+                    CurrencyField(title: "Amount", value: $line.amount)
+                    Toggle("This was in the terms I entered", isOn: $line.appearedInContract)
+                        .minimumTapTarget()
+                }
+                .padding(.vertical, 2)
+            }
+            .onDelete { lines.remove(atOffsets: $0) }
+
+            Button {
+                lines.append(DraftLine())
+            } label: {
+                Label("Add a line", systemImage: "plus")
+            }
+            .minimumTapTarget()
+        } header: {
+            Text("Lines")
+        } footer: {
+            Text("""
+                Enter the invoice's own breakdown. \(AppConfiguration.displayName) compares \
+                the rental line against the terms you confirmed and asks you to review the \
+                rest — it does not judge charges it knows nothing about.
+                """)
+        }
+    }
+
+    private var expectationSection: some View {
+        Section {
+            CurrencyField(title: "What you expected", value: $expectedOverride)
+        } header: {
+            Text("Your own expectation (optional)")
+        } footer: {
+            Text("""
+                If you enter an amount here it replaces the one \(AppConfiguration.displayName) \
+                derives. You have the contract; the app has what you typed in.
+                """)
+        }
+    }
+
+    private var notesSection: some View {
+        Section("Notes") {
+            TextField("Notes", text: $notes, axis: .vertical).lineLimit(2...6)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    if DocumentScannerView.isSupported {
-                        Button { showingCamera = true } label: {
-                            Label("Scan the invoice", systemImage: "doc.viewfinder")
-                        }
-                        .minimumTapTarget()
-                    }
-                    PhotosPicker(selection: $photoItem, matching: .images) {
-                        Label("Choose a photo", systemImage: "photo.on.rectangle")
-                    }
-                    .minimumTapTarget()
-                    Button { showingFileImporter = true } label: {
-                        Label("Import a PDF", systemImage: "doc")
-                    }
-                    .minimumTapTarget()
-                } header: {
-                    Text("Start from the invoice (optional)")
-                } footer: {
-                    Text(AppCopy.scanReviewExplanation)
-                }
-
-                Section("Invoice") {
-                    TextField("Invoice number", text: $invoiceNumber)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                    DatePicker("Received", selection: $receivedDate, displayedComponents: .date)
-                    OptionalDatePicker(title: "Billed through", date: $billedThroughDate)
-                    CurrencyField(title: "Invoice total", value: $invoiceTotal)
-                }
-
-                Section {
-                    ForEach($lines) { $line in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Picker("Category", selection: $line.category) {
-                                ForEach(InvoiceCategory.allCases, id: \.self) { category in
-                                    Label(category.displayName, systemImage: category.symbolName)
-                                        .tag(category)
-                                }
-                            }
-                            TextField("Description (optional)", text: $line.detail)
-                            CurrencyField(title: "Amount", value: $line.amount)
-                            Toggle("This was in the terms I entered", isOn: $line.appearedInContract)
-                                .minimumTapTarget()
-                        }
-                        .padding(.vertical, 2)
-                    }
-                    .onDelete { lines.remove(atOffsets: $0) }
-
-                    Button {
-                        lines.append(DraftLine())
-                    } label: {
-                        Label("Add a line", systemImage: "plus")
-                    }
-                    .minimumTapTarget()
-                } header: {
-                    Text("Lines")
-                } footer: {
-                    Text("""
-                        Enter the invoice's own breakdown. \(AppConfiguration.displayName) compares \
-                        the rental line against the terms you confirmed and asks you to review the \
-                        rest — it does not judge charges it knows nothing about.
-                        """)
-                }
-
-                Section {
-                    CurrencyField(title: "What you expected", value: $expectedOverride)
-                } header: {
-                    Text("Your own expectation (optional)")
-                } footer: {
-                    Text("""
-                        If you enter an amount here it replaces the one \(AppConfiguration.displayName) \
-                        derives. You have the contract; the app has what you typed in.
-                        """)
-                }
-
-                Section("Notes") {
-                    TextField("Notes", text: $notes, axis: .vertical).lineLimit(2...6)
-                }
+                scanSection
+                invoiceSection
+                linesSection
+                expectationSection
+                notesSection
             }
             .navigationTitle("Attach invoice")
             .navigationBarTitleDisplayMode(.inline)

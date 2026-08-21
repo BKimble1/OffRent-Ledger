@@ -12,8 +12,15 @@ import SwiftUI
 /// the sheet still requires the tick.
 struct AddRentalIntent: AppIntent {
     static var title: LocalizedStringResource = "Add a rental"
+    // No `\(AppConfiguration.displayName)` here, and none in any other static intent metadata.
+    // `appintentsmetadataprocessor` extracts these strings at build time and can only resolve
+    // literal segments, so interpolating a runtime property fails the build with
+    // "'LocalizedStringResource' is passed in an Interpolated String with an invalid segment."
+    // Shortcuts already lists every action under the app's own name and icon, so naming the app
+    // again in the description was redundant anyway. The one interpolation AppIntents does
+    // support in static metadata is the `\(.applicationName)` token, used in `phrases` below.
     static var description = IntentDescription(
-        "Opens \(AppConfiguration.displayName) ready to add a piece of rented equipment."
+        "Opens the new-rental screen ready for a piece of rented equipment."
     )
     static var openAppWhenRun = true
 
@@ -27,7 +34,7 @@ struct AddRentalIntent: AppIntent {
 struct OpenActiveRentalsIntent: AppIntent {
     static var title: LocalizedStringResource = "Open active rentals"
     static var description = IntentDescription(
-        "Opens \(AppConfiguration.displayName) to the rentals you still have on the ground."
+        "Opens the list of rentals you still have on the ground."
     )
     static var openAppWhenRun = true
 
@@ -42,9 +49,8 @@ struct RecordVendorConfirmationIntent: AppIntent {
     static var title: LocalizedStringResource = "Record a vendor confirmation"
     static var description = IntentDescription(
         """
-        Opens \(AppConfiguration.displayName) to the confirmation screen. It does not record anything on its own — \
-        you enter the confirmation number the rental company gave you, and confirm that you \
-        contacted them.
+        Opens the confirmation screen. It does not record anything on its own — you enter the \
+        confirmation number the rental company gave you, and confirm that you contacted them.
         """
     )
     static var openAppWhenRun = true

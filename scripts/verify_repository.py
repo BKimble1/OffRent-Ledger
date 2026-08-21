@@ -262,6 +262,85 @@ def check_display_name_is_centralised() -> None:
                 )
 
 
+def check_app_intents_metadata_is_literal() -> None:
+    check("AppIntents static metadata interpolates nothing at runtime")
+    # `appintentsmetadataprocessor` runs after the Swift compile and extracts intent titles,
+    # descriptions and display names from the source *as literals*. It cannot evaluate a runtime
+    # property, so an IntentDescription interpolating AppConfiguration.displayName compiles
+    # cleanly and then fails the build at the very last step with
+    #   'LocalizedStringResource' is passed in an Interpolated String with an invalid segment.
+    # That cost a full CI round to find, and it would cost another one to find again.
+    #
+    # The one exception is the leading-dot token form the processor does understand — the
+    # applicationName token used in `phrases`. Interpolation in an *instance* property such as
+    # `displayRepresentation` is fine and is deliberately not matched here: that is evaluated at
+    # runtime by the app, not at build time by the processor.
+    static_metadata = re.compile(
+        r"(IntentDescription\s*\(|TypeDisplayRepresentation\s*\(|"
+        r"static\s+(?:var|let)\s+title\s*:\s*LocalizedStringResource\s*=|"
+        r"@Parameter\s*\(|shortTitle\s*:)"
+    )
+    for path in swift_files(APP_SOURCES, SHARED_SOURCES, WIDGET_SOURCES):
+        source = without_comments(path.read_text())
+        if "import AppIntents" not in source:
+            continue
+        relative = path.relative_to(ROOT).as_posix()
+        for match in static_metadata.finditer(source):
+            region = _metadata_region(source, match.end())
+            for literal in string_literals(region):
+                for segment in re.findall(r"\\\((.*?)\)", literal, re.S):
+                    if segment.strip().startswith("."):
+                        continue  # A token the processor resolves for itself.
+                    line = source[: match.start()].count("\n") + 1
+                    fail(
+                        "appintents-metadata",
+                        f"{relative}:{line} interpolates `{segment.strip()}` into static intent "
+                        "metadata; appintentsmetadataprocessor can only read literals",
+                    )
+
+
+def _metadata_region(source: str, start: int) -> str:
+    """The value that follows a static-metadata marker.
+
+    A small lexer rather than a paren count, because both shapes occur: a title assigned with
+    `=` ends at its line break, while an `IntentDescription(` opens a parenthesis and may not
+    reach its literal until the next line. Counting parens alone stops too late on the first;
+    stopping at a newline alone stops immediately on the second, before the literal has been
+    reached at all.
+
+    So: skip the leading whitespace first, then read tokens, treating string literals — the
+    triple-quoted ones included — as opaque, so a bracket or a line break inside one cannot end
+    the region early.
+    """
+    index = start
+    while index < len(source) and source[index] in " \t\n":
+        index += 1
+    begin = index
+    depth = 0
+    while index < len(source):
+        if source.startswith('"' * 3, index):
+            closing = source.find('"' * 3, index + 3)
+            index = len(source) if closing == -1 else closing + 3
+            continue
+        character = source[index]
+        if character == '"':
+            index += 1
+            while index < len(source) and source[index] != '"':
+                index += 2 if source[index] == "\\" else 1
+            index += 1
+            continue
+        if character in "([":
+            depth += 1
+        elif character in ")]":
+            if depth == 0:
+                return source[begin:index]
+            depth -= 1
+        elif character == "\n" and depth == 0:
+            return source[begin:index]
+        index += 1
+    return source[begin:]
+
+
 def check_no_unsafe_unwraps() -> None:
     check("No force-try or force-cast on production paths")
     for path in swift_files(APP_SOURCES, SHARED_SOURCES, WIDGET_SOURCES):
@@ -891,6 +970,7 @@ def main() -> int:
         check_domain_is_portable,
         check_status_assignment_is_confined,
         check_display_name_is_centralised,
+        check_app_intents_metadata_is_literal,
         check_no_unsafe_unwraps,
         check_fatal_error_is_confined,
         check_no_print,
