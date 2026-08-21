@@ -474,6 +474,35 @@ def check_accessibility_identifiers_are_used() -> None:
             fail("a11y-unused", f"A11yID …{name} is declared but never set on a view")
 
 
+def check_accessibility_references_resolve() -> None:
+    check("Every A11yID reference resolves to a declaration")
+    # The other direction from the "declared but never used" check. A reference to a member that
+    # no longer exists is a compile error on a Mac, but this repository has no compiler — so the
+    # check exists here instead, and catches a rename before somebody spends an afternoon on it.
+    source = (APP_SOURCES / "SharedUI" / "AccessibilityIdentifiers.swift").read_text()
+    declared: set[str] = set()
+    current: str | None = None
+    for line in source.splitlines():
+        match = re.match(r"\s*enum (\w+) \{", line)
+        if match:
+            current = match.group(1)
+            continue
+        match = re.match(r"\s*static (?:let|func) (\w+)", line)
+        if match and current:
+            declared.add(f"{current}.{match.group(1)}")
+
+    for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
+        if path.name == "AccessibilityIdentifiers.swift":
+            continue
+        for match in re.finditer(r"A11yID\.(\w+)\.(\w+)", path.read_text()):
+            reference = f"{match.group(1)}.{match.group(2)}"
+            if reference not in declared:
+                fail(
+                    "a11y-missing",
+                    f"{path.relative_to(ROOT)} references A11yID.{reference}, which is not declared",
+                )
+
+
 def check_ui_test_identifiers_match() -> None:
     check("The UI suite's identifier copy matches the app's")
     # The UI test target drives the app as a black box and cannot @testable import it, so it
@@ -481,7 +510,10 @@ def check_ui_test_identifiers_match() -> None:
     # into a UI test that times out looking for an element that no longer has that identifier —
     # a failure that reads like a broken feature rather than a stale constant.
     def literals(path: pathlib.Path) -> set[str]:
-        return set(re.findall(r'static let \w+ = "([^"]+)"', path.read_text()))
+        found = set(re.findall(r'static let \w+ = "([^"]+)"', path.read_text()))
+        # Identifiers are dotted ("today.root"); visible titles are not ("Today"). The UI suite
+        # addresses tab-bar buttons by title because `.tabItem` builds the button itself.
+        return {value for value in found if "." in value}
 
     app = literals(APP_SOURCES / "SharedUI" / "AccessibilityIdentifiers.swift")
     ui = literals(ROOT / "OffRentLedgerUITests" / "A11yUI.swift")
@@ -642,6 +674,7 @@ def main() -> int:
         check_privacy_posture,
         check_legal_urls_not_claimed_live,
         check_accessibility_identifiers_are_used,
+        check_accessibility_references_resolve,
         check_ui_test_identifiers_match,
         check_no_colour_only_status,
         check_generated_project_is_current,

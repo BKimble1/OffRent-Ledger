@@ -80,18 +80,7 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .accessibilityIdentifier(A11yID.Settings.root)
-        .navigationDestination(for: SettingsDestination.self) { destination in
-            switch destination {
-            case .subscription: SubscriptionSettingsView()
-            case .reminders: ReminderSettingsView()
-            case .appearance: AppearanceSettingsView()
-            case .dataAndPrivacy: DataAndPrivacyView()
-            case .privacyPolicy: LegalDocumentView(document: .privacy)
-            case .terms: LegalDocumentView(document: .terms)
-            case .support: SupportView()
-            case .about: AboutView()
-            }
-        }
+        .offRentNavigationDestinations()
     }
 }
 
@@ -309,15 +298,15 @@ struct ReminderSettingsView: View {
 }
 
 struct AppearanceSettingsView: View {
-    @AppStorage("com.idlery.offrent.appearance") private var appearance = "system"
+    @AppStorage(AppearanceSetting.storageKey) private var appearance = AppearanceSetting.system
 
     var body: some View {
         List {
             Section {
                 Picker("Appearance", selection: $appearance) {
-                    Text("Match iOS").tag("system")
-                    Text("Light").tag("light")
-                    Text("Dark").tag("dark")
+                    Text("Match iOS").tag(AppearanceSetting.system)
+                    Text("Light").tag(AppearanceSetting.light)
+                    Text("Dark").tag(AppearanceSetting.dark)
                 }
                 .pickerStyle(.inline)
             } footer: {
@@ -330,8 +319,8 @@ struct AppearanceSettingsView: View {
         }
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
-        .preferredColorScheme(
-            appearance == "light" ? .light : (appearance == "dark" ? .dark : nil)
-        )
+        // The scheme itself is applied at the root, not here: `.preferredColorScheme` affects the
+        // view it is attached to and its children, so applying it on this screen would change
+        // this screen and nothing else.
     }
 }

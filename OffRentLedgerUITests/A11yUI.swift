@@ -7,11 +7,14 @@ import Foundation
 /// when they drift, which is what stops a renamed identifier turning into a silent timeout three
 /// weeks later.
 enum A11yUI {
+    /// Tab-bar buttons are found by their visible title rather than by an identifier — see the
+    /// note in the app's AccessibilityIdentifiers.swift. These are titles, not identifiers, which
+    /// is why the drift check skips them (identifiers are dotted; titles are not).
     enum Tab {
-        static let today = "tab.today"
-        static let rentals = "tab.rentals"
-        static let audit = "tab.audit"
-        static let settings = "tab.settings"
+        static let today = "Today"
+        static let rentals = "Rentals"
+        static let audit = "Audit"
+        static let settings = "Settings"
     }
 
     enum Today {

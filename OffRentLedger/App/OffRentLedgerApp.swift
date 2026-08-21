@@ -38,7 +38,6 @@ struct OffRentLedgerApp: App {
             }
             .environment(dependencies)
             .environment(router)
-            .environment(\.dependencies, dependencies)
             .onOpenURL { url in
                 _ = router.handle(url: url)
             }
@@ -59,6 +58,7 @@ struct OffRentLedgerApp: App {
 struct StoreRecoveryView: View {
     let detail: String?
     @State private var showingReset = false
+    @State private var didReset = false
 
     var body: some View {
         VStack(spacing: 18) {
@@ -67,9 +67,15 @@ struct StoreRecoveryView: View {
                 .foregroundStyle(Palette.attention)
                 .accessibilityHidden(true)
 
-            Text("Your rental data could not be opened")
+            Text(didReset ? "Data cleared" : "Your rental data could not be opened")
                 .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
+
+            if didReset {
+                Text("Close \(AppConfiguration.displayName) completely and open it again.")
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+            }
 
             Text("""
                 This usually means the app was updated or restored while the data file was in an \
@@ -125,6 +131,9 @@ struct StoreRecoveryView: View {
         try? FileManager.default.removeItem(
             at: support.appendingPathComponent("OffRentLedger", isDirectory: true)
         )
-        exit(0)
+        // Deliberately does not call exit(). Terminating yourself is grounds for App Store
+        // rejection, and to the user it is indistinguishable from a crash at the exact moment
+        // they were told the app was recovering. Asking them to reopen it is honest and works.
+        didReset = true
     }
 }

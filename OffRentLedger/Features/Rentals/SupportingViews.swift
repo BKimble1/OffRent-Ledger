@@ -83,7 +83,7 @@ struct VendorListView: View {
 
     var body: some View {
         List {
-            ForEach(vendors) { vendor in
+            ForEach(vendors, id: \.id) { vendor in
                 Button { editing = vendor } label: {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(vendor.name).font(.body)
@@ -186,7 +186,7 @@ struct JobSiteListView: View {
 
     var body: some View {
         List {
-            ForEach(jobSites) { site in
+            ForEach(jobSites, id: \.id) { site in
                 VStack(alignment: .leading, spacing: 3) {
                     Text(site.name)
                     if let project = site.projectIdentifier {
@@ -357,11 +357,11 @@ struct EvidenceThumbnail: View {
             let path = asset.thumbnailRelativePath ?? asset.relativePath
             guard asset.mediaType == .image else { return }
             let url = fileStore.url(forRelativePath: path)
-            let loaded = await Task.detached(priority: .utility) { () -> UIImage? in
-                guard let data = try? Data(contentsOf: url) else { return nil }
-                return UIImage(data: data)
-            }.value
-            image = loaded
+            // `Data` crosses the boundary, not `UIImage`: UIImage is not Sendable, and the point
+            // of going off the main actor here is the file read anyway.
+            let data = await Task.detached(priority: .utility) { try? Data(contentsOf: url) }.value
+            guard let data else { return }
+            image = UIImage(data: data)
         }
     }
 }

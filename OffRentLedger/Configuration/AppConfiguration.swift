@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// The single source for the product's identity, its URLs and its product identifiers.
 ///
@@ -108,4 +109,24 @@ enum LaunchArgument {
     static let stubTextRecogniser = "-offrent-stub-ocr"
     /// ISO-8601 instant to freeze the clock at, as `-offrent-fixed-now <value>`.
     static let fixedNow = "-offrent-fixed-now"
+}
+
+/// The user's appearance choice.
+///
+/// Applied once, at the root, because `preferredColorScheme` affects the view it is attached to
+/// and its children — setting it on the settings screen would change the settings screen and
+/// nothing else.
+enum AppearanceSetting {
+    static let storageKey = "com.idlery.offrent.appearance"
+    static let system = "system"
+    static let light = "light"
+    static let dark = "dark"
+
+    static func colorScheme(for value: String) -> ColorScheme? {
+        switch value {
+        case light: .light
+        case dark: .dark
+        default: nil   // nil means "match iOS"
+        }
+    }
 }

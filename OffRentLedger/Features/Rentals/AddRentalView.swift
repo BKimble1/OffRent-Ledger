@@ -174,7 +174,7 @@ struct AddRentalView: View {
         Section("Rental company") {
             Picker("Rental company", selection: $selectedVendorID) {
                 Text("New rental company").tag(UUID?.none)
-                ForEach(vendors) { vendor in Text(vendor.name).tag(UUID?.some(vendor.id)) }
+                ForEach(vendors, id: \.id) { vendor in Text(vendor.name).tag(UUID?.some(vendor.id)) }
             }
             .accessibilityIdentifier(A11yID.AddRental.vendorPicker)
 
@@ -196,7 +196,7 @@ struct AddRentalView: View {
         Section("Jobsite") {
             Picker("Jobsite", selection: $selectedJobSiteID) {
                 Text("New jobsite").tag(UUID?.none)
-                ForEach(jobSites) { site in Text(site.name).tag(UUID?.some(site.id)) }
+                ForEach(jobSites, id: \.id) { site in Text(site.name).tag(UUID?.some(site.id)) }
             }
             .accessibilityIdentifier(A11yID.AddRental.jobSitePicker)
 

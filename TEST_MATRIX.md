@@ -79,15 +79,17 @@ reproduces it exactly.
 
 ## B. Written, NOT executed — needs Xcode
 
+**56 tests: 45 XCTest cases and 11 UI test methods. None were run.**
+
 45 XCTest cases in `OffRentLedgerTests/` and 11 UI test methods in
 `OffRentLedgerUITests/`. They compile against Apple frameworks that do not exist on this machine.
 
 | Suite | Tests | Status | Covers |
 |---|---:|---|---|
-| `PersistenceTests` | 7 | ⛔ not executed | SwiftData relationships, cascade vs nullify, unknown-status degradation, archive round trip, additive import |
-| `WorkflowServiceTests` | 7 | ⛔ not executed | Accrual stops on done and backdates to the vendor's time; refused transitions write no event; reopen restarts accrual; estimate cache |
+| `PersistenceTests` | 8 | ⛔ not executed | SwiftData relationships, cascade vs nullify, unknown-status degradation, archive round trip, additive import |
+| `WorkflowServiceTests` | 8 | ⛔ not executed | Accrual stops on done and backdates to the vendor's time; refused transitions write no event; reopen restarts accrual; estimate cache |
 | `FileStoreTests` | 7 | ⛔ not executed | Downscaling, digests, **reconcile never removes a referenced file**, path traversal refused |
-| `ScanReviewCommitTests` | 6 | ⛔ not executed | **Running the whole scan pipeline and discarding it writes nothing** |
+| `ScanReviewCommitTests` | 7 | ⛔ not executed | **Running the whole scan pipeline and discarding it writes nothing** |
 | `EntitlementBehaviourTests` | 4 | ⛔ not executed | Free limit against a real store; resolving frees the slot; lapsed Pro keeps everything working |
 | `NotificationSchedulerTests` | 5 | ⛔ not executed | Add/cancel diffing; no authorisation request from synchronising |
 | `CopyTests` + `FixtureParityTests` | 6 | ⛔ not executed | Required copy present, banned copy absent, stub matches the committed fixture |

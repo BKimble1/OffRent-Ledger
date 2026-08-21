@@ -20,13 +20,13 @@ struct RentalsView: View {
     var body: some View {
         List {
             if !activeItems.isEmpty {
-                Section("Active") { ForEach(activeItems, content: row) }
+                Section("Active") { ForEach(activeItems, id: \.id, content: row) }
             }
             if !completedItems.isEmpty {
-                Section("Completed") { ForEach(completedItems, content: row) }
+                Section("Completed") { ForEach(completedItems, id: \.id, content: row) }
             }
             if !archivedItems.isEmpty {
-                Section("Archived") { ForEach(archivedItems, content: row) }
+                Section("Archived") { ForEach(archivedItems, id: \.id, content: row) }
             }
             if filtered.isEmpty {
                 Section {
@@ -57,16 +57,7 @@ struct RentalsView: View {
         // The identifier goes on the searchable container: `.searchable` builds the field
         // itself, so there is no view for the test to address without this.
         .accessibilityIdentifier(A11yID.Rentals.searchField)
-        .searchPresentationToolbarBehavior(.avoidHidingContent)
-        .navigationDestination(for: RentalDestination.self) { destination in
-            switch destination {
-            case let .item(id): RentalItemDetailView(itemID: id)
-            case let .agreement(id): AgreementDetailView(agreementID: id)
-            case let .timeline(itemID): RentalTimelineView(itemID: itemID)
-            case .vendors: VendorListView()
-            case .jobSites: JobSiteListView()
-            }
-        }
+        .offRentNavigationDestinations()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: addRental) { Label("Add rental", systemImage: "plus") }
@@ -89,11 +80,11 @@ struct RentalsView: View {
         Menu {
             Picker("Vendor", selection: $vendorFilter) {
                 Text("All vendors").tag(UUID?.none)
-                ForEach(vendors) { vendor in Text(vendor.name).tag(UUID?.some(vendor.id)) }
+                ForEach(vendors, id: \.id) { vendor in Text(vendor.name).tag(UUID?.some(vendor.id)) }
             }
             Picker("Jobsite", selection: $jobSiteFilter) {
                 Text("All jobsites").tag(UUID?.none)
-                ForEach(jobSites) { site in Text(site.name).tag(UUID?.some(site.id)) }
+                ForEach(jobSites, id: \.id) { site in Text(site.name).tag(UUID?.some(site.id)) }
             }
             Picker("Status", selection: $statusFilter) {
                 Text("All statuses").tag(RentalItemStatus?.none)

@@ -275,32 +275,3 @@ struct CurrencyField: View {
         .onAppear { if let value { text = "\(MoneyMath.rounded(value))" } }
     }
 }
-
-/// Wraps a Pro-only control. Tapping it opens the paywall rather than doing nothing.
-struct ProGate<Content: View>: View {
-    let feature: ProFeature
-    let entitlement: EntitlementState
-    let onBlocked: (PaywallReason) -> Void
-    let reason: PaywallReason
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        if EntitlementPolicy.isAllowed(feature, entitlement: entitlement) {
-            content()
-        } else {
-            Button { onBlocked(reason) } label: {
-                HStack {
-                    content().disabled(true)
-                    Spacer(minLength: 8)
-                    Label("Pro", systemImage: "lock.fill")
-                        .font(.caption2)
-                        .labelStyle(.titleAndIcon)
-                        .foregroundStyle(Palette.accent)
-                }
-            }
-            .buttonStyle(.plain)
-            .minimumTapTarget()
-            .accessibilityHint("\(feature.displayName) is part of \(AppConfiguration.displayName) Pro. Opens the subscription options.")
-        }
-    }
-}

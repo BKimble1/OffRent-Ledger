@@ -45,6 +45,7 @@ struct TodayView: View {
         .background(Palette.groupedBackground)
         .navigationTitle("Today")
         .navigationBarTitleDisplayMode(.large)
+        .offRentNavigationDestinations()
         .accessibilityIdentifier(A11yID.Today.root)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

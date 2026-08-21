@@ -7,32 +7,36 @@ struct RootView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(AppearanceSetting.storageKey) private var appearance = AppearanceSetting.system
 
     var body: some View {
         @Bindable var router = router
 
+        // The classic `.tabItem` form rather than iOS 18's `Tab` builder.
+        //
+        // `Tab` produces `TabContent`, not a `View`, and `TabContent` does not accept view
+        // modifiers — an accessibility identifier on a `Tab` does not compile. `.tabItem` does
+        // accept them, and the UI suite addresses tabs by their visible title anyway, which is
+        // what XCUITest exposes on a tab bar button regardless of how the tab was built.
         TabView(selection: $router.selectedTab) {
-            Tab(AppTab.today.title, systemImage: AppTab.today.symbolName, value: AppTab.today) {
-                NavigationStack(path: router.path(for: .today)) { TodayView() }
-            }
-            .accessibilityIdentifier(A11yID.Tab.today)
+            NavigationStack(path: router.path(for: .today)) { TodayView() }
+                .tabItem { Label(AppTab.today.title, systemImage: AppTab.today.symbolName) }
+                .tag(AppTab.today)
 
-            Tab(AppTab.rentals.title, systemImage: AppTab.rentals.symbolName, value: AppTab.rentals) {
-                NavigationStack(path: router.path(for: .rentals)) { RentalsView() }
-            }
-            .accessibilityIdentifier(A11yID.Tab.rentals)
+            NavigationStack(path: router.path(for: .rentals)) { RentalsView() }
+                .tabItem { Label(AppTab.rentals.title, systemImage: AppTab.rentals.symbolName) }
+                .tag(AppTab.rentals)
 
-            Tab(AppTab.audit.title, systemImage: AppTab.audit.symbolName, value: AppTab.audit) {
-                NavigationStack(path: router.path(for: .audit)) { AuditView() }
-            }
-            .accessibilityIdentifier(A11yID.Tab.audit)
+            NavigationStack(path: router.path(for: .audit)) { AuditView() }
+                .tabItem { Label(AppTab.audit.title, systemImage: AppTab.audit.symbolName) }
+                .tag(AppTab.audit)
 
-            Tab(AppTab.settings.title, systemImage: AppTab.settings.symbolName, value: AppTab.settings) {
-                NavigationStack(path: router.path(for: .settings)) { SettingsView() }
-            }
-            .accessibilityIdentifier(A11yID.Tab.settings)
+            NavigationStack(path: router.path(for: .settings)) { SettingsView() }
+                .tabItem { Label(AppTab.settings.title, systemImage: AppTab.settings.symbolName) }
+                .tag(AppTab.settings)
         }
         .tint(Palette.accent)
+        .preferredColorScheme(AppearanceSetting.colorScheme(for: appearance))
         .sheet(item: $router.presentedSheet) { sheet in
             sheetContent(for: sheet)
         }

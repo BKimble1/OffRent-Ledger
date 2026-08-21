@@ -53,12 +53,7 @@ struct AuditView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Audit")
         .accessibilityIdentifier(A11yID.Audit.root)
-        .navigationDestination(for: AuditDestination.self) { destination in
-            switch destination {
-            case let .invoice(id): InvoiceReviewView(invoiceID: id)
-            case .followUps, .resolvedHistory: AuditView()
-            }
-        }
+        .offRentNavigationDestinations()
         .overlay {
             if invoices.isEmpty {
                 EmptyStateView(

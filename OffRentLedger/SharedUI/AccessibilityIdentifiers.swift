@@ -8,12 +8,9 @@ import Foundation
 /// other direction: a test written against an identifier nothing sets.
 enum A11yID {
 
-    enum Tab {
-        static let today = "tab.today"
-        static let rentals = "tab.rentals"
-        static let audit = "tab.audit"
-        static let settings = "tab.settings"
-    }
+    // Tabs are addressed by their visible title, not by an identifier: `.tabItem` builds the
+    // tab-bar button itself, and XCUITest exposes that button by label. The titles live on
+    // `AppTab.title`, which is the same constant the tab bar draws.
 
     enum Today {
         static let root = "today.root"
