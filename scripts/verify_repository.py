@@ -1005,6 +1005,30 @@ def check_codemagic_config() -> None:
         if app_store.get("testFlightInternalTestingOnly"):
             fail("codemagic", f"{name} restricts the build to internal testing only")
 
+        # A publishing block that carries no credentials is a block that does nothing.
+        if app_store and not app_store.get("auth"):
+            for key in ["api_key", "key_id", "issuer_id"]:
+                if not app_store.get(key):
+                    fail(
+                        "codemagic",
+                        f"{name} publishes to App Store Connect but has no {key} and no `auth`",
+                    )
+
+    # A workflow named for TestFlight that does not upload is the worst kind of green build: it
+    # succeeds, reports nothing wrong, and produces no build for anybody to install. This one did
+    # exactly that — it archived a correctly signed .ipa into `artifacts` and stopped, and the
+    # first anyone knew was a TestFlight page with nothing on it and no email.
+    for name, workflow in workflows.items():
+        if "testflight" not in name.lower():
+            continue
+        publishing = (workflow.get("publishing") or {}).get("app_store_connect")
+        if not publishing:
+            fail(
+                "codemagic",
+                f"{name} is named for TestFlight but has no `publishing.app_store_connect`, "
+                "so it would archive and upload nothing",
+            )
+
     if "offrent-fast-verify" not in workflows:
         fail("codemagic", "the fast-verify gate is missing")
     if "triggering" not in workflows.get("offrent-fast-verify", {}):

@@ -310,37 +310,38 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
       - $CM_BUILD_DIR/*.log
 
-    # NO `publishing:` BLOCK — deliberately, and this is not an oversight.
-    #
-    # `auth: integration` requires the workflow to name a configured App Store Connect
-    # integration, and Codemagic validates the *entire* file: a publishing block referring to an
-    # integration that does not exist rejects codemagic.yaml outright, which blocks
-    # `offrent-fast-verify` too. One aspirational workflow taking the whole config down with it
-    # is a bad trade, so this one archives and stops.
-    #
-    # The .ipa is in `artifacts` above, so it can be uploaded by hand in the meantime.
-    #
-    # To enable uploading, do BOTH of these together — neither works alone:
-    #
-    #   1. In Codemagic: Teams > Integrations > App Store Connect, add the API key and give the
-    #      integration a name.
-    #   2. Uncomment both stanzas below and replace <INTEGRATION_NAME> with that name.
-    #
-    # integrations:
-    #   app_store_connect: <INTEGRATION_NAME>
-    #
-    # publishing:
-    #   app_store_connect:
-    #     auth: integration
-    #     submit_to_testflight: true
-    #     # Deliberately absent even then: `submit_to_app_store`. Submission is a human
-    #     # decision and this repository does not make it.
-    #     #
-    #     # Also deliberately absent: any internal-testing-only restriction. A build limited
-    #     # that way cannot later be selected for App Store review, which is discovered at the
-    #     # worst possible moment.
-    #     beta_groups: []
-    #
-    # Codemagic reports the required path as `workflow -> integrations -> app_store_connect`.
-    # Check the current schema in Codemagic's docs before uncommenting: nothing in this
-    # repository can validate it, and the last attempt is what produced this comment.
+    publishing:
+      app_store_connect:
+        # The environment-variable form, deliberately, not `auth: integration`.
+        #
+        # `auth: integration` names an App Store Connect integration configured in the Codemagic
+        # UI, and Codemagic validates the *whole* file: if that name is wrong or the integration
+        # does not exist, the entire codemagic.yaml is rejected and every workflow stops —
+        # including the fast-verify gate. That already happened here once. This form depends on
+        # nothing outside the `offrent_appstore` group the preflight above already requires, so
+        # there is no name to get wrong.
+        #
+        # Shape taken from Codemagic's own current sample project, not from memory:
+        # codemagic-ci-cd/codemagic-sample-projects → ios/ios-automatic-code-signing-demo-project
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+
+        # Uploads the build. Submits it to nothing.
+        #
+        # `submit_to_testflight: true` submits to TestFlight *beta review*, which is only needed
+        # to distribute to external tester groups, and which is a submission to Apple. Internal
+        # testers — App Store Connect users with access to this app — can install the build as
+        # soon as processing finishes, with no review at all. That is what installing it on your
+        # own phone needs.
+        #
+        # To add external testers later: set this true and name the groups under `beta_groups`.
+        submit_to_testflight: false
+
+        # Deliberately absent: `submit_to_app_store`. Submission for App Store review is a human
+        # decision and this repository does not make it. `verify_repository.py` fails the build
+        # if it ever appears here.
+        #
+        # Also deliberately absent: `testFlightInternalTestingOnly`. A build restricted that way
+        # cannot later be selected for App Store review, which is discovered at the worst
+        # possible moment.
