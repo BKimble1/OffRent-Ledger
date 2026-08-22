@@ -404,6 +404,21 @@ def check_tests_do_not_sleep_for_a_result() -> None:
                 )
 
 
+def check_website_is_generated() -> None:
+    check("Website/ matches its generator and the bundled legal text")
+    # The site's privacy and terms pages are rendered from the same Markdown the app displays in
+    # Settings. That is the whole reason the site is generated rather than written: a policy that
+    # says one thing in the app and another on the web is an App Review problem and a broken
+    # promise. This check is what stops somebody fixing a typo in the HTML and leaving the app
+    # saying the old thing.
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "generate_website.py"), "--check"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        fail("website-stale", (result.stdout + result.stderr).strip())
+
+
 def check_no_unsafe_unwraps() -> None:
     check("No force-try or force-cast on production paths")
     for path in swift_files(APP_SOURCES, SHARED_SOURCES, WIDGET_SOURCES):
@@ -1076,6 +1091,7 @@ def main() -> int:
         check_ui_test_identifiers_match,
         check_no_colour_only_status,
         check_generated_project_is_current,
+        check_website_is_generated,
         check_pbxproj_integrity,
         check_slow_type_check_warnings_enabled,
         check_scheme_is_shared,

@@ -3,122 +3,361 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Overview · OffRent Ledger</title>
-<meta name="description" content="OffRent Ledger — equipment rental off-rent and invoice tracking for contractors.">
-<style>
-:root {
-  color-scheme: light dark;
-  --ink: #1a1c22;
-  --muted: #5b6270;
-  --bg: #fbfaf7;
-  --card: #ffffff;
-  --accent: #d86616;
-  --rule: #e3e0d9;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #eceef2; --muted: #a2aab8; --bg: #16181c;
-    --card: #1e2126; --accent: #f28a36; --rule: #313640;
-  }
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0; padding: 0;
-  background: var(--bg); color: var(--ink);
-  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-.wrap { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
-header { border-bottom: 1px solid var(--rule); padding-bottom: 1.25rem; margin-bottom: 2rem; }
-.mark { display: flex; align-items: center; gap: .65rem; }
-.mark svg { width: 34px; height: 34px; flex: none; }
-.mark strong { font-size: 1.1rem; letter-spacing: -0.01em; }
-.mark span { color: var(--muted); font-size: .85rem; }
-nav { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 1.1rem; font-size: .9rem; }
-nav a { color: var(--accent); text-decoration: none; }
-nav a:hover { text-decoration: underline; }
-h1 { font-size: 1.75rem; letter-spacing: -0.02em; margin: 0 0 .5rem; }
-h2 { font-size: 1.15rem; margin: 2.2rem 0 .6rem; letter-spacing: -0.01em; }
-h3 { font-size: 1rem; margin: 1.5rem 0 .4rem; }
-p, li { color: var(--ink); }
-ul { padding-left: 1.2rem; }
-li { margin: .3rem 0; }
-strong { font-weight: 650; }
-hr { border: 0; border-top: 1px solid var(--rule); margin: 2.5rem 0; }
-.note {
-  background: var(--card); border: 1px solid var(--rule);
-  border-left: 3px solid var(--accent);
-  border-radius: 10px; padding: 1rem 1.15rem; margin: 1.5rem 0;
-}
-.note p { margin: 0; }
-footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: .85rem; }
-footer a { color: var(--accent); }
-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
-</style>
+<title>OffRent Ledger</title>
+<meta name="description" content="OffRent Ledger tracks active equipment-rental costs, records off-rent confirmations, follows equipment awaiting pickup and reviews final invoices for possible mismatches — from your iPhone.">
+<link rel="canonical" href="https://offrent.idlery.com/">
+<meta name="theme-color" content="#171A1F">
+<meta name="color-scheme" content="light">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OffRent Ledger">
+<meta property="og:title" content="OffRent Ledger">
+<meta property="og:description" content="OffRent Ledger tracks active equipment-rental costs, records off-rent confirmations, follows equipment awaiting pickup and reviews final invoices for possible mismatches — from your iPhone.">
+<meta property="og:url" content="https://offrent.idlery.com/">
+<meta property="og:image" content="https://offrent.idlery.com/assets/img/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="OffRent Ledger — stop the rental clock with proof.">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="/assets/img/favicon.ico" sizes="any">
+<link rel="icon" href="/assets/img/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="/assets/css/site.css">
 </head>
 <body>
-<div class="wrap">
-<header>
-  <div class="mark">
-    <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M30 6 H70 L94 30 V70 L70 94 H30 L6 70 V30 Z" fill="none" stroke="var(--accent)" stroke-width="11" stroke-linejoin="round"/><circle cx="50" cy="55" r="6" fill="var(--ink)"/><path d="M50 55 L70 34" stroke="var(--ink)" stroke-width="8" stroke-linecap="round"/></svg>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav">
+  <div class="shell nav__inner">
+    <a class="brand" href="/">
+      <img src="/assets/img/icon-64.png" width="30" height="30" alt="">
+      <span>OffRent Ledger</span>
+    </a>
+    <nav class="nav__links" aria-label="Primary"><a href="/#features">Features</a><a href="/#how">How it works</a><a href="/privacy/">Privacy</a><a href="/support/">Support</a></nav>
+    <div class="nav__cta"><span class="soon soon--sm"><span class="soon__dot" aria-hidden="true"></span>Coming soon to the App Store</span></div>
+  </div>
+</header>
+<main id="main">
+
+<section class="hero">
+  <div class="shell hero__grid">
     <div>
-      <strong>OffRent Ledger</strong><br>
-      <span>Idlery Services LLC</span>
+      <span class="eyebrow">For small contractors</span>
+      <h1>Stop the rental clock <span class="accent">with proof.</span></h1>
+      <p class="hero__sub">Track active rental costs, document off-rent confirmations, follow
+      equipment awaiting pickup, and catch questionable final charges — all from your iPhone.</p>
+      <div class="actions">
+        <span class="soon"><span class="soon__dot" aria-hidden="true"></span>Coming soon to the App Store</span>
+        <a class="btn btn--ghost" href="#how">See how it works</a>
+      </div>
+      <p class="hero__note"><strong>You</strong> call the rental company. OffRent Ledger keeps the
+      record of what was said, when, and by whom — it does not contact vendors and does not end
+      rentals.</p>
+    </div>
+    <div><div class="phone">
+    <div class="phone__screen"><div class="reserved">
+        <span class="reserved__tag">Screenshot pending</span>
+        <span class="reserved__name">Today</span>
+        <span class="reserved__file">today.png</span>
+      </div></div>
+  </div></div>
+  </div>
+</section>
+
+<section class="band-sand">
+  <div class="shell">
+    <span class="eyebrow">The problem</span>
+    <h2>Calling it off rent is not the end of the money.</h2>
+    <p class="lede">You phone the yard on a Friday and tell them you are done with the skid steer.
+    Then the machine sits on site until Wednesday. The invoice arrives three weeks later with an
+    extra week on it, and nobody can remember who you spoke to, or when.</p>
+    <div class="grid grid--3" style="margin-top:2.5rem">
+      <article class="card">
+        <h3>The call is not written down</h3>
+        <p>A confirmation number on the back of a receipt is not a record. Two months later,
+        neither is a memory of the call.</p>
+      </article>
+      <article class="card">
+        <h3>Pickup is a separate event</h3>
+        <p>Off rent and collected are different days. Which one the invoice bills to is worth
+        knowing before you pay it.</p>
+      </article>
+      <article class="card">
+        <h3>The invoice arrives cold</h3>
+        <p>Checking a final invoice means reconstructing dates and rates from memory — which is
+        why most of them are simply paid.</p>
+      </article>
     </div>
   </div>
-  <nav>
-    <a href="./">Overview</a>
-    <a href="./privacy.html">Privacy</a>
-    <a href="./terms.html">Terms</a>
-    <a href="./support.html">Support</a>
-  </nav>
-</header>
+</section>
 
-<h1>Know what every rental is costing you</h1>
-<p>OffRent Ledger is an iPhone app for contractors who rent equipment. Track what a machine is
-costing while it sits on the jobsite, capture the rental company's off-rent confirmation number,
-record pickup, and check the final invoice against the terms you confirmed.</p>
+<section id="features">
+  <div class="shell">
+    <span class="eyebrow">What it does</span>
+    <h2>Six things, done properly.</h2>
+    <p class="lede">Every figure comes from the rates and dates you entered. The app does not
+    interpret your contract and does not decide anything for you.</p>
+    <div class="grid grid--3" style="margin-top:2.5rem">
+      <article class="card">
+        <div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg></div>
+        <h3>See what is running now</h3>
+        <p>Estimated rent running across every open rental, from the delivery date and the rates you entered. One number on the Today screen, updated as the days pass.</p>
+      </article>
+      <article class="card">
+        <div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 17.5 9.5 11l4 4L21 7.5"/><path d="M15.5 7.5H21V13"/></svg></div>
+        <h3>See the next rate change coming</h3>
+        <p>Daily to weekly, weekly to four-week — the app shows when the next roll-over falls and what it is expected to add, so a decision to keep a machine is a decision, not a surprise.</p>
+      </article>
+      <article class="card">
+        <div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.2 19.2 6v5.4c0 4.3-2.9 7.6-7.2 9.4-4.3-1.8-7.2-5.1-7.2-9.4V6Z"/><path d="m8.9 11.9 2.2 2.2 4-4.4"/></svg></div>
+        <h3>Record the off-rent confirmation</h3>
+        <p>Confirmation number, who you spoke to, how you reached them, and when. Written down at the moment you get it, while you are still standing in the yard.</p>
+      </article>
+      <article class="card">
+        <div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.8 15.6V7.2a.9.9 0 0 1 .9-.9h9.4v9.3"/><path d="M13.1 9.6h3.6l3.5 3.4v2.6"/><circle cx="7.2" cy="17.4" r="1.9"/><circle cx="16.8" cy="17.4" r="1.9"/><path d="M9.1 17.4h5.8"/></svg></div>
+        <h3>Follow what is awaiting pickup</h3>
+        <p>Confirmed off rent is not the same as collected. Equipment stays on the Awaiting pickup list until you record that it actually left.</p>
+      </article>
+      <article class="card">
+        <div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 17a8 8 0 1 1 16 0"/><path d="m12 17 3.6-4.6"/><circle cx="12" cy="17" r="1.2"/></svg></div>
+        <h3>Document meter, fuel and condition</h3>
+        <p>Photograph the hour meter, the fuel gauge and the condition at hand-back, with the reading you noted. The state of the machine when you finished with it, kept with the rental.</p>
+      </article>
+      <article class="card">
+        <div class="card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6.5 3.2h11v17.6l-2.7-1.7-2.8 1.7-2.8-1.7-2.7 1.7Z"/><path d="M9.4 8.1h5.2M9.4 11.7h5.2M9.4 15.3h3"/></svg></div>
+        <h3>Review the final invoice</h3>
+        <p>The app compares the invoice against the terms you confirmed and flags a possible mismatch — an extra rental day, a rate that is not the one you entered — for you to look at.</p>
+      </article>
+    </div>
+  </div>
+</section>
 
-<div class="note">
-  <p><strong>OffRent Ledger does not notify the rental company or end your rental.</strong>
-  Contact the vendor directly and obtain its confirmation number. The app helps you record what
-  happened, reminds you to get that number, and keeps the evidence together.</p>
-</div>
+<section id="how" class="band-dark">
+  <div class="shell">
+    <span class="eyebrow">How it works</span>
+    <h2>From delivery to the final invoice.</h2>
+    <p class="lede">One workflow, six steps. You stay in control of every one of them.</p>
+    <ol class="steps">
+      <li>
+        <h3>Add or scan the rental</h3>
+        <p>Type it in, or scan the rental contract with the camera. Text recognition runs on your iPhone; every value it reads waits for you to confirm it before anything is saved.</p>
+      </li>
+      <li>
+        <h3>Watch the cost and the timing</h3>
+        <p>Estimated rent running, the next rate change, and how long the machine has been on the ground. Based on the terms you confirmed.</p>
+      </li>
+      <li>
+        <h3>Mark it done, then make the call</h3>
+        <p>You contact the rental company — the app opens your dialler or an email draft. It does not contact anyone for you.</p>
+      </li>
+      <li>
+        <h3>Record the vendor confirmation</h3>
+        <p>Confirmation number, representative, method and time. Optionally a one-off location. The rental moves to Vendor confirmation recorded, and the estimate stops accruing there.</p>
+      </li>
+      <li>
+        <h3>Track it until it is collected</h3>
+        <p>Awaiting pickup, until you record the pickup with the meter reading, the fuel level and photographs of the condition.</p>
+      </li>
+      <li>
+        <h3>Check the invoice, export if you need to</h3>
+        <p>When the final invoice arrives, attach it and review. If you decide to question a charge, export a PDF packet with the timeline, the confirmation and the photographs.</p>
+      </li>
+    </ol>
+    <div class="truth" style="margin-top:2.75rem">
+      <p><strong>OffRent Ledger does not contact rental companies and does not end rentals.</strong>
+      It can open your dialler or start an email draft, but you make the contact. Nothing recorded
+      in the app is communicated to any rental company, and nothing in it changes your rental
+      agreement.</p>
+    </div>
+  </div>
+</section>
 
-<h2>What it does</h2>
-<ul>
-  <li>Estimates what each rental is costing, from the rates and dates you confirm.</li>
-  <li>Reminds you before a rate change so you can decide whether to keep the machine.</li>
-  <li>Walks you through contacting the vendor and recording its confirmation number.</li>
-  <li>Records pickup, meter readings, fuel level and condition photographs.</li>
-  <li>Lays a final invoice next to the terms you confirmed and flags anything worth a look.</li>
-  <li>Assembles it all into one PDF you can keep or send.</li>
-</ul>
+<section>
+  <div class="shell">
+    <span class="eyebrow">Inside the app</span>
+    <h2>The screens you will actually use.</h2>
+    <div class="showcase">
+      <figure>
+        <div class="phone">
+    <div class="phone__screen"><div class="reserved">
+        <span class="reserved__tag">Screenshot pending</span>
+        <span class="reserved__name">Today</span>
+        <span class="reserved__file">today.png</span>
+      </div></div>
+  </div>
+        <figcaption>
+          <span class="shot__name">Today</span>
+          <span class="shot__desc">Estimated rent running across every open rental, and what needs attention.</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <div class="phone">
+    <div class="phone__screen"><div class="reserved">
+        <span class="reserved__tag">Screenshot pending</span>
+        <span class="reserved__name">Rentals</span>
+        <span class="reserved__file">rentals.png</span>
+      </div></div>
+  </div>
+        <figcaption>
+          <span class="shot__name">Rentals</span>
+          <span class="shot__desc">Every rental with its status, searchable by machine, vendor or jobsite.</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <div class="phone">
+    <div class="phone__screen"><div class="reserved">
+        <span class="reserved__tag">Screenshot pending</span>
+        <span class="reserved__name">Rental detail</span>
+        <span class="reserved__file">rental-detail.png</span>
+      </div></div>
+  </div>
+        <figcaption>
+          <span class="shot__name">Rental detail</span>
+          <span class="shot__desc">Terms, running estimate, next rate change and the full timeline.</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <div class="phone">
+    <div class="phone__screen"><div class="reserved">
+        <span class="reserved__tag">Screenshot pending</span>
+        <span class="reserved__name">Scan review</span>
+        <span class="reserved__file">scan-review.png</span>
+      </div></div>
+  </div>
+        <figcaption>
+          <span class="shot__name">Scan review</span>
+          <span class="shot__desc">What the scan read, with every value waiting for you to confirm it.</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <div class="phone">
+    <div class="phone__screen"><div class="reserved">
+        <span class="reserved__tag">Screenshot pending</span>
+        <span class="reserved__name">Vendor confirmation recorded</span>
+        <span class="reserved__file">confirmation.png</span>
+      </div></div>
+  </div>
+        <figcaption>
+          <span class="shot__name">Vendor confirmation recorded</span>
+          <span class="shot__desc">Confirmation number, who you spoke to, and when.</span>
+        </figcaption>
+      </figure>
+      <figure>
+        <div class="phone">
+    <div class="phone__screen"><div class="reserved">
+        <span class="reserved__tag">Screenshot pending</span>
+        <span class="reserved__name">Awaiting pickup</span>
+        <span class="reserved__file">awaiting-pickup.png</span>
+      </div></div>
+  </div>
+        <figcaption>
+          <span class="shot__name">Awaiting pickup</span>
+          <span class="shot__desc">Equipment confirmed off rent but still on the ground.</span>
+        </figcaption>
+      </figure>
+    </div>
+    <div class="truth truth--light" style="margin-top:2.5rem">
+      <p><strong>These frames are reserved, not decorative.</strong> Real screenshots of
+      OffRent Ledger go here. Nothing on this page is a mock-up of an interface that does not exist —
+      an invented screen is not a preview, it is a picture of software nobody has run.</p>
+    </div>
+  </div>
+</section>
 
-<h2>What it is not</h2>
-<ul>
-  <li>It is not a way to contact a rental company. You do that.</li>
-  <li>Its figures are estimates, not invoices, and not a statement of what you owe.</li>
-  <li>A "possible mismatch" means an invoice differs from what you entered. It is not a finding
-  that any charge is wrong.</li>
-  <li>It does not provide legal, accounting, insurance or contract advice.</li>
-</ul>
+<section class="band-dark">
+  <div class="shell">
+    <span class="eyebrow">Privacy and field use</span>
+    <h2>It all stays on your iPhone.</h2>
+    <p class="lede">Not a policy position — an architecture. There is no server, so there is
+    nowhere for your rentals, documents, photographs or location to go.</p>
+    <ul class="checks">
+      <li>No account, no sign-up, no password</li>
+      <li>No server — there is nowhere for your data to go</li>
+      <li>No analytics, telemetry or crash-reporting SDK</li>
+      <li>No advertising and no ad identifier</li>
+      <li>Text recognition runs on your iPhone, never in a cloud</li>
+      <li>Works with no signal, in a yard or a basement</li>
+      <li>Location is one optional reading, only when you tap for it</li>
+      <li>Export a CSV, a JSON backup or a PDF at any time — not behind the subscription</li>
+    </ul>
+    <div class="actions">
+      <a class="btn btn--ghost" href="/privacy/">Read the Privacy Policy</a>
+    </div>
+  </div>
+</section>
 
-<h2>Your data</h2>
-<p>Everything stays on your iPhone. There is no account, no server, no analytics and no tracking.
-Scanning and text recognition run on the device. See the
-<a href="./privacy.html">privacy policy</a>.</p>
+<section class="band-ivory">
+  <div class="shell">
+    <span class="eyebrow">Pricing</span>
+    <h2>Free for one rental. Pro for a fleet.</h2>
+    <p class="lede">Ending a subscription never removes or hides anything you have already
+    recorded. You keep viewing, editing, resolving, exporting and deleting all of it.</p>
+    <div class="tiers">
+      <article class="tier">
+        <span class="tier__name">Free</span>
+        <p class="tier__price">$0</p>
+        <p style="color:var(--ink-muted);margin:0">One open rental at a time.</p>
+        <ul>
+          <li>The complete workflow on that rental</li>
+          <li>Scanning and on-device text recognition</li>
+          <li>Invoice review and possible-mismatch flags</li>
+          <li>CSV, JSON and PDF export</li>
+        </ul>
+      </article>
+      <article class="tier tier--pro">
+        <span class="tier__name">OffRent Ledger Pro</span>
+        <p class="tier__price">$14.99 <span>/ month</span></p>
+        <p style="color:var(--ink-muted);margin:0">or $119.99 a year.</p>
+        <ul>
+          <li>Unlimited open rentals</li>
+          <li>Home-screen widget</li>
+          <li>The full reminder set</li>
+          <li>Everything in Free, unchanged</li>
+        </ul>
+      </article>
+    </div>
+    <p style="margin-top:1.5rem;font-size:0.9rem;color:var(--ink-muted);max-width:60ch">
+      Auto-renewing subscription sold through Apple. Prices shown in the app come from the App
+      Store and are current for your storefront. Manage or cancel any time in your Apple Account
+      settings. See the <a href="/terms/">Terms of Use</a>.</p>
+  </div>
+</section>
 
-<h2>Pricing</h2>
-<p>Free for one open rental at a time, with the complete workflow available on it. OffRent Ledger Pro
-adds unlimited open rentals, the invoice audit, evidence packet PDFs, the widget, advanced
-reminders and full history export. Current prices are shown in the App Store.</p>
-<p>Cancelling never removes or hides anything you have already recorded.</p>
+<section class="band-dark">
+  <div class="shell" style="text-align:center">
+    <h2>Know what the rental cost, and be able to show it.</h2>
+    <p class="lede" style="margin-inline:auto">Not a promise about what you will save. A record of
+    what happened, kept while it is still fresh, and ready if you decide to question a charge.</p>
+    <div class="actions" style="justify-content:center">
+      <span class="soon"><span class="soon__dot" aria-hidden="true"></span>Coming soon to the App Store</span>
+      <a class="btn btn--ghost" href="/support/">Read the support guide</a>
+    </div>
+  </div>
+</section>
 
-<footer>
-  <p>OffRent Ledger is a record-keeping tool. It does not contact rental companies and does not end
-  rentals.</p>
-  <p>Idlery Services LLC · <a href="mailto:support@idlery.com">support@idlery.com</a></p>
+</main>
+<footer class="footer">
+  <div class="shell">
+    <div class="footer__top">
+      <a class="footer__brand" href="/">
+        <img src="/assets/img/icon-64.png" width="34" height="34" alt="">
+        <span>OffRent Ledger</span>
+      </a>
+      <nav aria-label="Footer">
+        <a href="/">Overview</a>
+        <a href="/privacy/">Privacy Policy</a>
+        <a href="/terms/">Terms of Use</a>
+        <a href="/support/">Support</a>
+        <a href="mailto:support@idlery.com">support@idlery.com</a>
+      </nav>
+    </div>
+    <div class="footer__legal">
+      <p>&copy; 2026 Idlery Services LLC. All rights reserved.</p>
+      <p>offrent.idlery.com</p>
+      <p>OffRent Ledger does not contact rental companies and does not end rentals.</p>
+    </div>
+  </div>
 </footer>
-</div>
 </body>
 </html>

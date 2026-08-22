@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://offrent.idlery.com/sitemap.xml
