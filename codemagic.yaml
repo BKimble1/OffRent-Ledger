@@ -229,119 +229,70 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m2
 
+    # Reuse the same team-level App Store Connect integration that already signs and publishes
+    # CoreCredit. The integration is not app-specific; OffRent keeps its own identifiers below.
+    integrations:
+      app_store_connect: "CoreCredit App Store"
+
     environment:
-      xcode: latest
-      groups:
-        # Both groups must exist in Codemagic before this workflow can run. Nothing is stored here.
-        #   offrent_appstore  → APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER,
-        #                       APP_STORE_CONNECT_PRIVATE_KEY, APP_APPLE_ID
-        #   offrent_signing   → CERTIFICATE_PRIVATE_KEY
-        - offrent_appstore
-        - offrent_signing
+      xcode: 26.4
+      # Codemagic-managed App Store signing. The main bundle identifier also matches the widget
+      # prefix; the explicit widget fetch below guarantees its extension profile is installed.
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.idlery.offrent
       vars:
         XCODE_SCHEME: OffRentLedger
         XCODE_PROJECT: OffRentLedger.xcodeproj
         BUNDLE_ID: com.idlery.offrent
         WIDGET_BUNDLE_ID: com.idlery.offrent.widget
+        APP_STORE_APPLE_ID: "6804070266"
 
     scripts:
-      # Refuses to start rather than failing two thirds of the way through with a signing error
-      # that reads like a code problem.
-      - name: Preflight — credentials and records must already exist
-        script: |
-          missing=0
-          for name in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER \
-                      APP_STORE_CONNECT_PRIVATE_KEY CERTIFICATE_PRIVATE_KEY APP_APPLE_ID; do
-            eval "value=\${$name:-}"
-            if [ -z "$value" ]; then
-              echo "MISSING: $name"
-              missing=1
-            fi
-          done
-          if [ "$missing" = "1" ]; then
-            echo ""
-            echo "This workflow signs and uploads. It will not run until the App Store Connect"
-            echo "API key and the signing certificate exist in Codemagic, and until the app"
-            echo "record and both App IDs have been created in App Store Connect:"
-            echo ""
-            echo "  com.idlery.offrent          (App Groups capability)"
-            echo "  com.idlery.offrent.widget   (App Groups capability)"
-            echo "  group.com.idlery.offrent"
-            echo ""
-            echo "See RELEASE_CHECKLIST.md section 3. Nothing here creates them."
-            exit 1
-          fi
-          echo "Credentials present."
-
       - name: Repository invariants
-        script: python3 scripts/verify_repository.py
+        script: |
+          set -e
+          python3 scripts/verify_repository.py
 
       - name: Portable domain tests
-        script: swift test --package-path .
-
-      # The widget needs its own profile. Fetching only the app's is the classic way an archive
-      # succeeds locally and then fails at export with an unhelpful message.
-      - name: Fetch signing files for the app and the widget
         script: |
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
-          app-store-connect fetch-signing-files "$WIDGET_BUNDLE_ID" --type IOS_APP_STORE --create
-          keychain initialize
-          keychain add-certificates
+          set -e
+          swift test --package-path .
+
+      # Managed signing installs the distribution certificate and main app profile before scripts
+      # run. Fetch the embedded widget's separate App Store profile into that same keychain.
+      - name: Fetch the widget provisioning profile
+        script: |
+          set -e
+          app-store-connect fetch-signing-files "$WIDGET_BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+
+      - name: Apply App Store signing
+        script: |
+          set -e
           xcode-project use-profiles
 
-      - name: Set the build number from App Store Connect
+      - name: Set unique build number
         script: |
-          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_APPLE_ID" 2>/dev/null || echo 0)
-          NEXT=$((LATEST + 1))
-          echo "Building $NEXT"
-          agvtool new-version -all "$NEXT"
+          set -e
+          agvtool new-version -all "$PROJECT_BUILD_NUMBER"
 
-      - name: Archive
+      - name: Build signed IPA
         script: |
-          set -o pipefail
+          set -e
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME" \
-            --config Release \
-            | tee "$CM_BUILD_DIR/xcodebuild-archive.log"
+            --scheme "$XCODE_SCHEME"
 
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - $CM_BUILD_DIR/*.log
 
+    # Upload the normal App Store-signed IPA to App Store Connect without automated App Review,
+    # beta-group assignment, or an internal-only export restriction. The owner manually assigns
+    # the processed build to internal TestFlight testers.
     publishing:
       app_store_connect:
-        # The environment-variable form, deliberately, not `auth: integration`.
-        #
-        # `auth: integration` names an App Store Connect integration configured in the Codemagic
-        # UI, and Codemagic validates the *whole* file: if that name is wrong or the integration
-        # does not exist, the entire codemagic.yaml is rejected and every workflow stops —
-        # including the fast-verify gate. That already happened here once. This form depends on
-        # nothing outside the `offrent_appstore` group the preflight above already requires, so
-        # there is no name to get wrong.
-        #
-        # Shape taken from Codemagic's own current sample project, not from memory:
-        # codemagic-ci-cd/codemagic-sample-projects → ios/ios-automatic-code-signing-demo-project
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-
-        # Uploads the build. Submits it to nothing.
-        #
-        # `submit_to_testflight: true` submits to TestFlight *beta review*, which is only needed
-        # to distribute to external tester groups, and which is a submission to Apple. Internal
-        # testers — App Store Connect users with access to this app — can install the build as
-        # soon as processing finishes, with no review at all. That is what installing it on your
-        # own phone needs.
-        #
-        # To add external testers later: set this true and name the groups under `beta_groups`.
-        submit_to_testflight: false
-
-        # Deliberately absent: `submit_to_app_store`. Submission for App Store review is a human
-        # decision and this repository does not make it. `verify_repository.py` fails the build
-        # if it ever appears here.
-        #
-        # Also deliberately absent: `testFlightInternalTestingOnly`. A build restricted that way
-        # cannot later be selected for App Store review, which is discovered at the worst
-        # possible moment.
+        auth: integration
