@@ -236,8 +236,8 @@ workflows:
 
     environment:
       xcode: 26.4
-      # Codemagic-managed App Store signing. The main bundle identifier also matches the widget
-      # prefix; the explicit widget fetch below guarantees its extension profile is installed.
+      # Codemagic-managed App Store signing. The main bundle identifier prefix also matches the
+      # embedded widget, so Codemagic installs the compatible app and extension profiles.
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.idlery.offrent
@@ -245,7 +245,6 @@ workflows:
         XCODE_SCHEME: OffRentLedger
         XCODE_PROJECT: OffRentLedger.xcodeproj
         BUNDLE_ID: com.idlery.offrent
-        WIDGET_BUNDLE_ID: com.idlery.offrent.widget
         APP_STORE_APPLE_ID: "6804070266"
 
     scripts:
@@ -258,15 +257,6 @@ workflows:
         script: |
           set -e
           swift test --package-path .
-
-      # Managed signing installs the distribution certificate and main app profile before scripts
-      # run. Fetch the embedded widget's separate App Store profile into that same keychain.
-      - name: Fetch the widget provisioning profile
-        script: |
-          set -e
-          app-store-connect fetch-signing-files "$WIDGET_BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
 
       - name: Apply App Store signing
         script: |
