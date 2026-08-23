@@ -119,9 +119,15 @@ def check_svg(path: pathlib.Path, number: int) -> None:
         if banned in text:
             bad(path.name, f"contains {why}")
 
-    for word in ["lorem", "ipsum", "placeholder text", "sample", "mockup", "template 0"]:
-        if word in text.lower():
-            bad(path.name, f"contains the word {word!r} in the artwork")
+    # Placeholder copy, checked against what actually renders — the text nodes — rather than
+    # against the whole file. Scanning the file caught the word "sample" inside a comment
+    # explaining a rasteriser probe, which is a false positive: a comment is not artwork, and a
+    # check that fires on its own documentation trains people to ignore it.
+    rendered = " ".join(re.findall(r"<tspan[^>]*>([^<]*)</tspan>", text)
+                        + re.findall(r"<title[^>]*>([^<]*)</title>", text)).lower()
+    for word in ["lorem", "ipsum", "placeholder", "sample", "mockup", "your text", "headline here"]:
+        if word in rendered:
+            bad(path.name, f"the word {word!r} renders in the artwork")
 
 
 def main() -> int:

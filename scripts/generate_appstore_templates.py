@@ -47,7 +47,16 @@ GRAPHITE_3 = "#39414E"
 ORANGE = "#FF8A1F"
 ORANGE_DEEP = "#D2690D"
 STONE_SHADE = "#DFD9CC"    # the deepest pale field used behind type
-WARM_GRAY = "#6E695F"      # neutral-warm, for comparison lines on graphite
+
+# Templates 2 and 5 sit on their own stones, a step down from STONE and a step warmer — red is
+# held while blue falls, which is what makes a grey read as warm rather than merely darker.
+# STONE is r-b 13; these are 19 and 24.
+STONE_WARM = "#DED7C8"     # template 2
+STONE_WARMER = "#D7CEBD"   # template 5, the deepest of the light five
+STONE_WARMER_2 = "#CFC5B0"  # its wedge
+WARM_GRAY = "#867F72"      # expected-cost lines on graphite. Lifted from #6E695F so the neutral
+                           # bars hold their own against the orange variance segment instead of
+                           # sinking into the ground.
 RAIL_LIGHT = "#52504A"     # phone rail on a light template
 RAIL_DARK = "#4C4840"      # phone rail on graphite
 
@@ -55,14 +64,14 @@ RAIL_DARK = "#4C4840"      # phone rail on graphite
 # washed out at App Store thumbnail size, which is the size that decides whether anyone opens
 # the listing. This is a warm dark gray at 9.4:1.
 INK_SUPPORT = "#413E38"
-IVORY_SUPPORT = "#C9C2B4"  # supporting copy on graphite: warm, not the old blue-gray #A8B0BC
+IVORY_SUPPORT = "#DAD4C7"  # supporting copy on graphite. Warm, and brighter than the #C9C2B4 it
+                           # replaced: 12.1:1 on #171A1F rather than 9.6:1.
 
 SCREEN_LIGHT = "#D8D2C7"   # the blank display on a light template
-SCREEN_DARK = "#4C4A45"    # the blank display on the graphite template.
-                           # Warm, deliberately. Every earlier pick was blue-grey — #2C333E,
-                           # then #39424F (one unit from GRAPHITE_3), then #434D5C — and a
-                           # blue-grey blank screen is the one element that would have read as
-                           # a sibling product's palette in the closing frame of the set.
+SCREEN_DARK = "#4A4A48"    # the blank display on the graphite template.
+                           # Neutral. Every earlier pick was blue-grey — #2C333E, then #39424F
+                           # (one unit from GRAPHITE_3), then #434D5C — and then the correction
+                           # overshot into brown. This is r-b 2: neither.
 
 FONT_STACK = "Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif"
 
@@ -107,19 +116,26 @@ def phone_svg(g: dict, *, screen_fill: str, dark: bool, rotation: float = 0.0) -
     The screen is a flat neutral and nothing else. It is a hole to drop a real screenshot into,
     and anything drawn inside it would have to be painted out again by whoever does that.
     """
-    shadow = "phoneShadowDark" if dark else "phoneShadow"
     body = "#0E1116" if dark else "#1E1D1B"
     rail = RAIL_DARK if dark else RAIL_LIGHT
 
-    transform = ""
-    if rotation:
-        cx = g["device_x"] + g["device_w"] / 2
-        cy = g["device_y"] + g["device_h"] / 2
-        transform = f' transform="rotate({rotation:.3f} {cx:.2f} {cy:.2f})"'
+    cx = g["device_x"] + g["device_w"] / 2
+    cy = g["device_y"] + g["device_h"] / 2
+    transform = f' transform="rotate({rotation:.3f} {cx:.2f} {cy:.2f})"' if rotation else ""
 
-    return f"""  <g class="device"{transform}>
+    # Identical on all six: 9% ambient behind, 10% contact under the bottom edge. The contact
+    # pool is what reads as "mounted"; the ambient one alone is what read as flat.
+    ambient = (f'<ellipse cx="{cx:.1f}" cy="{cy + g["device_h"] * 0.10:.1f}" '
+               f'rx="{g["device_w"] * 0.78:.1f}" ry="{g["device_h"] * 0.56:.1f}" '
+               f'fill="url(#deviceShadow)" opacity="0.09"/>')
+    contact = (f'<ellipse cx="{cx:.1f}" cy="{g["device_y"] + g["device_h"] + g["device_h"] * 0.018:.1f}" '
+               f'rx="{g["device_w"] * 0.47:.1f}" ry="{g["device_h"] * 0.040:.1f}" '
+               f'fill="url(#deviceShadow)" opacity="0.10"/>')
+
+    return f"""  <g class="device-shadow"{transform}>{ambient}{contact}</g>
+  <g class="device"{transform}>
     <rect x="{g['device_x']:.2f}" y="{g['device_y']:.2f}" width="{g['device_w']:.2f}" height="{g['device_h']:.2f}"
-          rx="{g['device_r']:.2f}" fill="{body}" filter="url(#{shadow})"/>
+          rx="{g['device_r']:.2f}" fill="{body}"/>
     <rect x="{g['device_x'] + 1.5:.2f}" y="{g['device_y'] + 1.5:.2f}"
           width="{g['device_w'] - 3:.2f}" height="{g['device_h'] - 3:.2f}"
           rx="{g['device_r'] - 1.5:.2f}" fill="none" stroke="{rail}" stroke-width="3"/>
@@ -311,13 +327,25 @@ def motif_variance(x: float, y: float, w: float, *, bar_h: float, gap: float, ex
 
 def defs(dark: bool) -> str:
     return f"""  <defs>
-    <filter id="phoneShadow" x="-40%" y="-25%" width="180%" height="160%">
-      <feDropShadow dx="0" dy="46" stdDeviation="52" flood-color="#5A4F3C" flood-opacity="0.30"/>
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3B342A" flood-opacity="0.20"/>
-    </filter>
-    <filter id="phoneShadowDark" x="-40%" y="-25%" width="180%" height="160%">
-      <feDropShadow dx="0" dy="52" stdDeviation="58" flood-color="#000000" flood-opacity="0.62"/>
-    </filter>
+    <!--
+      The device shadow is drawn, not filtered.
+
+      `feDropShadow` is silently ignored by cairosvg: a probe of a 50%-opacity drop shadow over a
+      known background came back with the background luminance unchanged at every sample point.
+      So the shadows in every previous version of these templates never rendered at all — which
+      is exactly why the devices looked flat, and why turning the opacity down would not have
+      helped. `feGaussianBlur` + `feOffset` renders, but with a hard edge where the falloff
+      should be.
+
+      Two radial gradients per device instead: a tight contact pool under the bottom edge and a
+      wide ambient one behind. Both render exactly, and both survive an editor that drops filters
+      on import — which Canva does.
+    -->
+    <radialGradient id="deviceShadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2E2A22" stop-opacity="1"/>
+      <stop offset="55%" stop-color="#2E2A22" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#2E2A22" stop-opacity="0"/>
+    </radialGradient>
     <radialGradient id="warmGlow" cx="50%" cy="16%" r="76%">
       <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.80"/>
       <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
@@ -336,14 +364,13 @@ def defs(dark: bool) -> str:
       <stop offset="0%" stop-color="{STONE}"/>
       <stop offset="100%" stop-color="{STONE}" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="emberGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="{ORANGE}" stop-opacity="0.115"/>
-      <stop offset="100%" stop-color="{ORANGE}" stop-opacity="0"/>
+    <radialGradient id="neutralLift" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.055"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="graphiteFade" x1="0" y1="0" x2="0.35" y2="1">
+    <linearGradient id="graphiteFade" x1="0" y1="0" x2="0.28" y2="1">
       <stop offset="0%" stop-color="{GRAPHITE}"/>
-      <stop offset="58%" stop-color="#1E2025"/>
-      <stop offset="100%" stop-color="#2A2B2E"/>
+      <stop offset="100%" stop-color="{GRAPHITE_2}"/>
     </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="{STONE}"/>
@@ -455,11 +482,12 @@ def background(kind: str, g: dict | None = None) -> str:
                 f'ry="{H * 0.30:.0f}" fill="{STONE}" opacity="0.55"/>')
 
     if kind == "stone":
-        # The deeper one. Reads as a distinctly different tone beside templates 1 and 3.
-        return (f'  <rect width="{W}" height="{H}" fill="{STONE}"/>\n'
+        # A step down and a step warmer than STONE, so it separates from templates 1 and 3 at
+        # thumbnail size rather than only at full resolution.
+        return (f'  <rect width="{W}" height="{H}" fill="{STONE_WARM}"/>\n'
                 f'  <rect width="{W}" height="{H}" fill="url(#topLift)"/>\n'
                 f'  <rect x="0" y="{H * 0.40:.0f}" width="{W}" height="{H * 0.60:.0f}" '
-                f'fill="{STONE_SHADE}" opacity="0.55"/>')
+                f'fill="{STONE_WARMER}" opacity="0.50"/>')
 
     if kind == "band":
         # Ivory, with an oversized pale document field behind the phone, tilted to the same
@@ -488,9 +516,9 @@ def background(kind: str, g: dict | None = None) -> str:
 
     if kind == "wedge":
         # The deepest of the light five. A single diagonal, nothing else.
-        return (f'  <rect width="{W}" height="{H}" fill="{STONE}"/>\n'
+        return (f'  <rect width="{W}" height="{H}" fill="{STONE_WARMER}"/>\n'
                 f'  <path d="M {W} 0 L {W} {H} L {W * 0.10:.0f} {H} Z" '
-                f'fill="{STONE_SHADE}" opacity="0.85"/>\n'
+                f'fill="{STONE_WARMER_2}" opacity="0.85"/>\n'
                 f'  <rect width="{W}" height="{H}" fill="url(#topLift)"/>')
 
     if kind == "graphite":
@@ -501,9 +529,13 @@ def background(kind: str, g: dict | None = None) -> str:
         # seam through it — a dirty texture, which is the one finish this palette must not have.
         # A smooth graphite-to-secondary-graphite fall and one small warm bloom in the corner
         # give the frame depth without tinting it.
+        # The two brand graphites and nothing else. The orange bloom that used to sit over the
+        # top of this is gone: at any opacity high enough to read, it tinted the whole frame,
+        # which is where the brown cast came from. Depth now comes from the fall between the two
+        # graphites plus a neutral highlight that adds no colour of its own.
         return (f'  <rect width="{W}" height="{H}" fill="url(#graphiteFade)"/>\n'
-                f'  <ellipse cx="{W * 0.82:.0f}" cy="{H * 0.10:.0f}" rx="{W * 0.62:.0f}" '
-                f'ry="{H * 0.20:.0f}" fill="url(#emberGlow)"/>')
+                f'  <ellipse cx="{W * 0.74:.0f}" cy="{H * 0.13:.0f}" rx="{W * 0.66:.0f}" '
+                f'ry="{H * 0.22:.0f}" fill="url(#neutralLift)"/>')
 
     raise ValueError(kind)
 

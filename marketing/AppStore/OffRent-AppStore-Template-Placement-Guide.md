@@ -167,7 +167,7 @@ To regenerate everything from source:
 | Secondary graphite | `#252A31` |
 | Construction orange | `#FF8A1F` |
 | Blank screen, light templates | `#D8D2C7` |
-| Blank screen, graphite template | `#4C4A45` |
+| Blank screen, graphite template | `#4A4A48` |
 
 Five of the six are light — warm ivory and pale stone with graphite structure. Template 6 is the
 single graphite frame, placed last so the gallery closes on its strongest contrast rather than

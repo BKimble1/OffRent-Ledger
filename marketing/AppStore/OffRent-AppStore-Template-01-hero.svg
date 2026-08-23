@@ -1,13 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1290" height="2796" viewBox="0 0 1290 2796" role="img" aria-label="OffRent Ledger App Store template 1">
   <title>OffRent Ledger — App Store template 1 — hero</title>
   <defs>
-    <filter id="phoneShadow" x="-40%" y="-25%" width="180%" height="160%">
-      <feDropShadow dx="0" dy="46" stdDeviation="52" flood-color="#5A4F3C" flood-opacity="0.30"/>
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3B342A" flood-opacity="0.20"/>
-    </filter>
-    <filter id="phoneShadowDark" x="-40%" y="-25%" width="180%" height="160%">
-      <feDropShadow dx="0" dy="52" stdDeviation="58" flood-color="#000000" flood-opacity="0.62"/>
-    </filter>
+    <!--
+      The device shadow is drawn, not filtered.
+
+      `feDropShadow` is silently ignored by cairosvg: a probe of a 50%-opacity drop shadow over a
+      known background came back with the background luminance unchanged at every sample point.
+      So the shadows in every previous version of these templates never rendered at all — which
+      is exactly why the devices looked flat, and why turning the opacity down would not have
+      helped. `feGaussianBlur` + `feOffset` renders, but with a hard edge where the falloff
+      should be.
+
+      Two radial gradients per device instead: a tight contact pool under the bottom edge and a
+      wide ambient one behind. Both render exactly, and both survive an editor that drops filters
+      on import — which Canva does.
+    -->
+    <radialGradient id="deviceShadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2E2A22" stop-opacity="1"/>
+      <stop offset="55%" stop-color="#2E2A22" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#2E2A22" stop-opacity="0"/>
+    </radialGradient>
     <radialGradient id="warmGlow" cx="50%" cy="16%" r="76%">
       <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.80"/>
       <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
@@ -26,14 +38,13 @@
       <stop offset="0%" stop-color="#E9E5DC"/>
       <stop offset="100%" stop-color="#E9E5DC" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="emberGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.115"/>
-      <stop offset="100%" stop-color="#FF8A1F" stop-opacity="0"/>
+    <radialGradient id="neutralLift" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.055"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="graphiteFade" x1="0" y1="0" x2="0.35" y2="1">
+    <linearGradient id="graphiteFade" x1="0" y1="0" x2="0.28" y2="1">
       <stop offset="0%" stop-color="#171A1F"/>
-      <stop offset="58%" stop-color="#1E2025"/>
-      <stop offset="100%" stop-color="#2A2B2E"/>
+      <stop offset="100%" stop-color="#252A31"/>
     </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#E9E5DC"/>
@@ -51,9 +62,10 @@
           stroke="#171A1F" stroke-width="9.9" stroke-linecap="round"/>
     <circle cx="1108.0" cy="252.0" r="8.3" fill="#171A1F"/>
   </g>
+  <g class="device-shadow"><ellipse cx="645.0" cy="2030.6" rx="646.4" ry="974.0" fill="url(#deviceShadow)" opacity="0.09"/><ellipse cx="645.0" cy="2757.6" rx="389.5" ry="69.6" fill="url(#deviceShadow)" opacity="0.10"/></g>
   <g class="device">
     <rect x="230.66" y="987.00" width="828.67" height="1739.28"
-          rx="116.38" fill="#1E1D1B" filter="url(#phoneShadow)"/>
+          rx="116.38" fill="#1E1D1B"/>
     <rect x="232.16" y="988.50"
           width="825.67" height="1736.28"
           rx="114.88" fill="none" stroke="#52504A" stroke-width="3"/>
