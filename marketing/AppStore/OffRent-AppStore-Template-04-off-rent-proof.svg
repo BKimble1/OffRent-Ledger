@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1290" height="2796" viewBox="0 0 1290 2796" role="img" aria-label="OffRent Ledger App Store template 4">
+  <title>OffRent Ledger — App Store template 4 — off-rent-proof</title>
+  <defs>
+    <filter id="phoneShadow" x="-40%" y="-25%" width="180%" height="160%">
+      <feDropShadow dx="0" dy="46" stdDeviation="52" flood-color="#5A4F3C" flood-opacity="0.30"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3B342A" flood-opacity="0.20"/>
+    </filter>
+    <filter id="phoneShadowDark" x="-40%" y="-25%" width="180%" height="160%">
+      <feDropShadow dx="0" dy="52" stdDeviation="58" flood-color="#000000" flood-opacity="0.62"/>
+    </filter>
+    <radialGradient id="warmGlow" cx="50%" cy="18%" r="78%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="emberGlow" cx="50%" cy="20%" r="72%">
+      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#FF8A1F" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9E5DC"/>
+      <stop offset="100%" stop-color="#F6F1E8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1290" height="2796" fill="#F6F1E8"/>
+  <rect x="0" y="0" width="1290" height="1845" fill="#E9E5DC" opacity="0.72"/>
+  <rect width="1290" height="2796" fill="url(#warmGlow)" opacity="0.5"/>
+  <g class="motif-stop">
+    <rect x="104.0" y="1960.0" width="1042.0" height="46.0" rx="23.0"
+          fill="none" stroke="#B2AA9B" stroke-width="7.0"/>
+    <rect x="104.0" y="1960.0" width="646.0" height="46.0" rx="23.0" fill="#FF8A1F"/>
+    <rect x="742.7" y="1931.5" width="14.7"
+          height="103.0" rx="7.4" fill="#B2AA9B"/>
+  </g>
+  <g class="device">
+    <rect x="170.57" y="168.00" width="780.86" height="1638.93"
+          rx="109.66" fill="#20242B" filter="url(#phoneShadow)"/>
+    <rect x="172.07" y="169.50"
+          width="777.86" height="1635.93"
+          rx="108.16" fill="none" stroke="#4A525F" stroke-width="3"/>
+    <rect class="screen-area" x="193.50" y="190.93"
+          width="735.00" height="1593.07"
+          rx="86.73" fill="#D8D2C7"/>
+    <rect x="454.17" y="209.65" width="213.66" height="62.67"
+          rx="31.33" fill="#0B0E12"/>
+  </g>
+  <text x="104.0" y="2246.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Record</tspan><tspan x="104.0" dy="118.7">off-rent proof.</tspan></text>
+  <text x="104.0" y="2513.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#5B6068" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Keep confirmation, meter, fuel,</tspan><tspan x="104.0" dy="70.7">and condition together.</tspan></text>
+</svg>

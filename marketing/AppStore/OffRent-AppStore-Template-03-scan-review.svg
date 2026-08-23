@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1290" height="2796" viewBox="0 0 1290 2796" role="img" aria-label="OffRent Ledger App Store template 3">
+  <title>OffRent Ledger — App Store template 3 — scan-review</title>
+  <defs>
+    <filter id="phoneShadow" x="-40%" y="-25%" width="180%" height="160%">
+      <feDropShadow dx="0" dy="46" stdDeviation="52" flood-color="#5A4F3C" flood-opacity="0.30"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3B342A" flood-opacity="0.20"/>
+    </filter>
+    <filter id="phoneShadowDark" x="-40%" y="-25%" width="180%" height="160%">
+      <feDropShadow dx="0" dy="52" stdDeviation="58" flood-color="#000000" flood-opacity="0.62"/>
+    </filter>
+    <radialGradient id="warmGlow" cx="50%" cy="18%" r="78%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="emberGlow" cx="50%" cy="20%" r="72%">
+      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#FF8A1F" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9E5DC"/>
+      <stop offset="100%" stop-color="#F6F1E8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1290" height="2796" fill="#F6F1E8"/>
+  <path d="M 0 839 L 1290 615 L 1290 2796 L 0 2796 Z" fill="#E9E5DC" opacity="0.62"/>
+  <g class="motif-scan"><path d="M 223.06400000000002 1216.65184 L 223.06400000000002 1031.0 L 408.71584 1031.0" fill="none" stroke="#FF8A1F" stroke-width="8" stroke-linecap="square"/><path d="M 881.2841599999999 1031.0 L 1066.936 1031.0 L 1066.936 1216.65184" fill="none" stroke="#BCB4A5" stroke-width="8" stroke-linecap="square"/><path d="M 1066.936 2453.894578604651 L 1066.936 2639.546418604651 L 881.2841599999999 2639.546418604651" fill="none" stroke="#FF8A1F" stroke-width="8" stroke-linecap="square"/><path d="M 408.71584 2639.546418604651 L 223.06400000000002 2639.546418604651 L 223.06400000000002 2453.894578604651" fill="none" stroke="#BCB4A5" stroke-width="8" stroke-linecap="square"/></g>
+  <g class="device" transform="rotate(-5.500 645.00 1835.27)">
+    <rect x="297.06" y="1105.00" width="695.87" height="1460.55"
+          rx="97.73" fill="#20242B" filter="url(#phoneShadow)"/>
+    <rect x="298.56" y="1106.50"
+          width="692.87" height="1457.55"
+          rx="96.23" fill="none" stroke="#4A525F" stroke-width="3"/>
+    <rect class="screen-area" x="317.50" y="1125.44"
+          width="655.00" height="1419.67"
+          rx="77.29" fill="#D8D2C7"/>
+    <rect x="549.80" y="1142.12" width="190.41" height="55.85"
+          rx="27.92" fill="#0B0E12"/>
+  </g>
+  <text x="104.0" y="440.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Scan rental details</tspan><tspan x="104.0" dy="118.7">in seconds.</tspan></text>
+  <text x="104.0" y="707.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#5B6068" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Review every field before</tspan><tspan x="104.0" dy="70.7">anything is saved.</tspan></text>
+</svg>

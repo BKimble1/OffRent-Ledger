@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1290" height="2796" viewBox="0 0 1290 2796" role="img" aria-label="OffRent Ledger App Store template 2">
+  <title>OffRent Ledger — App Store template 2 — active-costs</title>
+  <defs>
+    <filter id="phoneShadow" x="-40%" y="-25%" width="180%" height="160%">
+      <feDropShadow dx="0" dy="46" stdDeviation="52" flood-color="#5A4F3C" flood-opacity="0.30"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3B342A" flood-opacity="0.20"/>
+    </filter>
+    <filter id="phoneShadowDark" x="-40%" y="-25%" width="180%" height="160%">
+      <feDropShadow dx="0" dy="52" stdDeviation="58" flood-color="#000000" flood-opacity="0.62"/>
+    </filter>
+    <radialGradient id="warmGlow" cx="50%" cy="18%" r="78%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="emberGlow" cx="50%" cy="20%" r="72%">
+      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#FF8A1F" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9E5DC"/>
+      <stop offset="100%" stop-color="#F6F1E8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1290" height="2796" fill="url(#stoneFade)"/>
+  <rect x="0" y="0" width="1290" height="2796" fill="#E9E5DC" opacity="0.35"/>
+  <g class="motif-progression"><rect x="104.0" y="1144.0" width="26.0" height="54.0" rx="13.0" fill="#C6BFB0"/><rect x="152.0" y="1114.0" width="26.0" height="84.0" rx="13.0" fill="#C6BFB0"/><rect x="200.0" y="1084.0" width="26.0" height="114.0" rx="13.0" fill="#C6BFB0"/><rect x="248.0" y="1054.0" width="26.0" height="144.0" rx="13.0" fill="#C6BFB0"/><rect x="296.0" y="1024.0" width="26.0" height="174.0" rx="13.0" fill="#C6BFB0"/><rect x="344.0" y="994.0" width="26.0" height="204.0" rx="13.0" fill="#C6BFB0"/><rect x="392.0" y="964.0" width="26.0" height="234.0" rx="13.0" fill="#C6BFB0"/><rect x="440.0" y="934.0" width="26.0" height="264.0" rx="13.0" fill="#FF8A1F"/><rect x="488.0" y="904.0" width="26.0" height="294.0" rx="13.0" fill="#FF8A1F"/></g>
+  <g class="device">
+    <rect x="489.54" y="1300.00" width="764.93" height="1605.49"
+          rx="107.42" fill="#20242B" filter="url(#phoneShadow)"/>
+    <rect x="491.04" y="1301.50"
+          width="761.93" height="1602.49"
+          rx="105.92" fill="none" stroke="#4A525F" stroke-width="3"/>
+    <rect class="screen-area" x="512.00" y="1322.46"
+          width="720.00" height="1560.56"
+          rx="84.96" fill="#D8D2C7"/>
+    <rect x="767.35" y="1340.80" width="209.30" height="61.39"
+          rx="30.69" fill="#0B0E12"/>
+  </g>
+  <text x="104.0" y="440.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Control every</tspan><tspan x="104.0" dy="118.7">active rental.</tspan></text>
+  <text x="104.0" y="707.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#5B6068" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">See running costs and</tspan><tspan x="104.0" dy="70.7">upcoming rate changes.</tspan></text>
+</svg>
