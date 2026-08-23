@@ -46,14 +46,23 @@ GRAPHITE_2 = "#252A31"
 GRAPHITE_3 = "#39414E"
 ORANGE = "#FF8A1F"
 ORANGE_DEEP = "#D2690D"
-INK_MUTED = "#5B6068"
-IVORY_MUTED = "#A8B0BC"
+STONE_SHADE = "#DFD9CC"    # the deepest pale field used behind type
+WARM_GRAY = "#6E695F"      # neutral-warm, for comparison lines on graphite
+RAIL_LIGHT = "#52504A"     # phone rail on a light template
+RAIL_DARK = "#4C4840"      # phone rail on graphite
+
+# Supporting copy. The old #5B6068 was a cool gray at 5.4:1 on ivory — legible up close and
+# washed out at App Store thumbnail size, which is the size that decides whether anyone opens
+# the listing. This is a warm dark gray at 9.4:1.
+INK_SUPPORT = "#413E38"
+IVORY_SUPPORT = "#C9C2B4"  # supporting copy on graphite: warm, not the old blue-gray #A8B0BC
+
 SCREEN_LIGHT = "#D8D2C7"   # the blank display on a light template
-SCREEN_DARK = "#434D5C"    # the blank display on the graphite template. Light enough that the
-                           # device still reads as a device against graphite, and clearly
-                           # apart from GRAPHITE_3 — the first pick, #39424F, was one unit
-                           # from it, so the variance bars and the blank screen were the
-                           # same colour by accident.
+SCREEN_DARK = "#4C4A45"    # the blank display on the graphite template.
+                           # Warm, deliberately. Every earlier pick was blue-grey — #2C333E,
+                           # then #39424F (one unit from GRAPHITE_3), then #434D5C — and a
+                           # blue-grey blank screen is the one element that would have read as
+                           # a sibling product's palette in the closing frame of the set.
 
 FONT_STACK = "Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif"
 
@@ -99,8 +108,8 @@ def phone_svg(g: dict, *, screen_fill: str, dark: bool, rotation: float = 0.0) -
     and anything drawn inside it would have to be painted out again by whoever does that.
     """
     shadow = "phoneShadowDark" if dark else "phoneShadow"
-    body = "#0E1116" if dark else "#20242B"
-    rail = GRAPHITE_3 if dark else "#4A525F"
+    body = "#0E1116" if dark else "#1E1D1B"
+    rail = RAIL_DARK if dark else RAIL_LIGHT
 
     transform = ""
     if rotation:
@@ -177,19 +186,29 @@ def text_block(lines: list[str], *, x: float, y: float, weight: str, size: int, 
 # reason the gallery reads as one campaign at six different rhythms.
 
 def motif_meter_arc(cx: float, cy: float, r: float, *, sweep: float, ink: str,
-                    track: str, width: float) -> str:
-    """A partial ring — time elapsed, drawn as an arc rather than as a clock face."""
-    def point(fraction: float) -> tuple[float, float]:
-        angle = math.radians(-90 + 360 * fraction)
-        return cx + r * math.cos(angle), cy + r * math.sin(angle)
+                    track: str, width: float, hand: str) -> str:
+    """Elapsed rental time: a track ring, an orange arc, and a hand from the centre.
 
-    sx, sy = point(0.0)
-    ex, ey = point(sweep)
+    The hand and the hub are the point. Without them this was a three-quarter orange ring in a
+    top-right corner, which is the shape of a download or refresh glyph on every platform — an
+    unexplained control implying a feature the app does not have. A hub and a hand make it a
+    meter, which is what the headline is about.
+    """
+    def point(fraction: float, radius: float) -> tuple[float, float]:
+        angle = math.radians(-90 + 360 * fraction)
+        return cx + radius * math.cos(angle), cy + radius * math.sin(angle)
+
+    sx, sy = point(0.0, r)
+    ex, ey = point(sweep, r)
+    hx, hy = point(sweep, r * 0.60)
     large = 1 if sweep > 0.5 else 0
     return f"""  <g class="motif-meter">
     <circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="none" stroke="{track}" stroke-width="{width:.1f}"/>
     <path d="M {sx:.2f} {sy:.2f} A {r:.1f} {r:.1f} 0 {large} 1 {ex:.2f} {ey:.2f}"
           fill="none" stroke="{ink}" stroke-width="{width:.1f}" stroke-linecap="round"/>
+    <line x1="{cx:.1f}" y1="{cy:.1f}" x2="{hx:.2f}" y2="{hy:.2f}"
+          stroke="{hand}" stroke-width="{width * 0.62:.1f}" stroke-linecap="round"/>
+    <circle cx="{cx:.1f}" cy="{cy:.1f}" r="{width * 0.52:.1f}" fill="{hand}"/>
   </g>"""
 
 
@@ -299,14 +318,33 @@ def defs(dark: bool) -> str:
     <filter id="phoneShadowDark" x="-40%" y="-25%" width="180%" height="160%">
       <feDropShadow dx="0" dy="52" stdDeviation="58" flood-color="#000000" flood-opacity="0.62"/>
     </filter>
-    <radialGradient id="warmGlow" cx="50%" cy="18%" r="78%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    <radialGradient id="warmGlow" cx="50%" cy="16%" r="76%">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.80"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="emberGlow" cx="50%" cy="20%" r="72%">
-      <stop offset="0%" stop-color="{ORANGE}" stop-opacity="0.20"/>
+    <linearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{IVORY}"/>
+      <stop offset="52%" stop-color="{IVORY}"/>
+      <stop offset="100%" stop-color="{STONE}"/>
+    </linearGradient>
+    <linearGradient id="topLift" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.55"/>
+      <stop offset="46%" stop-color="#FFFDF8" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="divisionFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{STONE}"/>
+      <stop offset="100%" stop-color="{STONE}" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="emberGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="{ORANGE}" stop-opacity="0.115"/>
       <stop offset="100%" stop-color="{ORANGE}" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="graphiteFade" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0%" stop-color="{GRAPHITE}"/>
+      <stop offset="58%" stop-color="#1E2025"/>
+      <stop offset="100%" stop-color="#2A2B2E"/>
+    </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="{STONE}"/>
       <stop offset="100%" stop-color="{IVORY}"/>
@@ -338,7 +376,10 @@ TEMPLATES = [
         "sub": ["See running costs and", "upcoming rate changes."],
         "shot": "Rentals list, or an active rental's detail",
         "dark": False, "bg": "stone",
-        "screen_w": 720, "device_y": 1300, "device_dx": 227, "rotation": 0.0,
+        # Was 720 wide starting at y=1300, which put 110px of the screen off the bottom and made
+        # the device the loudest thing in the frame. Smaller and higher: 96% of the screen is on
+        # canvas, so a rentals list, its running costs and a rate change all survive placement.
+        "screen_w": 700, "device_y": 1246, "device_dx": 218, "rotation": 0.0,
         "head_y": 440, "head_max": 116, "align": "left",
     },
     {
@@ -365,12 +406,15 @@ TEMPLATES = [
         "sub": ["Keep off-rented machines", "visible until they leave."],
         "shot": "Awaiting Pickup list, or a rental's detail",
         "dark": False, "bg": "wedge",
-        "screen_w": 760, "device_y": 905, "device_dx": 391, "rotation": 0.0,
+        # Was 760 wide at dx=391, leaving 81% of the device on canvas — enough of a phone, not
+        # enough of a list. Smaller and further left: 89% visible, so the status, the equipment
+        # and several rows of the Awaiting Pickup screen are all still there after placement.
+        "screen_w": 690, "device_y": 940, "device_dx": 362, "rotation": 0.0,
         "head_y": 440, "head_max": 112, "align": "left",
     },
     {
         "n": 6, "slug": "invoice-variance",
-        "headline": ["Catch questionable", "final charges."],
+        "headline": ["Spot possible billing", "differences."],
         "sub": ["Compare expected cost with", "the vendor invoice."],
         "shot": "Invoice Review showing an expected-versus-invoiced difference",
         "dark": True, "bg": "graphite",
@@ -393,63 +437,111 @@ def gallery_type_sizes() -> tuple[int, int]:
             fit(subs, "Medium", 52, column, tracking_em=-0.004))
 
 
-def background(kind: str) -> str:
+def background(kind: str, g: dict | None = None) -> str:
+    """The ground each template stands on.
+
+    The first version was five near-identical warm-white canvases: correct, premium and, seen as
+    a row of six thumbnails, flat. Each light template now carries one large tonal move — a
+    gradient, a field, a division or a wedge — held between roughly 4% and 9% luminance contrast
+    against its base. Enough that the gallery has rhythm; not so much that it competes with the
+    screenshot, which is the thing anyone is actually looking at.
+    """
     if kind == "hero":
-        return (f'  <rect width="{W}" height="{H}" fill="{IVORY}"/>\n'
+        # Warm ivory, with the faintest ivory-to-stone settle down the frame. The most negative
+        # space in the set, deliberately: this is the one that has to feel calm.
+        return (f'  <rect width="{W}" height="{H}" fill="url(#heroFade)"/>\n'
                 f'  <rect width="{W}" height="{H}" fill="url(#warmGlow)"/>\n'
-                f'  <rect x="0" y="{H - 620}" width="{W}" height="620" fill="{STONE}" opacity="0.55"/>')
+                f'  <ellipse cx="{W * 0.5:.0f}" cy="{H * 1.02:.0f}" rx="{W * 0.86:.0f}" '
+                f'ry="{H * 0.30:.0f}" fill="{STONE}" opacity="0.55"/>')
+
     if kind == "stone":
-        return (f'  <rect width="{W}" height="{H}" fill="url(#stoneFade)"/>\n'
-                f'  <rect x="0" y="0" width="{W}" height="{H}" fill="{STONE}" opacity="0.35"/>')
+        # The deeper one. Reads as a distinctly different tone beside templates 1 and 3.
+        return (f'  <rect width="{W}" height="{H}" fill="{STONE}"/>\n'
+                f'  <rect width="{W}" height="{H}" fill="url(#topLift)"/>\n'
+                f'  <rect x="0" y="{H * 0.40:.0f}" width="{W}" height="{H * 0.60:.0f}" '
+                f'fill="{STONE_SHADE}" opacity="0.55"/>')
+
     if kind == "band":
+        # Ivory, with an oversized pale document field behind the phone, tilted to the same
+        # angle as the device so the two read as one gesture rather than two.
+        field = ""
+        if g:
+            fw, fh = g["device_w"] + 300, g["device_h"] + 250
+            fx, fy = g["device_x"] - 150, g["device_y"] - 125
+            cx, cy = fx + fw / 2, fy + fh / 2
+            field = (f'  <rect x="{fx:.0f}" y="{fy:.0f}" width="{fw:.0f}" height="{fh:.0f}" '
+                     f'rx="56" fill="{STONE}" opacity="0.66" '
+                     f'transform="rotate(-5.5 {cx:.1f} {cy:.1f})"/>\n')
         return (f'  <rect width="{W}" height="{H}" fill="{IVORY}"/>\n'
-                f'  <path d="M 0 {H * 0.30:.0f} L {W} {H * 0.22:.0f} L {W} {H} L 0 {H} Z" '
-                f'fill="{STONE}" opacity="0.62"/>')
+                f'  <path d="M 0 {H * 0.315:.0f} L {W} {H * 0.245:.0f} L {W} {H} L 0 {H} Z" '
+                f'fill="{STONE}" opacity="0.40"/>\n'
+                f"{field}"
+                f'  <rect width="{W}" height="{H}" fill="url(#warmGlow)" opacity="0.55"/>')
+
     if kind == "stone-top":
+        # A clean tonal division: stone above, holding the phone; ivory below, holding the copy.
         return (f'  <rect width="{W}" height="{H}" fill="{IVORY}"/>\n'
-                f'  <rect x="0" y="0" width="{W}" height="{H * 0.66:.0f}" fill="{STONE}" opacity="0.72"/>\n'
-                f'  <rect width="{W}" height="{H}" fill="url(#warmGlow)" opacity="0.5"/>')
+                f'  <rect x="0" y="0" width="{W}" height="{H * 0.605:.0f}" fill="{STONE}"/>\n'
+                f'  <rect x="0" y="{H * 0.605 - 2:.0f}" width="{W}" height="150" '
+                f'fill="url(#divisionFade)"/>\n'
+                f'  <rect width="{W}" height="{H}" fill="url(#warmGlow)" opacity="0.45"/>')
+
     if kind == "wedge":
-        return (f'  <rect width="{W}" height="{H}" fill="{IVORY}"/>\n'
-                f'  <path d="M {W} 0 L {W} {H} L {W * 0.18:.0f} {H} Z" fill="{STONE}" opacity="0.62"/>')
+        # The deepest of the light five. A single diagonal, nothing else.
+        return (f'  <rect width="{W}" height="{H}" fill="{STONE}"/>\n'
+                f'  <path d="M {W} 0 L {W} {H} L {W * 0.10:.0f} {H} Z" '
+                f'fill="{STONE_SHADE}" opacity="0.85"/>\n'
+                f'  <rect width="{W}" height="{H}" fill="url(#topLift)"/>')
+
     if kind == "graphite":
-        return (f'  <rect width="{W}" height="{H}" fill="{GRAPHITE}"/>\n'
-                f'  <rect width="{W}" height="{H}" fill="url(#emberGlow)"/>\n'
-                f'  <rect x="0" y="{H - 700}" width="{W}" height="700" fill="{GRAPHITE_2}" opacity="0.75"/>')
+        # Graphite, and graphite all the way down.
+        #
+        # The previous version laid a 20%-opacity orange radial over the whole canvas and a hard
+        # 760px rectangle across the bottom. Together they produced a sepia wash with a visible
+        # seam through it — a dirty texture, which is the one finish this palette must not have.
+        # A smooth graphite-to-secondary-graphite fall and one small warm bloom in the corner
+        # give the frame depth without tinting it.
+        return (f'  <rect width="{W}" height="{H}" fill="url(#graphiteFade)"/>\n'
+                f'  <ellipse cx="{W * 0.82:.0f}" cy="{H * 0.10:.0f}" rx="{W * 0.62:.0f}" '
+                f'ry="{H * 0.20:.0f}" fill="url(#emberGlow)"/>')
+
     raise ValueError(kind)
 
 
 def motif_for(spec: dict, g: dict) -> tuple[str, tuple[float, float, float, float] | None]:
-    ink = IVORY_MUTED if spec["dark"] else "#B9B2A4"
-    strong = IVORY if spec["dark"] else GRAPHITE
+    # Each motif passes its own ink: they sit on six different grounds, and one shared value
+    # would be too faint on the deeper ones and too heavy on ivory.
     n = spec["n"]
     if n == 1:
-        cx, cy, r = W - MARGIN - 76, 246, 76
-        return (motif_meter_arc(cx, cy, r, sweep=0.63, ink=ORANGE, track="#DDD5C6", width=16),
+        cx, cy, r = W - MARGIN - 78, 252, 78
+        return (motif_meter_arc(cx, cy, r, sweep=0.63, ink=ORANGE, track=STONE_SHADE,
+                                width=16, hand=GRAPHITE),
                 (cx - r - 8, cy - r - 8, (r + 8) * 2, (r + 8) * 2))
     if n == 2:
         # Sits between the supporting line and the phone. At the old y it ran straight through
         # "upcoming rate changes" — the bars are 294px tall at the right-hand end.
         tallest = 54 + 30 * 8
         return (motif_progression(MARGIN, 1198, count=9, gap=22, base=54, growth=30,
-                                  width=26, ink="#C6BFB0", accent=ORANGE, accent_from=7),
+                                  width=26, ink="#BFB7A6", accent=ORANGE, accent_from=7),
                 (MARGIN, 1198 - tallest, 9 * 48 - 22, tallest))
     if n == 3:
         pad = 74
         box = (g["device_x"] - pad, g["device_y"] - pad,
                g["device_w"] + pad * 2, g["device_h"] + pad * 2)
-        return (motif_scan_edges(*box, ink="#BCB4A5", accent=ORANGE, stroke=8), box)
+        return (motif_scan_edges(*box, ink="#B4AB99", accent=ORANGE, stroke=8), box)
     if n == 4:
         return (motif_stop_block(MARGIN, 1960, W - MARGIN * 2 - 40, 46, ran=0.62,
-                                 ink="#B2AA9B", accent=ORANGE, stroke=7),
+                                 ink="#ADA391", accent=ORANGE, stroke=7),
                 (MARGIN, 1960 - 29, W - MARGIN * 2 - 40, 46 + 58))
     if n == 5:
         return (motif_staged(MARGIN, 2452, count=3, w=108, h=76, gap=30,
-                             ink="#BCB4A5", accent=ORANGE, stroke=7),
+                             ink="#B0A796", accent=ORANGE, stroke=7),
                 (MARGIN, 2452, 3 * 138 + 60, 76))
     if n == 6:
+        # WARM_GRAY, not GRAPHITE_3. The expected-cost lines were blue-grey, which is the one
+        # thing the closing frame of this gallery must not be.
         return (motif_variance(MARGIN, 1000, W - MARGIN * 2 - 120, bar_h=46, gap=30,
-                               expected=0.58, invoiced=0.86, ink=GRAPHITE_3, accent=ORANGE),
+                               expected=0.58, invoiced=0.86, ink=WARM_GRAY, accent=ORANGE),
                 (MARGIN, 1000 - 23, W - MARGIN * 2 - 120, 46 * 2 + 30 + 46))
     return "", None
 
@@ -480,7 +572,7 @@ GALLERY_HEAD_SIZE, GALLERY_SUB_SIZE = gallery_type_sizes()
 def build_template(spec: dict) -> tuple[str, dict]:
     dark = spec["dark"]
     ink = IVORY if dark else GRAPHITE
-    muted = IVORY_MUTED if dark else INK_MUTED
+    muted = IVORY_SUPPORT if dark else INK_SUPPORT
 
     g = phone_geometry(
         spec["screen_w"],
@@ -509,7 +601,7 @@ def build_template(spec: dict) -> tuple[str, dict]:
         f'aria-label="OffRent Ledger App Store template {spec["n"]}">',
         f"  <title>OffRent Ledger — App Store template {spec['n']} — {spec['slug']}</title>",
         defs(dark),
-        background(spec["bg"]),
+        background(spec["bg"], g),
         motif,
         phone_svg(g, screen_fill=SCREEN_DARK if dark else SCREEN_LIGHT, dark=dark,
                   rotation=spec["rotation"]),

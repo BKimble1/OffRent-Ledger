@@ -21,7 +21,7 @@ EXPECTED_HEADLINES = {
     3: "Scan rental details in seconds.",
     4: "Record off-rent proof.",
     5: "Track equipment awaiting pickup.",
-    6: "Catch questionable final charges.",
+    6: "Spot possible billing differences.",
 }
 
 problems: list[str] = []
@@ -65,16 +65,27 @@ def check_png(path: pathlib.Path, number: int) -> None:
                 bad(path.name, f"{name} edge looks like an unintended border "
                                f"({drifted}/{len(edge)} samples differ from just inside)")
 
-        # CoreCredit blue. Any pixel where blue clearly dominates both other channels is either
-        # the wrong brand or a stray gradient; the OffRent palette has none.
-        blue = 0
-        for x in range(0, W, 11):
-            for y in range(0, H, 23):
+        # Blue-grey, not just blue.
+        #
+        # The first threshold here was b > r + 42, which is a *saturated* blue. It passed every
+        # template while the graphite frame's blank screen was #434D5C and its comparison lines
+        # were #39414E — both unmistakably blue-grey to the eye, both well inside the old margin.
+        # A palette of ivory, stone, graphite and orange has no reason to drift blue at all, so
+        # the test is now for any cool cast: blue meaningfully ahead of both other channels.
+        #
+        # Secondary graphite #252A31 (b=49, r=37) sits just under this and is allowed — it is the
+        # brand's own dark from the app icon.
+        offenders: dict[tuple[int, int, int], int] = {}
+        for x in range(0, W, 9):
+            for y in range(0, H, 17):
                 r, g, b = rgb.getpixel((x, y))
-                if b > r + 42 and b > g + 30 and b > 90:
-                    blue += 1
-        if blue:
-            bad(path.name, f"{blue} sampled pixels are blue-dominant — check for CoreCredit blue")
+                if b > r + 14 and b > g + 8 and b > 70:
+                    offenders[(r, g, b)] = offenders.get((r, g, b), 0) + 1
+        if offenders:
+            worst = sorted(offenders.items(), key=lambda kv: -kv[1])[:3]
+            listed = ", ".join(f"#{r:02X}{g:02X}{b:02X}x{n}" for (r, g, b), n in worst)
+            bad(path.name, f"{sum(offenders.values())} sampled pixels have a cool/blue cast "
+                           f"({listed})")
 
         # Fully opaque, and actually drawn: a blank or near-blank frame means a font or asset
         # failed to load and the rasteriser produced a flat rectangle.

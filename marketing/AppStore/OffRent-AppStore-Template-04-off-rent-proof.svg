@@ -8,35 +8,55 @@
     <filter id="phoneShadowDark" x="-40%" y="-25%" width="180%" height="160%">
       <feDropShadow dx="0" dy="52" stdDeviation="58" flood-color="#000000" flood-opacity="0.62"/>
     </filter>
-    <radialGradient id="warmGlow" cx="50%" cy="18%" r="78%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    <radialGradient id="warmGlow" cx="50%" cy="16%" r="76%">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.80"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="emberGlow" cx="50%" cy="20%" r="72%">
-      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.20"/>
+    <linearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F6F1E8"/>
+      <stop offset="52%" stop-color="#F6F1E8"/>
+      <stop offset="100%" stop-color="#E9E5DC"/>
+    </linearGradient>
+    <linearGradient id="topLift" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.55"/>
+      <stop offset="46%" stop-color="#FFFDF8" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="divisionFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9E5DC"/>
+      <stop offset="100%" stop-color="#E9E5DC" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="emberGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.115"/>
       <stop offset="100%" stop-color="#FF8A1F" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="graphiteFade" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0%" stop-color="#171A1F"/>
+      <stop offset="58%" stop-color="#1E2025"/>
+      <stop offset="100%" stop-color="#2A2B2E"/>
+    </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#E9E5DC"/>
       <stop offset="100%" stop-color="#F6F1E8"/>
     </linearGradient>
   </defs>
   <rect width="1290" height="2796" fill="#F6F1E8"/>
-  <rect x="0" y="0" width="1290" height="1845" fill="#E9E5DC" opacity="0.72"/>
-  <rect width="1290" height="2796" fill="url(#warmGlow)" opacity="0.5"/>
+  <rect x="0" y="0" width="1290" height="1692" fill="#E9E5DC"/>
+  <rect x="0" y="1690" width="1290" height="150" fill="url(#divisionFade)"/>
+  <rect width="1290" height="2796" fill="url(#warmGlow)" opacity="0.45"/>
   <g class="motif-stop">
     <rect x="104.0" y="1960.0" width="1042.0" height="46.0" rx="23.0"
-          fill="none" stroke="#B2AA9B" stroke-width="7.0"/>
+          fill="none" stroke="#ADA391" stroke-width="7.0"/>
     <rect x="104.0" y="1960.0" width="646.0" height="46.0" rx="23.0" fill="#FF8A1F"/>
     <rect x="742.7" y="1931.5" width="14.7"
-          height="103.0" rx="7.4" fill="#B2AA9B"/>
+          height="103.0" rx="7.4" fill="#ADA391"/>
   </g>
   <g class="device">
     <rect x="170.57" y="168.00" width="780.86" height="1638.93"
-          rx="109.66" fill="#20242B" filter="url(#phoneShadow)"/>
+          rx="109.66" fill="#1E1D1B" filter="url(#phoneShadow)"/>
     <rect x="172.07" y="169.50"
           width="777.86" height="1635.93"
-          rx="108.16" fill="none" stroke="#4A525F" stroke-width="3"/>
+          rx="108.16" fill="none" stroke="#52504A" stroke-width="3"/>
     <rect class="screen-area" x="193.50" y="190.93"
           width="735.00" height="1593.07"
           rx="86.73" fill="#D8D2C7"/>
@@ -44,5 +64,5 @@
           rx="31.33" fill="#0B0E12"/>
   </g>
   <text x="104.0" y="2246.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Record</tspan><tspan x="104.0" dy="118.7">off-rent proof.</tspan></text>
-  <text x="104.0" y="2513.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#5B6068" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Keep confirmation, meter, fuel,</tspan><tspan x="104.0" dy="70.7">and condition together.</tspan></text>
+  <text x="104.0" y="2513.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#413E38" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Keep confirmation, meter, fuel,</tspan><tspan x="104.0" dy="70.7">and condition together.</tspan></text>
 </svg>

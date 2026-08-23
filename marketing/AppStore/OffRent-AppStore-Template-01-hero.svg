@@ -8,33 +8,55 @@
     <filter id="phoneShadowDark" x="-40%" y="-25%" width="180%" height="160%">
       <feDropShadow dx="0" dy="52" stdDeviation="58" flood-color="#000000" flood-opacity="0.62"/>
     </filter>
-    <radialGradient id="warmGlow" cx="50%" cy="18%" r="78%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    <radialGradient id="warmGlow" cx="50%" cy="16%" r="76%">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.80"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="emberGlow" cx="50%" cy="20%" r="72%">
-      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.20"/>
+    <linearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F6F1E8"/>
+      <stop offset="52%" stop-color="#F6F1E8"/>
+      <stop offset="100%" stop-color="#E9E5DC"/>
+    </linearGradient>
+    <linearGradient id="topLift" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.55"/>
+      <stop offset="46%" stop-color="#FFFDF8" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="divisionFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9E5DC"/>
+      <stop offset="100%" stop-color="#E9E5DC" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="emberGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.115"/>
       <stop offset="100%" stop-color="#FF8A1F" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="graphiteFade" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0%" stop-color="#171A1F"/>
+      <stop offset="58%" stop-color="#1E2025"/>
+      <stop offset="100%" stop-color="#2A2B2E"/>
+    </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#E9E5DC"/>
       <stop offset="100%" stop-color="#F6F1E8"/>
     </linearGradient>
   </defs>
-  <rect width="1290" height="2796" fill="#F6F1E8"/>
+  <rect width="1290" height="2796" fill="url(#heroFade)"/>
   <rect width="1290" height="2796" fill="url(#warmGlow)"/>
-  <rect x="0" y="2176" width="1290" height="620" fill="#E9E5DC" opacity="0.55"/>
+  <ellipse cx="645" cy="2852" rx="1109" ry="839" fill="#E9E5DC" opacity="0.55"/>
   <g class="motif-meter">
-    <circle cx="1110.0" cy="246.0" r="76.0" fill="none" stroke="#DDD5C6" stroke-width="16.0"/>
-    <path d="M 1110.00 170.00 A 76.0 76.0 0 1 1 1054.60 298.03"
+    <circle cx="1108.0" cy="252.0" r="78.0" fill="none" stroke="#DFD9CC" stroke-width="16.0"/>
+    <path d="M 1108.00 174.00 A 78.0 78.0 0 1 1 1051.14 305.39"
           fill="none" stroke="#FF8A1F" stroke-width="16.0" stroke-linecap="round"/>
+    <line x1="1108.0" y1="252.0" x2="1073.88" y2="284.04"
+          stroke="#171A1F" stroke-width="9.9" stroke-linecap="round"/>
+    <circle cx="1108.0" cy="252.0" r="8.3" fill="#171A1F"/>
   </g>
   <g class="device">
     <rect x="230.66" y="987.00" width="828.67" height="1739.28"
-          rx="116.38" fill="#20242B" filter="url(#phoneShadow)"/>
+          rx="116.38" fill="#1E1D1B" filter="url(#phoneShadow)"/>
     <rect x="232.16" y="988.50"
           width="825.67" height="1736.28"
-          rx="114.88" fill="none" stroke="#4A525F" stroke-width="3"/>
+          rx="114.88" fill="none" stroke="#52504A" stroke-width="3"/>
     <rect class="screen-area" x="255.00" y="1011.34"
           width="780.00" height="1690.60"
           rx="92.04" fill="#D8D2C7"/>
@@ -42,5 +64,5 @@
           rx="33.25" fill="#0B0E12"/>
   </g>
   <text x="645.0" y="470.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="middle" letter-spacing="-2.46" xml:space="preserve"><tspan x="645.0" dy="0.0">Stop the rental clock</tspan><tspan x="645.0" dy="118.7">with proof.</tspan></text>
-  <text x="645.0" y="737.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#5B6068" text-anchor="middle" letter-spacing="-0.21" xml:space="preserve"><tspan x="645.0" dy="0.0">Track costs, confirmations, pickup,</tspan><tspan x="645.0" dy="70.7">and final charges.</tspan></text>
+  <text x="645.0" y="737.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#413E38" text-anchor="middle" letter-spacing="-0.21" xml:space="preserve"><tspan x="645.0" dy="0.0">Track costs, confirmations, pickup,</tspan><tspan x="645.0" dy="70.7">and final charges.</tspan></text>
 </svg>

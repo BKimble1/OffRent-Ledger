@@ -8,34 +8,54 @@
     <filter id="phoneShadowDark" x="-40%" y="-25%" width="180%" height="160%">
       <feDropShadow dx="0" dy="52" stdDeviation="58" flood-color="#000000" flood-opacity="0.62"/>
     </filter>
-    <radialGradient id="warmGlow" cx="50%" cy="18%" r="78%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    <radialGradient id="warmGlow" cx="50%" cy="16%" r="76%">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.80"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="emberGlow" cx="50%" cy="20%" r="72%">
-      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.20"/>
+    <linearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F6F1E8"/>
+      <stop offset="52%" stop-color="#F6F1E8"/>
+      <stop offset="100%" stop-color="#E9E5DC"/>
+    </linearGradient>
+    <linearGradient id="topLift" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.55"/>
+      <stop offset="46%" stop-color="#FFFDF8" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="divisionFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9E5DC"/>
+      <stop offset="100%" stop-color="#E9E5DC" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="emberGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.115"/>
       <stop offset="100%" stop-color="#FF8A1F" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="graphiteFade" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0%" stop-color="#171A1F"/>
+      <stop offset="58%" stop-color="#1E2025"/>
+      <stop offset="100%" stop-color="#2A2B2E"/>
+    </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#E9E5DC"/>
       <stop offset="100%" stop-color="#F6F1E8"/>
     </linearGradient>
   </defs>
-  <rect width="1290" height="2796" fill="#F6F1E8"/>
-  <path d="M 1290 0 L 1290 2796 L 232 2796 Z" fill="#E9E5DC" opacity="0.62"/>
-  <g class="motif-staged"><rect x="104.0" y="2452.0" width="108.0" height="76.0" rx="21.3" fill="none" stroke="#BCB4A5" stroke-width="7.0"/><rect x="242.0" y="2452.0" width="108.0" height="76.0" rx="21.3" fill="none" stroke="#BCB4A5" stroke-width="7.0"/><rect x="380.0" y="2452.0" width="108.0" height="76.0" rx="21.3" fill="#FF8A1F"/><path d="M 523.4 2467.2 L 577.4 2490.0 L 523.4 2512.8" fill="none" stroke="#FF8A1F" stroke-width="8.4" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <rect width="1290" height="2796" fill="#E9E5DC"/>
+  <path d="M 1290 0 L 1290 2796 L 129 2796 Z" fill="#DFD9CC" opacity="0.85"/>
+  <rect width="1290" height="2796" fill="url(#topLift)"/>
+  <g class="motif-staged"><rect x="104.0" y="2452.0" width="108.0" height="76.0" rx="21.3" fill="none" stroke="#B0A796" stroke-width="7.0"/><rect x="242.0" y="2452.0" width="108.0" height="76.0" rx="21.3" fill="none" stroke="#B0A796" stroke-width="7.0"/><rect x="380.0" y="2452.0" width="108.0" height="76.0" rx="21.3" fill="#FF8A1F"/><path d="M 523.4 2467.2 L 577.4 2490.0 L 523.4 2512.8" fill="none" stroke="#FF8A1F" stroke-width="8.4" stroke-linecap="round" stroke-linejoin="round"/></g>
   <g class="device">
-    <rect x="632.29" y="905.00" width="807.42" height="1694.68"
-          rx="113.39" fill="#20242B" filter="url(#phoneShadow)"/>
-    <rect x="633.79" y="906.50"
-          width="804.42" height="1691.68"
-          rx="111.89" fill="none" stroke="#4A525F" stroke-width="3"/>
-    <rect class="screen-area" x="656.00" y="928.71"
-          width="760.00" height="1647.26"
-          rx="89.68" fill="#D8D2C7"/>
-    <rect x="925.53" y="948.07" width="220.93" height="64.80"
-          rx="32.40" fill="#0B0E12"/>
+    <rect x="640.47" y="940.00" width="733.06" height="1538.59"
+          rx="102.95" fill="#1E1D1B" filter="url(#phoneShadow)"/>
+    <rect x="641.97" y="941.50"
+          width="730.06" height="1535.59"
+          rx="101.45" fill="none" stroke="#52504A" stroke-width="3"/>
+    <rect class="screen-area" x="662.00" y="961.53"
+          width="690.00" height="1495.53"
+          rx="81.42" fill="#D8D2C7"/>
+    <rect x="906.71" y="979.10" width="200.58" height="58.83"
+          rx="29.42" fill="#0B0E12"/>
   </g>
   <text x="104.0" y="440.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Track equipment</tspan><tspan x="104.0" dy="118.7">awaiting pickup.</tspan></text>
-  <text x="104.0" y="707.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#5B6068" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Keep off-rented machines</tspan><tspan x="104.0" dy="70.7">visible until they leave.</tspan></text>
+  <text x="104.0" y="707.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#413E38" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Keep off-rented machines</tspan><tspan x="104.0" dy="70.7">visible until they leave.</tspan></text>
 </svg>

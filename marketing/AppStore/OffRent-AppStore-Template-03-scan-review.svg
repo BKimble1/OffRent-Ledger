@@ -8,28 +8,49 @@
     <filter id="phoneShadowDark" x="-40%" y="-25%" width="180%" height="160%">
       <feDropShadow dx="0" dy="52" stdDeviation="58" flood-color="#000000" flood-opacity="0.62"/>
     </filter>
-    <radialGradient id="warmGlow" cx="50%" cy="18%" r="78%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    <radialGradient id="warmGlow" cx="50%" cy="16%" r="76%">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.80"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="emberGlow" cx="50%" cy="20%" r="72%">
-      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.20"/>
+    <linearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F6F1E8"/>
+      <stop offset="52%" stop-color="#F6F1E8"/>
+      <stop offset="100%" stop-color="#E9E5DC"/>
+    </linearGradient>
+    <linearGradient id="topLift" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.55"/>
+      <stop offset="46%" stop-color="#FFFDF8" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="divisionFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9E5DC"/>
+      <stop offset="100%" stop-color="#E9E5DC" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="emberGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF8A1F" stop-opacity="0.115"/>
       <stop offset="100%" stop-color="#FF8A1F" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="graphiteFade" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0%" stop-color="#171A1F"/>
+      <stop offset="58%" stop-color="#1E2025"/>
+      <stop offset="100%" stop-color="#2A2B2E"/>
+    </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#E9E5DC"/>
       <stop offset="100%" stop-color="#F6F1E8"/>
     </linearGradient>
   </defs>
   <rect width="1290" height="2796" fill="#F6F1E8"/>
-  <path d="M 0 839 L 1290 615 L 1290 2796 L 0 2796 Z" fill="#E9E5DC" opacity="0.62"/>
-  <g class="motif-scan"><path d="M 223.06400000000002 1216.65184 L 223.06400000000002 1031.0 L 408.71584 1031.0" fill="none" stroke="#FF8A1F" stroke-width="8" stroke-linecap="square"/><path d="M 881.2841599999999 1031.0 L 1066.936 1031.0 L 1066.936 1216.65184" fill="none" stroke="#BCB4A5" stroke-width="8" stroke-linecap="square"/><path d="M 1066.936 2453.894578604651 L 1066.936 2639.546418604651 L 881.2841599999999 2639.546418604651" fill="none" stroke="#FF8A1F" stroke-width="8" stroke-linecap="square"/><path d="M 408.71584 2639.546418604651 L 223.06400000000002 2639.546418604651 L 223.06400000000002 2453.894578604651" fill="none" stroke="#BCB4A5" stroke-width="8" stroke-linecap="square"/></g>
+  <path d="M 0 881 L 1290 685 L 1290 2796 L 0 2796 Z" fill="#E9E5DC" opacity="0.40"/>
+  <rect x="147" y="980" width="996" height="1711" rx="56" fill="#E9E5DC" opacity="0.66" transform="rotate(-5.5 645.0 1835.3)"/>
+  <rect width="1290" height="2796" fill="url(#warmGlow)" opacity="0.55"/>
+  <g class="motif-scan"><path d="M 223.06400000000002 1216.65184 L 223.06400000000002 1031.0 L 408.71584 1031.0" fill="none" stroke="#FF8A1F" stroke-width="8" stroke-linecap="square"/><path d="M 881.2841599999999 1031.0 L 1066.936 1031.0 L 1066.936 1216.65184" fill="none" stroke="#B4AB99" stroke-width="8" stroke-linecap="square"/><path d="M 1066.936 2453.894578604651 L 1066.936 2639.546418604651 L 881.2841599999999 2639.546418604651" fill="none" stroke="#FF8A1F" stroke-width="8" stroke-linecap="square"/><path d="M 408.71584 2639.546418604651 L 223.06400000000002 2639.546418604651 L 223.06400000000002 2453.894578604651" fill="none" stroke="#B4AB99" stroke-width="8" stroke-linecap="square"/></g>
   <g class="device" transform="rotate(-5.500 645.00 1835.27)">
     <rect x="297.06" y="1105.00" width="695.87" height="1460.55"
-          rx="97.73" fill="#20242B" filter="url(#phoneShadow)"/>
+          rx="97.73" fill="#1E1D1B" filter="url(#phoneShadow)"/>
     <rect x="298.56" y="1106.50"
           width="692.87" height="1457.55"
-          rx="96.23" fill="none" stroke="#4A525F" stroke-width="3"/>
+          rx="96.23" fill="none" stroke="#52504A" stroke-width="3"/>
     <rect class="screen-area" x="317.50" y="1125.44"
           width="655.00" height="1419.67"
           rx="77.29" fill="#D8D2C7"/>
@@ -37,5 +58,5 @@
           rx="27.92" fill="#0B0E12"/>
   </g>
   <text x="104.0" y="440.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Scan rental details</tspan><tspan x="104.0" dy="118.7">in seconds.</tspan></text>
-  <text x="104.0" y="707.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#5B6068" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Review every field before</tspan><tspan x="104.0" dy="70.7">anything is saved.</tspan></text>
+  <text x="104.0" y="707.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#413E38" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Review every field before</tspan><tspan x="104.0" dy="70.7">anything is saved.</tspan></text>
 </svg>

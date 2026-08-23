@@ -32,10 +32,10 @@ SVG master, so either is a one-step edit.
 | # | Screen x | Screen y | Screen w | Screen h | Radius | Rotation | Intended screenshot |
 |---|---|---|---|---|---|---|---|
 | 1 | `255.0` | `1011.3` | `780` | `1690.6` | `92.0` | `0.0°` | Today dashboard |
-| 2 | `512.0` | `1322.5` | `720` | `1560.6` | `85.0` | `0.0°` | Rentals list, or an active rental's detail |
+| 2 | `513.0` | `1267.8` | `700` | `1517.2` | `82.6` | `0.0°` | Rentals list, or an active rental's detail |
 | 3 | `317.5` | `1125.4` | `655` | `1419.7` | `77.3` | `-5.5°` | Scan Review |
 | 4 | `193.5` | `190.9` | `735` | `1593.1` | `86.7` | `0.0°` | Record Confirmation, or a confirmed rental's detail |
-| 5 | `656.0` | `928.7` | `760` | `1647.3` | `89.7` | `0.0°` | Awaiting Pickup list, or a rental's detail |
+| 5 | `662.0` | `961.5` | `690` | `1495.5` | `81.4` | `0.0°` | Awaiting Pickup list, or a rental's detail |
 | 6 | `129.5` | `1267.3` | `715` | `1549.7` | `84.4` | `0.0°` | Invoice Review showing an expected-versus-invoiced difference |
 
 ## Device geometry, identical across all six
@@ -76,11 +76,11 @@ not true.
 
 | | |
 |---|---|
-| Screen opening | `720 × 1560.6` px |
-| Top-left corner | `x = 512.0`, `y = 1322.5` |
-| Corner radius | `85.0` px |
+| Screen opening | `700 × 1517.2` px |
+| Top-left corner | `x = 513.0`, `y = 1267.8` |
+| Corner radius | `82.6` px |
 | Rotation | `0.0°` |
-| Scale from source | `0.5581` — resize the 1290 × 2796 capture to `720 × 1560.6` |
+| Scale from source | `0.5426` — resize the 1290 × 2796 capture to `700 × 1517.2` |
 
 
 ### Template 3 — scan-review
@@ -121,16 +121,16 @@ not true.
 
 | | |
 |---|---|
-| Screen opening | `760 × 1647.3` px |
-| Top-left corner | `x = 656.0`, `y = 928.7` |
-| Corner radius | `89.7` px |
+| Screen opening | `690 × 1495.5` px |
+| Top-left corner | `x = 662.0`, `y = 961.5` |
+| Corner radius | `81.4` px |
 | Rotation | `0.0°` |
-| Scale from source | `0.5891` — resize the 1290 × 2796 capture to `760 × 1647.3` |
+| Scale from source | `0.5349` — resize the 1290 × 2796 capture to `690 × 1495.5` |
 
 
 ### Template 6 — invoice-variance
 
-> Catch questionable final charges.
+> Spot possible billing differences.
 
 **Intended screenshot:** Invoice Review showing an expected-versus-invoiced difference
 
@@ -167,7 +167,7 @@ To regenerate everything from source:
 | Secondary graphite | `#252A31` |
 | Construction orange | `#FF8A1F` |
 | Blank screen, light templates | `#D8D2C7` |
-| Blank screen, graphite template | `#434D5C` |
+| Blank screen, graphite template | `#4C4A45` |
 
 Five of the six are light — warm ivory and pale stone with graphite structure. Template 6 is the
 single graphite frame, placed last so the gallery closes on its strongest contrast rather than
