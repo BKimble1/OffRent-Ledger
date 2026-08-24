@@ -189,6 +189,56 @@ def check_required_disclosure() -> None:
             fail("disclosure", f"{name} does not render OffRentDisclosureBanner")
 
 
+def check_launch_screen_is_wired() -> None:
+    """The launch screen names assets that exist, and nothing regenerates it.
+
+    `UILaunchScreen` fails silently: a name the catalog does not have simply leaves that layer
+    out, and the only symptom is the app opening on a white flash. `LaunchScreenTests` pins this
+    at runtime; this pins it at commit time, where it is cheaper to notice.
+    """
+    check("The launch screen names assets that exist")
+    info = ROOT / "Config" / "OffRentLedger-Info.plist"
+    with info.open("rb") as handle:
+        plist = plistlib.load(handle)
+    launch = plist.get("UILaunchScreen")
+    if not isinstance(launch, dict):
+        fail("launch-screen", "Config/OffRentLedger-Info.plist has no UILaunchScreen dictionary")
+        return
+    for key, folder, suffix in (
+        ("UIColorName", "colorset", ""),
+        ("UIImageName", "imageset", ""),
+    ):
+        name = launch.get(key)
+        if not name:
+            fail("launch-screen", f"UILaunchScreen has no {key}")
+            continue
+        catalog = APP_SOURCES / "Resources" / "Assets.xcassets"
+        if not (catalog / f"{name}.{folder}").is_dir():
+            fail("launch-screen", f"UILaunchScreen names {name}, which is not in the catalog")
+
+    # A generated UILaunchScreen key merges an *empty* dictionary on top of the file above.
+    project = (ROOT / "OffRentLedger.xcodeproj" / "project.pbxproj").read_text(encoding="utf-8")
+    if "INFOPLIST_KEY_UILaunchScreen_Generation = YES" in project:
+        fail(
+            "launch-screen",
+            "INFOPLIST_KEY_UILaunchScreen_Generation is on; it would blank the launch screen",
+        )
+
+    # The SwiftUI layer draws the same assets and the credit. Matched against the *call*, not
+    # against the name appearing anywhere in the file: the first version of this check was
+    # satisfied by the phrase in a doc comment, so deleting the credit line from the body left it
+    # passing.
+    splash = (APP_SOURCES / "SharedUI" / "LaunchSplashView.swift").read_text(encoding="utf-8")
+    for call in (
+        'Image("LaunchMark")',
+        'Color("LaunchBackground")',
+        'Image("IdleryWordmark")',
+        'Text("Powered by")',
+    ):
+        if call not in splash:
+            fail("launch-screen", f"LaunchSplashView no longer contains {call}")
+
+
 def check_every_swift_file_parses() -> None:
     """Every Swift file in the repository is syntactically valid.
 
@@ -1143,6 +1193,7 @@ def main() -> int:
         check_banned_phrases,
         check_end_rental_label,
         check_required_disclosure,
+        check_launch_screen_is_wired,
         check_every_swift_file_parses,
         check_no_duplicate_top_level_types,
         check_estimates_are_labelled,

@@ -28,12 +28,14 @@ struct OffRentLedgerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if let container {
-                    RootView()
-                        .modelContainer(container)
-                } else {
-                    StoreRecoveryView(detail: dependencies.storeFailure)
+            LaunchSplashOverlay {
+                Group {
+                    if let container {
+                        RootView()
+                            .modelContainer(container)
+                    } else {
+                        StoreRecoveryView(detail: dependencies.storeFailure)
+                    }
                 }
             }
             .environment(dependencies)

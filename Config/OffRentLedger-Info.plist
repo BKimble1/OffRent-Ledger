@@ -12,10 +12,26 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!--
+	  UILaunchScreen is the screen iOS paints the instant the process starts, before a single
+	  line of SwiftUI runs. It stops the app opening on a white flash. It takes a colour and an
+	  image and nothing else — no text, no layout — so the "Powered by Idlery" line comes from
+	  LaunchSplashView, which draws the same colour and the same mark at the same fraction and
+	  then fades away.
+
+	  INFOPLIST_KEY_UILaunchScreen_Generation must stay OFF in the build settings. It generates
+	  an empty UILaunchScreen dictionary, and a generated key is merged on top of this file —
+	  which would silently replace everything below with nothing.
+	-->
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
+		<!-- The orange tag on a transparent square canvas, occupying the same fraction of it
+		     that LaunchSplashView.markFraction draws. Same asset, same proportion, so the two
+		     layers cannot drift apart. -->
+		<key>UIImageName</key>
+		<string>LaunchMark</string>
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
