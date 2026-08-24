@@ -109,6 +109,14 @@ struct AttachInvoiceRobot {
         app.dismissKeyboard()
         app.buttons["Add a line"].tap()
 
+        // A new line is "Other" until somebody says otherwise, and an uncategorised amount
+        // deliberately does not count as rent — which is why the last run compared 1,710 expected
+        // against 0 invoiced and reported the whole subtotal as the variance. The app is right to
+        // refuse to guess; the test has to say what kind of line this is, which is also the thing
+        // it is asserting about.
+        app.expect(app.anyElement(A11yUI.Audit.lineCategory)).tap()
+        app.expect(app.buttons["Rental subtotal"]).tap()
+
         app.expect(app.textFields["currencyField.Amount"]).tap()
         app.typeText(rentalSubtotal)
         app.dismissKeyboard()

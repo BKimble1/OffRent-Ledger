@@ -39,9 +39,19 @@ final class EntitlementUITests: XCTestCase {
         XCTAssertTrue(app.buttons[A11yUI.Paywall.purchase].isEnabled)
     }
 
-    /// The StoreKit configuration in the scheme drives this. Passing it says nothing about
-    /// production purchases; Sandbox and TestFlight are separate real-device gates.
-    func testPurchasingUnlocksUnlimitedOpenRentals() {
+    /// Reaching the paywall from Settings, and choosing a plan.
+    ///
+    /// This used to run on to tap Subscribe and drive the StoreKit dialog. It never worked, and
+    /// the run that finally got far enough showed why: the plan was selected and Subscribe was
+    /// enabled, then the confirmation sheet never appeared in this app's accessibility tree at
+    /// all, because StoreKit presents it out of process.
+    ///
+    /// Chasing it would have bought nothing. The test's own note always said a passing StoreKit
+    /// *configuration* test says nothing about production purchases — a real purchase is a
+    /// Sandbox and TestFlight gate, and it is recorded as unverified in TEST_MATRIX.md, which is
+    /// the honest place for it. What is deterministic is everything up to the tap, and that is
+    /// what this asserts.
+    func testTheSubscriptionScreenReachesThePaywallAndAPlanCanBeChosen() {
         let app = XCUIApplication.launched(seed: .freeLimit, entitlement: .free)
 
         app.tab(A11yUI.Tab.settings).tap()
@@ -50,28 +60,26 @@ final class EntitlementUITests: XCTestCase {
 
         app.expect(app.anyElement(A11yUI.Paywall.root))
         selectPlan(A11yUI.Paywall.annual, in: app)
+        XCTAssertTrue(
+            app.buttons[A11yUI.Paywall.purchase].isEnabled,
+            "choosing a plan must enable Subscribe"
+        )
+    }
 
-        let purchase = app.buttons[A11yUI.Paywall.purchase]
-        XCTAssertTrue(purchase.isEnabled, "choosing a plan must enable Subscribe")
-        purchase.tap()
-
-        // Not `app.buttons["Subscribe"]`. The paywall's own primary action carries that label
-        // too and matched first, so the last run tapped our own disabled button and then waited
-        // ten seconds for a purchase nothing had started.
-        let dialogSubscribe = app.buttons.matching(
-            NSPredicate(
-                format: "label == %@ AND identifier != %@", "Subscribe", A11yUI.Paywall.purchase
-            )
-        ).firstMatch
-        if dialogSubscribe.waitForExistence(timeout: 10) { dialogSubscribe.tap() }
-        let confirm = app.buttons["OK"]
-        if confirm.waitForExistence(timeout: 10) { confirm.tap() }
+    /// The invariant the old test claimed to prove, proved deterministically: Pro is what lifts
+    /// the free limit. How somebody *becomes* Pro is StoreKit's business and is gated elsewhere.
+    func testProAllowsASecondOpenRental() {
+        let app = XCUIApplication.launched(seed: .freeLimit, entitlement: .pro)
 
         app.tab(A11yUI.Tab.rentals).tap()
         app.expect(app.buttons[A11yUI.Rentals.addRental]).tap()
         XCTAssertTrue(
             app.anyElement(A11yUI.AddRental.root).waitForExistence(timeout: 8),
             "Pro must allow a second open rental"
+        )
+        XCTAssertTrue(
+            app.alerts.element.exists == false,
+            "Pro must not be refused at the free limit"
         )
     }
 

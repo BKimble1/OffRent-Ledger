@@ -210,6 +210,7 @@ of them.
 | App Intents / Shortcuts | ⛔ unverified |
 | PDF sharing via the share sheet | ⛔ unverified |
 | StoreKit **Sandbox** purchase | ⛔ unverified |
+| The StoreKit purchase confirmation sheet | ⛔ **unautomatable here** — StoreKit presents it out of process, so it is not in the app's accessibility tree. The UI suite asserts up to the Subscribe tap; what a purchase *unlocks* is asserted directly with a forced entitlement |
 | Restore purchases against a real Apple Account | ⛔ unverified |
 | Cancellation, expiry, billing retry, refund behaviour | ⛔ unverified |
 | TestFlight install and purchase | ⛔ unverified |

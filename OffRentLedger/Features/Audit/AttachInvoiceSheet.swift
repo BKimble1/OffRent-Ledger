@@ -99,6 +99,12 @@ struct AttachInvoiceSheet: View {
                                 .tag(category)
                         }
                     }
+                    // Menu rather than the automatic style. Nine options behind a push means
+                    // leaving the form and coming back for every line on an invoice, and the
+                    // automatic style's choice between push and menu is not something a test can
+                    // rely on either.
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier(A11yID.Audit.lineCategory)
                     TextField("Description (optional)", text: $line.detail)
                     CurrencyField(title: "Amount", value: $line.amount)
                     Toggle("This was in the terms I entered", isOn: $line.appearedInContract)
