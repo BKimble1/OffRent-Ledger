@@ -54,32 +54,43 @@ struct ScanIntelligenceTests {
 
     /// A value that really is on the page arrives — and arrives unticked, whatever else happens.
     @Test func aValueThatIsOnThePageArrivesUntickedWithItsSourceLine() async throws {
-        let recognised = StubTextRecognizer.skidSteerContract
-        let document = try await recognised.recognize(imageData: [], source: .documentCamera)
+        let document = try await StubTextRecognizer.skidSteerContract
+            .recognize(imageData: [], source: .documentCamera)
 
-        // Pick a line the rule parser leaves alone, and a token that is genuinely printed on it.
+        // The field has to be one the rule parser did *not* claim on this fixture, or rule 4
+        // correctly discards the proposal and the test proves nothing. Chosen by asking the
+        // parser rather than by picking one and hoping — which is how the first version of this
+        // failed: it named `serialNumber`, which the parser finds on this very contract.
         let baseline = await run(UnavailableDocumentIntelligence())
         let alreadyFound = Set(baseline.suggestions.map(\.field))
-        let candidate = SuggestedField.allCases.first { !alreadyFound.contains($0) && $0 == .serialNumber }
+        let textFields: [SuggestedField] = [
+            .serialNumber, .equipmentIdentifier, .invoiceNumber, .agreementNumber,
+        ]
+        let candidate = try #require(
+            textFields.first { !alreadyFound.contains($0) },
+            "the parser claimed every text field; pick a fixture it does not read completely"
+        )
 
-        try #require(candidate != nil)
-        guard let line = document.lines.first(where: { $0.count > 6 }) else { return }
-        let token = String(line.split(separator: " ").first ?? "")
+        // A token that is genuinely printed, on a line that is genuinely in the document.
+        let line = try #require(document.lines.first { $0.split(separator: " ").count > 1 })
+        let token = String(line.split(separator: " ")[0])
         try #require(!token.isEmpty)
 
         let model = await run(
             StubDocumentIntelligence(proposals: [
-                ProposedField(field: "serialNumber", value: token, sourceLine: line),
+                ProposedField(field: candidate.rawValue, value: token, sourceLine: line),
             ])
         )
 
-        if let added = model.suggestions.first(where: { $0.field == .serialNumber }) {
-            #expect(added.provenance.rule == ModelSuggestionValidator.ruleName)
-            #expect(added.provenance.sourceLine == line)
-            #expect(added.isPreselected == false, "nothing a model proposed may arrive ticked")
-            #expect(!model.selection.contains(.serialNumber))
-            #expect(model.modelSuggestionCount == 1)
-        }
+        let added = try #require(
+            model.suggestions.first { $0.field == candidate },
+            "a value printed on the page, quoted from a real line, must survive validation"
+        )
+        #expect(added.provenance.rule == ModelSuggestionValidator.ruleName)
+        #expect(added.provenance.sourceLine == line)
+        #expect(added.isPreselected == false, "nothing a model proposed may arrive ticked")
+        #expect(!model.selection.contains(candidate))
+        #expect(model.modelSuggestionCount == 1)
     }
 
     @Test func theFactoryAlwaysReturnsSomethingUsable() {
