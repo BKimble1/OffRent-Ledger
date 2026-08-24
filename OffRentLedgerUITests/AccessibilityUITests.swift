@@ -36,7 +36,10 @@ final class AccessibilityUITests: XCTestCase {
         app.expect(app.staticTexts["Skid Steer Loader"]).tap()
         app.expect(app.buttons[A11yUI.ItemDetail.markDone]).tap()
 
-        let disclosure = app.expect(app.otherElements[A11yUI.ItemDetail.disclosure])
+        // A StaticText, not an Other: the banner combines its symbol and its sentence into one
+        // element, and XCUITest reports a combined element backed by a UILabel as static text.
+        // The assertion below is the point of the test either way — one element, whole sentence.
+        let disclosure = app.expect(app.staticTexts[A11yUI.ItemDetail.disclosure])
         XCTAssertTrue(disclosure.label.contains("does not notify the rental company"))
     }
 

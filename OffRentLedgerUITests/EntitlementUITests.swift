@@ -23,7 +23,7 @@ final class EntitlementUITests: XCTestCase {
         )
         alert.buttons["See Pro"].tap()
 
-        app.expect(app.otherElements[A11yUI.Paywall.root])
+        app.expect(app.anyElement(A11yUI.Paywall.root))
         XCTAssertTrue(app.buttons[A11yUI.Paywall.monthly].exists)
         XCTAssertTrue(app.buttons[A11yUI.Paywall.annual].exists)
         XCTAssertTrue(app.buttons[A11yUI.Paywall.restore].exists)
@@ -45,10 +45,10 @@ final class EntitlementUITests: XCTestCase {
         let app = XCUIApplication.launched(seed: .freeLimit, entitlement: .free)
 
         app.tab(A11yUI.Tab.settings).tap()
-        app.expect(app.cells[A11yUI.Settings.subscription]).tap()
+        app.expect(app.anyElement(A11yUI.Settings.subscription)).tap()
         app.expect(app.buttons["See Pro options"]).tap()
 
-        app.expect(app.otherElements[A11yUI.Paywall.root])
+        app.expect(app.anyElement(A11yUI.Paywall.root))
         app.buttons[A11yUI.Paywall.annual].tap()
         app.buttons[A11yUI.Paywall.purchase].tap()
 
@@ -61,7 +61,7 @@ final class EntitlementUITests: XCTestCase {
         app.tab(A11yUI.Tab.rentals).tap()
         app.expect(app.buttons[A11yUI.Rentals.addRental]).tap()
         XCTAssertTrue(
-            app.otherElements[A11yUI.AddRental.root].waitForExistence(timeout: 8),
+            app.anyElement(A11yUI.AddRental.root).waitForExistence(timeout: 8),
             "Pro must allow a second open rental"
         )
     }
@@ -79,7 +79,7 @@ final class EntitlementUITests: XCTestCase {
         app.expect(app.buttons[A11yUI.ItemDetail.recordConfirmation])
 
         app.tab(A11yUI.Tab.settings).tap()
-        app.expect(app.cells[A11yUI.Settings.dataAndPrivacy]).tap()
+        app.expect(app.anyElement(A11yUI.Settings.dataAndPrivacy)).tap()
         XCTAssertTrue(
             app.expect(app.buttons[A11yUI.Settings.exportBackup]).isEnabled,
             "exporting a backup must never require a subscription"

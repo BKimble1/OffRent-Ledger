@@ -41,6 +41,9 @@ struct TourView: View {
             footer
         }
         .offRentScreen()
+        // See the note in WelcomeView: without `.contain` this identifier lands on Skip, Next
+        // and Done rather than on the tour.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11yID.Onboarding.tourRoot)
     }
 

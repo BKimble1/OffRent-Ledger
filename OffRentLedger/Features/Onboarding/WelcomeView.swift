@@ -33,6 +33,12 @@ struct WelcomeView: View {
             actions
         }
         .offRentScreen()
+        // `children: .contain` before the identifier, not the identifier alone. An accessibility
+        // modifier on a plain layout container is pushed down onto everything inside it, so the
+        // bare identifier put "onboarding.welcome" on all three buttons and left the screen
+        // itself with no element at all. `.contain` makes this view a real container that owns
+        // the identifier while its children keep their own.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11yID.Onboarding.welcomeRoot)
     }
 

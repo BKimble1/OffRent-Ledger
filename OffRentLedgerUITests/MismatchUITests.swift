@@ -26,8 +26,13 @@ final class MismatchUITests: XCTestCase {
         app.expect(app.buttons[A11yUI.ItemDetail.recordConfirmation]).tap()
         app.textFields[A11yUI.Confirmation.number].tap()
         app.typeText("OR-44921")
-        app.switches[A11yUI.Confirmation.affirmation].tap()
-        app.buttons[A11yUI.Confirmation.save].tap()
+        app.setOn(app.switches[A11yUI.Confirmation.affirmation])
+
+        // Asserted rather than assumed. When this silently failed, the test reported a missing
+        // "record pickup" button three steps later and said nothing about why.
+        let save = app.buttons[A11yUI.Confirmation.save]
+        XCTAssertTrue(save.isEnabled, "a number and the affirmation must be enough to save")
+        save.tap()
 
         app.expect(app.buttons[A11yUI.ItemDetail.recordPickup]).tap()
         app.buttons[A11yUI.Pickup.save].tap()
@@ -56,7 +61,7 @@ final class MismatchUITests: XCTestCase {
         app.relaunchKeepingStore()
         app.tab(A11yUI.Tab.audit).tap()
         XCTAssertTrue(
-            app.otherElements[A11yUI.Audit.possibleMismatches].waitForExistence(timeout: 10),
+            app.anyElement(A11yUI.Audit.possibleMismatches).waitForExistence(timeout: 10),
             "the unresolved difference must survive a relaunch"
         )
     }
@@ -82,7 +87,7 @@ final class MismatchUITests: XCTestCase {
         scan.tap()
 
         // The stub recogniser returns fixture text, so the review sheet appears with suggestions.
-        app.expect(app.otherElements[A11yUI.Scan.reviewRoot])
+        app.expect(app.anyElement(A11yUI.Scan.reviewRoot))
         XCTAssertTrue(app.staticTexts[A11yUI.Scan.explanation].exists)
 
         // Cancel out of the review. Nothing may have been written.

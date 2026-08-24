@@ -17,6 +17,11 @@ echo "--- Recorded test issues (Swift Testing) ---"
 grep -a "recorded an issue" "$LOG" | head -n 60 || echo "(none)"
 echo "--- Failing test cases (XCTest) ---"
 grep -aE "^Test Case .* failed" "$LOG" | head -n 40 || echo "(none)"
+echo "--- What was on screen when an element was not found ---"
+# `expect()` prints every identified element and its type when it times out. That answer — is the
+# control a StaticText where the test asked for an Other? did the screen appear at all? — is the
+# whole of the diagnosis, and it is thousands of lines up in the raw log.
+grep -aA 40 "Identified elements on screen:" "$LOG" | head -n 160 || echo "(none)"
 echo "--- Compile errors ---"
 # Both forms: Swift diagnostics carry a file:line:col, and some (linker, asset catalog,
 # code-signing) do not. Missing the second kind is how a build "fails with no errors".

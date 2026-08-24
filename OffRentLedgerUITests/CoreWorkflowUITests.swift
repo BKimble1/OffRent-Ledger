@@ -58,13 +58,13 @@ final class CoreWorkflowUITests: XCTestCase {
         // Mark done. The app must route through Contact Vendor with the disclosure visible.
         app.expect(app.buttons[A11yUI.ItemDetail.markDone]).tap()
         XCTAssertTrue(
-            app.expect(app.otherElements[A11yUI.ItemDetail.disclosure]).exists,
+            app.expect(app.staticTexts[A11yUI.ItemDetail.disclosure]).exists,
             "the Contact Vendor step must show the disclosure"
         )
 
         // Record the confirmation.
         app.expect(app.buttons[A11yUI.ItemDetail.recordConfirmation]).tap()
-        app.expect(app.otherElements[A11yUI.Confirmation.disclosure])
+        app.expect(app.staticTexts[A11yUI.Confirmation.disclosure])
 
         let save = app.buttons[A11yUI.Confirmation.save]
         XCTAssertFalse(save.isEnabled, "Save must be disabled before the affirmation is ticked")
@@ -73,7 +73,7 @@ final class CoreWorkflowUITests: XCTestCase {
         app.typeText("OR-44921")
         XCTAssertFalse(save.isEnabled, "a number alone is not enough; the affirmation is required")
 
-        app.switches[A11yUI.Confirmation.affirmation].tap()
+        app.setOn(app.switches[A11yUI.Confirmation.affirmation])
         XCTAssertTrue(save.isEnabled)
         save.tap()
 
