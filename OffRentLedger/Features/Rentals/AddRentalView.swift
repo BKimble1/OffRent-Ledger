@@ -13,6 +13,7 @@ struct AddRentalView: View {
     @Environment(AppDependencies.self) private var dependencies
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(OnboardingState.self) private var onboarding
 
     @Query(sort: \Vendor.name) private var vendors: [Vendor]
     @Query(sort: \JobSite.name) private var jobSites: [JobSite]
@@ -540,7 +541,7 @@ struct AddRentalView: View {
         )
 
         let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
-        workflow.createItem(
+        let created = workflow.createItem(
             equipmentName: equipmentName.trimmingCharacters(in: .whitespaces),
             equipmentClass: equipmentClass.nilIfBlank,
             vendorEquipmentIdentifier: vendorEquipmentIdentifier.nilIfBlank,
@@ -552,6 +553,9 @@ struct AddRentalView: View {
         )
 
         try? context.save()
+        // The walkthrough follows this one from here on, so the bar keeps pointing at the
+        // machine the user just made rather than at whatever happens to be newest later.
+        onboarding.followGuidedTourItem(created.id)
         dismiss()
     }
 }

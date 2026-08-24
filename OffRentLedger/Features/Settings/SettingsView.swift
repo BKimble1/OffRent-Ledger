@@ -40,6 +40,20 @@ struct SettingsView: View {
                     Label("Show the tour again", systemImage: "questionmark.circle")
                 }
                 .accessibilityIdentifier(A11yID.Onboarding.replayTour)
+
+                if onboarding.isGuidedTourActive {
+                    Button("Stop the walkthrough", role: .destructive) {
+                        onboarding.endGuidedTour()
+                    }
+                    .accessibilityIdentifier(A11yID.Onboarding.stopGuide)
+                } else {
+                    Button {
+                        onboarding.startGuidedTour()
+                    } label: {
+                        Label("Walk me through the workflow", systemImage: "figure.walk")
+                    }
+                    .accessibilityIdentifier(A11yID.Onboarding.continueTour)
+                }
             }
 
             Section("Legal and support") {

@@ -39,6 +39,9 @@ struct RootView: View {
         }
         .tint(Palette.accent)
         .preferredColorScheme(AppearanceSetting.colorScheme(for: appearance))
+        // Above the tab bar, not over the content: the walkthrough is about the real screens and
+        // must not cover the controls it is telling somebody to tap.
+        .safeAreaInset(edge: .bottom) { GuidedTourBar() }
         .sheet(item: $router.presentedSheet) { sheet in
             sheetContent(for: sheet)
         }
@@ -64,7 +67,10 @@ struct RootView: View {
             )
         }
         .fullScreenCover(isPresented: $onboarding.isShowingTour) {
-            TourView(onFinish: { onboarding.markTourSeen() })
+            TourView(
+                onFinish: { onboarding.markTourSeen() },
+                onContinue: { onboarding.startGuidedTour() }
+            )
         }
         .task { await prepare() }
         .onChange(of: scenePhase) { _, phase in

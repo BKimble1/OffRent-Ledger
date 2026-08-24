@@ -70,6 +70,35 @@ final class OnboardingUITests: XCTestCase {
         )
     }
 
+    /// The hands-on half. The bar has to appear *in* the app — over it would defeat the point,
+    /// since it is telling somebody which control to tap.
+    func testTheTourContinuesIntoAWalkthroughThatCanBeLeft() {
+        let app = XCUIApplication.launchedAsNewUser()
+
+        app.expect(app.buttons[A11yUI.Onboarding.welcomeTour]).tap()
+        app.expect(app.otherElements[A11yUI.Onboarding.tourRoot])
+        for _ in 1...4 {
+            app.expect(app.buttons[A11yUI.Onboarding.tourNext], timeout: 5).tap()
+        }
+        app.expect(app.buttons[A11yUI.Onboarding.continueTour]).tap()
+
+        XCTAssertTrue(
+            app.tab(A11yUI.Tab.today).waitForExistence(timeout: 5),
+            "the walkthrough runs inside the app, not as another full-screen wall"
+        )
+        app.expect(app.otherElements[A11yUI.Onboarding.guideBar])
+        XCTAssertTrue(
+            app.buttons[A11yUI.Onboarding.guideAction].exists,
+            "the first step must offer a way to open Add rental"
+        )
+
+        app.buttons[A11yUI.Onboarding.guideSkip].tap()
+        XCTAssertFalse(
+            app.otherElements[A11yUI.Onboarding.guideBar].exists,
+            "skipping the walkthrough must end it, not hide it until next launch"
+        )
+    }
+
     func testAddYourFirstRentalOpensTheForm() {
         let app = XCUIApplication.launchedAsNewUser()
 

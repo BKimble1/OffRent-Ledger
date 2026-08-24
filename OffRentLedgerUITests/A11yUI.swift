@@ -77,6 +77,10 @@ enum A11yUI {
         static let tourSkip = "onboarding.tour.skip"
         static let tourNext = "onboarding.tour.next"
         static let tourDone = "onboarding.tour.done"
+        static let continueTour = "onboarding.tour.continue"
+        static let guideBar = "onboarding.guide"
+        static let guideSkip = "onboarding.guide.skip"
+        static let guideAction = "onboarding.guide.action"
     }
 
     enum Audit {

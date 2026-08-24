@@ -167,6 +167,11 @@ enum A11yID {
         static let tourNext = "onboarding.tour.next"
         static let tourDone = "onboarding.tour.done"
         static let replayTour = "settings.replayTour"
+        static let continueTour = "onboarding.tour.continue"
+        static let guideBar = "onboarding.guide"
+        static let guideSkip = "onboarding.guide.skip"
+        static let guideAction = "onboarding.guide.action"
+        static let stopGuide = "settings.stopGuide"
     }
 
     enum Settings {

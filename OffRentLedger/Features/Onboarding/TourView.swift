@@ -18,6 +18,7 @@ import SwiftUI
 struct TourView: View {
 
     let onFinish: () -> Void
+    let onContinue: () -> Void
 
     @State private var page = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -69,8 +70,15 @@ struct TourView: View {
                 .buttonStyle(.offRentPrimary)
                 .accessibilityIdentifier(A11yID.Onboarding.tourNext)
             } else {
-                Button("Start using \(AppConfiguration.displayName)", action: onFinish)
+                // The primary action on the last page is the hands-on half, not the exit. Five
+                // pages of screenshots teach somebody what the app looks like; walking the
+                // workflow once teaches them what it is for.
+                Button("Continue tour — walk the workflow", action: onContinue)
                     .buttonStyle(.offRentPrimary)
+                    .accessibilityIdentifier(A11yID.Onboarding.continueTour)
+
+                Button("Start using \(AppConfiguration.displayName)", action: onFinish)
+                    .buttonStyle(.offRentSecondary)
                     .accessibilityIdentifier(A11yID.Onboarding.tourDone)
             }
         }
@@ -205,5 +213,5 @@ struct TourView: View {
 }
 
 #Preview {
-    TourView(onFinish: {})
+    TourView(onFinish: {}, onContinue: {})
 }
