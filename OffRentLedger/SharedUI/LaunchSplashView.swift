@@ -85,6 +85,13 @@ struct LaunchSplashOverlay<Content: View>: View {
             }
         }
         .task {
+            // Under UI test the splash is 900ms of nothing to assert against, on every launch of
+            // every test. It reuses the existing `-offrent-disable-animations` flag rather than
+            // adding a hook of its own, and like every one of those it is compiled out of Release.
+            if AppDependencies.testOverrides().disableAnimations {
+                isFinished = true
+                return
+            }
             try? await Task.sleep(for: Self.hold)
             withAnimation(reduceMotion ? .default : Motion.standard) { isFinished = true }
         }

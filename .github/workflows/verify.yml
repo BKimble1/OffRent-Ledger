@@ -117,6 +117,31 @@ jobs:
           bash scripts/ci/summarize_test_log.sh xcodebuild-tests.log
           exit $STATUS
 
+      # The app's first actual launch. Separate from the unit tests so that a UI failure is
+      # legible as one, and named per class so a slow scenario added later cannot silently turn
+      # this into something nobody wants to wait for.
+      - name: UI tests
+        run: |
+          set -o pipefail
+          STATUS=0
+          DEVICE_ID=$(bash scripts/ci/find_simulator.sh)
+          echo "Running UI tests on simulator $DEVICE_ID"
+          xcodebuild test \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$DEVICE_ID" \
+            -only-testing:OffRentLedgerUITests/CoreWorkflowUITests \
+            -only-testing:OffRentLedgerUITests/MismatchUITests \
+            -only-testing:OffRentLedgerUITests/EntitlementUITests \
+            -only-testing:OffRentLedgerUITests/AccessibilityUITests \
+            -resultBundlePath OffRentLedgerUITests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild-uitests.log || STATUS=$?
+          bash scripts/ci/summarize_test_log.sh xcodebuild-uitests.log
+          exit $STATUS
+
       - name: Upload logs and results
         if: always()
         uses: actions/upload-artifact@v4
@@ -125,5 +150,6 @@ jobs:
           path: |
             *.log
             OffRentLedgerTests.xcresult
+            OffRentLedgerUITests.xcresult
           retention-days: 14
           if-no-files-found: ignore
