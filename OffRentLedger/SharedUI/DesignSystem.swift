@@ -69,10 +69,15 @@ enum Palette {
 /// Type. Six roles, so a screen cannot end up with five near-identical sizes — which is what
 /// happened when Today drew three consecutive rows at `.subheadline`, `.caption`, `.caption`.
 enum Typography {
+    // The plain system face throughout. An earlier pass set the money figures in SF Rounded,
+    // which reads as friendly — wrong for a document somebody may end up putting in front of a
+    // rental company. Numbers are `monospacedDigit` where they sit in a column, which is an
+    // alignment decision rather than a stylistic one.
+
     /// The one number a screen is about.
-    static let hero = Font.system(.largeTitle, design: .rounded).weight(.semibold)
+    static let hero = Font.largeTitle.weight(.semibold)
     /// A metric inside a tile.
-    static let metric = Font.system(.title2, design: .rounded).weight(.semibold)
+    static let metric = Font.title2.weight(.semibold)
     /// Section headings.
     static let sectionTitle = Font.headline
     /// The primary line of a row — the equipment name.

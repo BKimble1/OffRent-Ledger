@@ -81,9 +81,7 @@ struct SettingsView: View {
         return NavigationLink(value: SettingsDestination.subscription) {
             VStack(alignment: .leading, spacing: Space.base) {
                 Text("Your plan")
-                    .font(Typography.micro.weight(.semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.8)
+                    .font(Typography.caption.weight(.semibold))
                     .foregroundStyle(Palette.onGraphiteSecondary)
                 HStack(alignment: .firstTextBaseline) {
                     Text(isPro ? "\(AppConfiguration.displayName) Pro" : "Free plan")

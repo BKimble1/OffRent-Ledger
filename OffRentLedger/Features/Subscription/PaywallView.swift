@@ -76,9 +76,7 @@ struct PaywallView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: Space.snug) {
             Text("\(AppConfiguration.displayName) Pro")
-                .font(Typography.micro.weight(.semibold))
-                .textCase(.uppercase)
-                .tracking(0.8)
+                .font(Typography.caption.weight(.semibold))
                 .foregroundStyle(Palette.accent)
             Text(reason.headline)
                 .font(.title2.weight(.semibold))

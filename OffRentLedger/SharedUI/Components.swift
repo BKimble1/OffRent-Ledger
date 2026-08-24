@@ -35,14 +35,11 @@ struct EstimateLabel: View {
                     .fontWeight(.semibold)
                     .monospacedDigit()
                     .contentTransition(.numericText())
+                // Sentence case, no letter spacing. Uppercase with tracking was also the widest
+                // thing in a row's trailing column — wider than the figure it qualifies.
                 Text(AppCopy.estimateQualifier)
                     .font(qualifierFont)
                     .foregroundStyle(.secondary)
-                    // Mixed case, no tracking, in a row: uppercase "ESTIMATE" with 0.6pt of
-                    // tracking is the widest thing in the trailing column — wider than the figure
-                    // it qualifies — and it was taking the width away from the equipment name.
-                    .textCase(size == .small ? nil : .uppercase)
-                    .tracking(size == .small ? 0 : 0.6)
             } else {
                 Text("Not available")
                     .font(font)
@@ -68,9 +65,9 @@ struct EstimateLabel: View {
 
     private var font: Font {
         switch size {
-        case .large: .system(.title, design: .rounded)
-        case .medium: .system(.title3, design: .rounded)
-        case .small: .system(.subheadline, design: .rounded)
+        case .large: .title
+        case .medium: .title3
+        case .small: .subheadline
         }
     }
 
@@ -341,9 +338,7 @@ struct SummaryPanel<Trailing: View>: View {
             // "Estimated rent running" onto two lines at default type, which is the one string
             // on this screen the product specification fixes word for word.
             Text(eyebrow)
-                .font(Typography.micro.weight(.semibold))
-                .textCase(.uppercase)
-                .tracking(0.8)
+                .font(Typography.caption.weight(.semibold))
                 .foregroundStyle(Palette.onGraphiteSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .bottom) {

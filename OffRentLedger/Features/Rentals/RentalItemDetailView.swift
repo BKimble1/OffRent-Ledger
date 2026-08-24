@@ -110,9 +110,7 @@ struct RentalItemDetailView: View {
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
                     Text(AppCopy.estimateQualifier)
-                        .font(Typography.micro.weight(.semibold))
-                        .textCase(.uppercase)
-                        .tracking(0.8)
+                        .font(Typography.caption.weight(.semibold))
                         .foregroundStyle(Palette.accent)
                 } else {
                     Text("Not available")

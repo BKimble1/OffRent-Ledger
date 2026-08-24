@@ -85,7 +85,6 @@ struct SummaryWidgetView: View {
             Text("Estimate")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-                .textCase(.uppercase)
 
             Spacer(minLength: 0)
 
