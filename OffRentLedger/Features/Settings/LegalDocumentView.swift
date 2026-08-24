@@ -60,15 +60,16 @@ struct LegalDocumentView: View {
     let document: LegalDocument
     @Environment(\.openURL) private var openURL
 
-    private var outline: LegalDocumentOutline {
-        LegalDocumentOutline(markdown: Self.bundledMarkdown(for: document) ?? "")
-    }
+    /// Read and parsed once, not on every body evaluation. It was a computed property, which
+    /// meant opening a twenty-kilobyte file from the bundle and re-parsing it every time SwiftUI
+    /// re-evaluated this view — including on every jump to a clause, which is the one interaction
+    /// the screen has.
+    @State private var outline = LegalDocumentOutline(title: "", preamble: [], clauses: [])
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.section) {
-                    let outline = self.outline
                     if outline.isEmpty {
                         missingDocument
                     } else {
@@ -89,6 +90,10 @@ struct LegalDocumentView: View {
         .navigationTitle(document.title)
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("legal.\(document.rawValue)")
+        .task {
+            guard outline.isEmpty else { return }
+            outline = LegalDocumentOutline(markdown: Self.bundledMarkdown(for: document) ?? "")
+        }
     }
 
     // MARK: - Pieces

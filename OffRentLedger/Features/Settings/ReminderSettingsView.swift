@@ -22,6 +22,12 @@ struct ReminderSettingsView: View {
     @State private var status: UNAuthorizationStatus = .notDetermined
     @State private var testMessage: String?
 
+    /// Recomputed when something that could change it changes, rather than on every body
+    /// evaluation. The planner walks every rental and its relationships; running that on each
+    /// redraw of a screen full of steppers is work nobody asked for, and the steppers are exactly
+    /// the controls that cause redraws.
+    @State private var plan: [PlannedReminder] = []
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.section) {
@@ -45,23 +51,34 @@ struct ReminderSettingsView: View {
         .navigationTitle("Reminders")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier(A11yID.Settings.remindersRoot)
-        .task { await refreshStatusAsync() }
+        .task {
+            await refreshStatusAsync()
+            recomputePlan()
+        }
+        .onChange(of: dependencies.reminderSettings) { _, _ in recomputePlan() }
+        .onChange(of: items.count) { _, _ in recomputePlan() }
         // Somebody who leaves to change the iOS switch has to come back to a screen that agrees
         // with what they just did.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { refreshStatus() }
+            if phase == .active {
+                refreshStatus()
+                recomputePlan()
+            }
         }
     }
 
     // MARK: - What is scheduled
 
-    /// Recomputed from the same planner the app schedules with, so this cannot drift from what
-    /// iOS actually holds. Showing the OS's own pending requests instead would show opaque
+    /// Built with the same planner the app schedules with, so this cannot drift from what iOS
+    /// actually holds. Showing the OS's own pending requests instead would show opaque
     /// identifiers; showing the plan shows sentences.
-    private var plan: [PlannedReminder] {
+    private func recomputePlan() {
         let settings = dependencies.reminderSettings
-        guard !settings.enabledKinds.isEmpty else { return [] }
-        return ReminderPlanner.plan(
+        guard !settings.enabledKinds.isEmpty else {
+            plan = []
+            return
+        }
+        plan = ReminderPlanner.plan(
             contexts: items.map { ReminderContext(item: $0) },
             settings: settings,
             entitlement: dependencies.effectiveEntitlement,

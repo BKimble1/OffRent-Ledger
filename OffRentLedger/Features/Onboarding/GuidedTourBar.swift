@@ -15,26 +15,38 @@ import SwiftUI
 struct GuidedTourBar: View {
 
     @Environment(OnboardingState.self) private var onboarding
+
+    /// The `@Query` lives one level down, in `ActiveGuidedTourBar`, so it is only ever created
+    /// while the walkthrough is running. A `@Query` declared here would fetch every rental on
+    /// every render of the root view for every user, almost all of whom will never see this bar.
+    var body: some View {
+        if onboarding.isGuidedTourActive {
+            ActiveGuidedTourBar()
+        }
+    }
+}
+
+private struct ActiveGuidedTourBar: View {
+
+    @Environment(OnboardingState.self) private var onboarding
     @Environment(AppRouter.self) private var router
 
     @Query(sort: \RentalItem.createdAt, order: .reverse) private var items: [RentalItem]
 
     var body: some View {
-        if onboarding.isGuidedTourActive {
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(Palette.hairline)
-                    .frame(height: Layout.hairline)
-                content
-                    .padding(.horizontal, Space.comfortable)
-                    .padding(.vertical, Space.base)
-                    .background(.bar)
-            }
-            // `.contain` before the identifier, as on the welcome screen. Without it the bar's
-            // identifier is pushed down onto Skip and the action button and both lose their own.
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier(A11yID.Onboarding.guideBar)
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Palette.hairline)
+                .frame(height: Layout.hairline)
+            content
+                .padding(.horizontal, Space.comfortable)
+                .padding(.vertical, Space.base)
+                .background(.bar)
         }
+        // `.contain` before the identifier, as on the welcome screen. Without it the bar's
+        // identifier is pushed down onto Skip and the action button and both lose their own.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(A11yID.Onboarding.guideBar)
     }
 
     // MARK: - Content
