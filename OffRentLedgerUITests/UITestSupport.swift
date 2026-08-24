@@ -103,10 +103,13 @@ extension XCUIApplication {
         line: UInt = #line
     ) -> XCUIElement {
         if !element.waitForExistence(timeout: timeout) {
+            // Deliberately nothing about `element` in this message. Every property that would
+            // name it — `identifier`, `label`, even `description` — resolves a snapshot, and
+            // resolving a snapshot for an element that does not exist throws the error that hid
+            // this diagnosis in the first place. The file and line say which call it was.
             XCTFail(
                 """
                 element did not appear within \(timeout)s.
-                Query: \(element)
                 Identified elements on screen:
                 \(identifiedElements())
                 """,
