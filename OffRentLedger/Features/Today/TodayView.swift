@@ -71,15 +71,22 @@ struct TodayView: View {
                 eyebrow: "Estimated rent running",
                 footnote: "Based on the terms you confirmed. Not an invoice."
             ) {
+                // The label and the identifier go on the figure itself rather than on the stack
+                // around it. A container with `children: .ignore` becomes an *other* element, and
+                // the test that checks this figure is announced as an estimate reads it as a
+                // static text — so it never matched, and nothing said so until the suite first ran.
                 VStack(alignment: .leading, spacing: Space.hair) {
                     if accruing.isEmpty && totalRunning == 0 {
                         Text(Formatters.currency(0))
                             .font(Typography.hero)
                             .monospacedDigit()
                             .foregroundStyle(Palette.onGraphite)
+                            .accessibilityLabel(summaryAccessibilityLabel)
+                            .accessibilityIdentifier(A11yID.Today.estimatedRentRunning)
                         Text("Nothing is accruing.")
                             .font(Typography.rowDetail)
                             .foregroundStyle(Palette.onGraphiteSecondary)
+                            .accessibilityHidden(true)
                     } else {
                         Text(Formatters.currency(totalRunning))
                             .font(Typography.hero)
@@ -88,14 +95,14 @@ struct TodayView: View {
                             .contentTransition(.numericText())
                             .minimumScaleFactor(0.6)
                             .lineLimit(1)
+                            .accessibilityLabel(summaryAccessibilityLabel)
+                            .accessibilityIdentifier(A11yID.Today.estimatedRentRunning)
                         Text(AppCopy.estimateQualifier)
                             .font(Typography.caption)
                             .foregroundStyle(Palette.onGraphiteSecondary)
+                            .accessibilityHidden(true)
                     }
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(summaryAccessibilityLabel)
-                .accessibilityIdentifier(A11yID.Today.estimatedRentRunning)
             } trailing: {
                 Text(accruing.count == 1 ? "1 on rent" : "\(accruing.count) on rent")
                     .font(Typography.caption)

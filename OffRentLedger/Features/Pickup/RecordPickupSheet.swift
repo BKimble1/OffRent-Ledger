@@ -127,6 +127,7 @@ struct RecordPickupSheet: View {
                 }
             }
             .offRentFormBackground()
+            .accessibilityIdentifier(A11yID.Pickup.root)
             .safeAreaInset(edge: .bottom) {
                 StickyActionBar {
                     VStack(spacing: Space.snug) {
@@ -143,7 +144,6 @@ struct RecordPickupSheet: View {
             }
             .navigationTitle("Record pickup")
             .navigationBarTitleDisplayMode(.inline)
-            .accessibilityIdentifier(A11yID.Pickup.root)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }

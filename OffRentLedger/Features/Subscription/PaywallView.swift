@@ -45,10 +45,10 @@ struct PaywallView: View {
             .offRentScreen()
             // Subscribe stays in reach: the plans are two thirds of the way down a screen that
             // scrolls, and a purchase button below the terms is a purchase button nobody finds.
+            .accessibilityIdentifier(A11yID.Paywall.root)
             .safeAreaInset(edge: .bottom) { purchaseBar }
             .navigationTitle("\(AppConfiguration.displayName) Pro")
             .navigationBarTitleDisplayMode(.inline)
-            .accessibilityIdentifier(A11yID.Paywall.root)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }

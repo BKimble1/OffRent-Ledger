@@ -71,11 +71,11 @@ struct AddRentalView: View {
                 rolloverSection
                 notesSection
             }
+            .accessibilityIdentifier(A11yID.AddRental.root)
             .offRentFormBackground()
             .safeAreaInset(edge: .bottom) { saveBar }
             .navigationTitle("New rental")
             .navigationBarTitleDisplayMode(.inline)
-            .accessibilityIdentifier(A11yID.AddRental.root)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

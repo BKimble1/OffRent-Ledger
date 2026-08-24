@@ -53,10 +53,10 @@ struct RentalsView: View {
         }
         .listStyle(.insetGrouped)
         .offRentFormBackground()
+        .accessibilityIdentifier(A11yID.Rentals.root)
         .safeAreaInset(edge: .top, spacing: 0) {
             if !items.isEmpty { filterBar }
         }
-        .accessibilityIdentifier(A11yID.Rentals.root)
         .navigationTitle("Rentals")
         .searchable(text: $search, prompt: "Equipment, vendor or jobsite")
         // The identifier goes on the searchable container: `.searchable` builds the field

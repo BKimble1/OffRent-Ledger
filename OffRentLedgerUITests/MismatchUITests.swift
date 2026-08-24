@@ -62,12 +62,24 @@ final class MismatchUITests: XCTestCase {
     }
 
     /// Scenario 6: the scan review sheet never saves without an explicit tap.
-    func testScanReviewNeverSavesWithoutConfirmation() {
+    ///
+    /// Requires a document camera. `VNDocumentCameraViewController.isSupported` is false on a
+    /// simulator, so the app correctly does not draw the scan button and there is nothing to tap.
+    /// This is skipped there rather than asserted against a device capability — and the invariant
+    /// it guards is separately covered by `ScanReviewCommitTests`, which run the whole pipeline
+    /// and assert that discarding it writes nothing.
+    func testScanReviewNeverSavesWithoutConfirmation() throws {
         let app = XCUIApplication.launched(seed: .empty)
 
         app.tab(A11yUI.Tab.rentals).tap()
         app.expect(app.buttons[A11yUI.Rentals.addRental]).tap()
-        app.expect(app.buttons[A11yUI.AddRental.scanButton]).tap()
+
+        let scan = app.buttons[A11yUI.AddRental.scanButton]
+        try XCTSkipUnless(
+            scan.waitForExistence(timeout: 5),
+            "no document camera on this device, so there is no scan button to open"
+        )
+        scan.tap()
 
         // The stub recogniser returns fixture text, so the review sheet appears with suggestions.
         app.expect(app.otherElements[A11yUI.Scan.reviewRoot])

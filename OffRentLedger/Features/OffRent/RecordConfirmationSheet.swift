@@ -131,11 +131,11 @@ struct RecordConfirmationSheet: View {
                     }
                 }
             }
+            .accessibilityIdentifier(A11yID.Confirmation.root)
             .offRentFormBackground()
             .safeAreaInset(edge: .bottom) { saveBar }
             .navigationTitle("Vendor confirmation")
             .navigationBarTitleDisplayMode(.inline)
-            .accessibilityIdentifier(A11yID.Confirmation.root)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
