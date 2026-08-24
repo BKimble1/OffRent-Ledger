@@ -154,13 +154,18 @@ struct AttachInvoiceSheet: View {
                 notesSection
             }
             .offRentFormBackground()
+            .safeAreaInset(edge: .bottom) {
+                StickyActionBar {
+                    Button("Save invoice", action: save)
+                        .buttonStyle(.offRentPrimary)
+                        .accessibilityIdentifier(A11yID.Audit.saveInvoice)
+                        .disabled(isSaving)
+                }
+            }
             .navigationTitle("Attach invoice")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save).disabled(isSaving)
-                }
             }
             .onAppear { receivedDate = dependencies.clock.now }
             .sheet(item: Binding(

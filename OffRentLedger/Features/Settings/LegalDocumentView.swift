@@ -41,22 +41,27 @@ struct LegalDocumentView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: Space.comfortable) {
+                // On a card rather than straight onto the page. Two thousand words of legal text
+                // with nothing behind it is the same blank-page problem the rest of this pass
+                // fixed; the card gives the column an edge and a measure.
                 Text(markdown)
                     .font(.callout)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .offRentCard(padding: Space.roomy - 4)
 
                 if AppConfiguration.legalURLsAreLive, let url = document.plannedURL {
-                    Divider()
                     Button("Read this online") { openURL(url) }
-                        .font(.footnote)
-                        .minimumTapTarget()
+                        .buttonStyle(.offRentSecondary)
                 }
             }
-            .padding()
+            .padding(.horizontal, Space.comfortable)
+            .padding(.top, Space.base)
+            .padding(.bottom, Space.screenBottom)
         }
-        .offRentFormBackground()
+        .offRentScreen()
         .navigationTitle(document.title)
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("legal.\(document.rawValue)")

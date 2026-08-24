@@ -318,13 +318,18 @@ struct CurrencyField: View {
 struct SummaryPanel<Trailing: View>: View {
     let eyebrow: String
     let headline: AnyView
+    /// A full-width line under the headline row — what this panel is *about*, as opposed to the
+    /// figure itself. It has its own line because sharing the headline row with the trailing pill
+    /// wrapped "Cedar Ridge Equipment · Bayview Tower" onto three lines with the pill on top of it.
+    var subhead: String?
     var footnote: String?
     @ViewBuilder var trailing: Trailing
 
-    init(eyebrow: String, footnote: String? = nil,
+    init(eyebrow: String, subhead: String? = nil, footnote: String? = nil,
          @ViewBuilder headline: () -> some View,
          @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
         self.eyebrow = eyebrow
+        self.subhead = subhead
         self.footnote = footnote
         self.headline = AnyView(headline())
         self.trailing = trailing()
@@ -345,6 +350,13 @@ struct SummaryPanel<Trailing: View>: View {
                 headline
                 Spacer(minLength: Space.snug)
                 trailing
+            }
+            if let subhead {
+                Text(subhead)
+                    .font(Typography.rowDetail)
+                    .foregroundStyle(Palette.onGraphite)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if let footnote {
                 Text(footnote)

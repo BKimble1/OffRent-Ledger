@@ -95,14 +95,28 @@ struct VendorListView: View {
 
     var body: some View {
         List {
+            // A `List` rather than the scrolling groups used elsewhere: swipe-to-delete is the
+            // reason this screen exists, and it is native here and hand-built anywhere else.
             ForEach(vendors, id: \.id) { vendor in
                 Button { editing = vendor } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(vendor.name).font(.body)
-                        if let detail = [vendor.branch, vendor.phone].compactMap({ $0 }).first {
-                            Text(detail).font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: Space.base) {
+                        RowIcon(symbol: "building.2")
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(vendor.name).font(Typography.rowTitle)
+                            if let detail = vendorDetail(vendor) {
+                                Text(detail)
+                                    .font(Typography.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
                         }
+                        Spacer(minLength: Space.snug)
+                        Image(systemName: "chevron.right")
+                            .font(Typography.micro.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .minimumTapTarget()
@@ -126,6 +140,16 @@ struct VendorListView: View {
             }
         }
         .sheet(item: $editing) { vendor in VendorEditView(vendor: vendor) }
+    }
+
+    /// Branch or phone, plus how many rentals are filed under this company.
+    private func vendorDetail(_ vendor: Vendor) -> String? {
+        var parts: [String] = []
+        if let first = [vendor.branch, vendor.phone].compactMap({ $0 }).first { parts.append(first) }
+        var rentals = 0
+        for agreement in vendor.agreements ?? [] { rentals += (agreement.items ?? []).count }
+        if rentals > 0 { parts.append(rentals == 1 ? "1 rental" : "\(rentals) rentals") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 
@@ -201,12 +225,20 @@ struct JobSiteListView: View {
     var body: some View {
         List {
             ForEach(jobSites, id: \.id) { site in
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(site.name)
-                    if let project = site.projectIdentifier {
-                        Text(project).font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: Space.base) {
+                    RowIcon(symbol: "mappin.and.ellipse")
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(site.name).font(Typography.rowTitle)
+                        if let project = site.projectIdentifier {
+                            Text(project)
+                                .font(Typography.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
                     }
+                    Spacer(minLength: 0)
                 }
+                .accessibilityElement(children: .combine)
             }
             .onDelete { offsets in
                 // Nullify, not cascade: deleting a jobsite label must not delete the rentals that

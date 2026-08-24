@@ -66,6 +66,7 @@ struct InvoiceReviewView: View {
                 linesSection
                 recordedFindingsSection
                 openRentalLink
+                acceptExplanation
             }
             .padding(.horizontal, Space.comfortable)
             .padding(.top, Space.screenTop)
@@ -317,22 +318,28 @@ struct InvoiceReviewView: View {
     }
 
     /// The one decision this screen exists to let somebody make, kept in reach of the thumb.
+    ///
+    /// The button alone. The sentence explaining what accepting does and does not do is four
+    /// lines long, and putting it in the bar cost 130pt of a 852pt screen on every scroll; it
+    /// reads better as the last thing in the content, immediately above this.
     private var acceptBar: some View {
         StickyActionBar {
-            VStack(spacing: Space.snug) {
-                Button("Accept this invoice") { acceptInvoice() }
-                    .buttonStyle(.offRentPrimary)
-                    .accessibilityIdentifier(A11yID.Audit.resolveInvoice)
-                Text("""
-                    Accepting records that you looked at this invoice and were satisfied. It does \
-                    not pay anything and does not tell the vendor anything.
-                    """)
-                    .font(Typography.micro)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Button("Accept this invoice") { acceptInvoice() }
+                .buttonStyle(.offRentPrimary)
+                .accessibilityIdentifier(A11yID.Audit.resolveInvoice)
         }
+    }
+
+    private var acceptExplanation: some View {
+        Text("""
+            Accepting records that you looked at this invoice and were satisfied. It does not pay \
+            anything and does not tell the vendor anything.
+            """)
+            .font(Typography.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Space.tight)
     }
 
     private func section(

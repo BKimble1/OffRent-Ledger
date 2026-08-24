@@ -125,6 +125,7 @@ enum A11yID {
         static let recordFollowUp = "audit.recordFollowUp"
         static let followUpReason = "audit.followUpReason"
         static let resolveInvoice = "audit.resolveInvoice"
+        static let saveInvoice = "audit.saveInvoice"
         static func line(_ id: UUID) -> String { "audit.line.\(id.uuidString)" }
     }
 

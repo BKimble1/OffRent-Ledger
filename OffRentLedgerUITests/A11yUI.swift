@@ -74,6 +74,7 @@ enum A11yUI {
         static let recordFollowUp = "audit.recordFollowUp"
         static let followUpReason = "audit.followUpReason"
         static let resolveInvoice = "audit.resolveInvoice"
+        static let saveInvoice = "audit.saveInvoice"
     }
 
     enum Paywall {

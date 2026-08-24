@@ -98,6 +98,7 @@ struct RentalItemDetailView: View {
         )
         return SummaryPanel(
             eyebrow: estimate.hasStoppedAccruing ? "Estimated rent, stopped" : "Estimated rent running",
+            subhead: identityLine(item),
             footnote: AppCopy.estimateExplanation
         ) {
             VStack(alignment: .leading, spacing: Space.tight) {
@@ -125,13 +126,6 @@ struct RentalItemDetailView: View {
                             .foregroundStyle(Palette.onGraphiteSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                }
-                if let where_ = identityLine(item) {
-                    Text(where_)
-                        .font(Typography.rowDetail)
-                        .foregroundStyle(Palette.onGraphiteSecondary)
-                        .lineLimit(2)
-                        .padding(.top, Space.tight)
                 }
             }
             .accessibilityElement(children: .ignore)

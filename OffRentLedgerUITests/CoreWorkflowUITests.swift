@@ -104,6 +104,9 @@ struct AttachInvoiceRobot {
         app.buttons["Add a line"].tap()
         app.textFields["currencyField.Amount"].tap()
         app.typeText(rentalSubtotal)
-        app.buttons["Save"].tap()
+        // Addressed by identifier rather than by the label "Save". The sheet's primary action
+        // moved to a bottom bar and reads "Save invoice"; matching on a bare label would also
+        // have matched any other Save that happened to be on screen.
+        app.expect(app.buttons[A11yUI.Audit.saveInvoice]).tap()
     }
 }
