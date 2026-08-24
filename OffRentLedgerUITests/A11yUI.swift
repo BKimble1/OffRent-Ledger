@@ -68,6 +68,17 @@ enum A11yUI {
         static let cancelButton = "scan.review.cancel"
     }
 
+    enum Onboarding {
+        static let welcomeRoot = "onboarding.welcome"
+        static let welcomeAddRental = "onboarding.welcome.addRental"
+        static let welcomeTour = "onboarding.welcome.tour"
+        static let welcomeSkip = "onboarding.welcome.skip"
+        static let tourRoot = "onboarding.tour"
+        static let tourSkip = "onboarding.tour.skip"
+        static let tourNext = "onboarding.tour.next"
+        static let tourDone = "onboarding.tour.done"
+    }
+
     enum Audit {
         static let possibleMismatches = "audit.possibleMismatches"
         static let possibleVariance = "audit.possibleVariance"

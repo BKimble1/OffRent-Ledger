@@ -143,6 +143,18 @@ enum A11yID {
         static let dataReassurance = "paywall.dataReassurance"
     }
 
+    enum Onboarding {
+        static let welcomeRoot = "onboarding.welcome"
+        static let welcomeAddRental = "onboarding.welcome.addRental"
+        static let welcomeTour = "onboarding.welcome.tour"
+        static let welcomeSkip = "onboarding.welcome.skip"
+        static let tourRoot = "onboarding.tour"
+        static let tourSkip = "onboarding.tour.skip"
+        static let tourNext = "onboarding.tour.next"
+        static let tourDone = "onboarding.tour.done"
+        static let replayTour = "settings.replayTour"
+    }
+
     enum Settings {
         static let root = "settings.root"
         static let subscription = "settings.subscription"

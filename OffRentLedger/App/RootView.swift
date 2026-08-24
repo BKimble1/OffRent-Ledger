@@ -7,10 +7,12 @@ struct RootView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(OnboardingState.self) private var onboarding
     @AppStorage(AppearanceSetting.storageKey) private var appearance = AppearanceSetting.system
 
     var body: some View {
         @Bindable var router = router
+        @Bindable var onboarding = onboarding
 
         // The classic `.tabItem` form rather than iOS 18's `Tab` builder.
         //
@@ -39,6 +41,30 @@ struct RootView: View {
         .preferredColorScheme(AppearanceSetting.colorScheme(for: appearance))
         .sheet(item: $router.presentedSheet) { sheet in
             sheetContent(for: sheet)
+        }
+        // The welcome covers the shell rather than replacing it, so dismissing it reveals an app
+        // already loaded rather than mounting one — and "Add your first rental" can open the
+        // sheet on the way out.
+        .fullScreenCover(isPresented: .constant(onboarding.shouldShowWelcome)) {
+            WelcomeView(
+                onAddRental: {
+                    onboarding.markWelcomed()
+                    onboarding.markTourSeen()
+                    router.selectedTab = .rentals
+                    router.presentedSheet = .addRental
+                },
+                onTakeTour: {
+                    onboarding.markWelcomed()
+                    onboarding.startTour()
+                },
+                onSkip: {
+                    onboarding.markWelcomed()
+                    onboarding.markTourSeen()
+                }
+            )
+        }
+        .fullScreenCover(isPresented: $onboarding.isShowingTour) {
+            TourView(onFinish: { onboarding.markTourSeen() })
         }
         .task { await prepare() }
         .onChange(of: scenePhase) { _, phase in

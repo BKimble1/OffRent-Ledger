@@ -226,7 +226,7 @@ struct AddRentalView: View {
 
     private var vendorSection: some View {
         Section("Rental company") {
-            Picker("Rental company", selection: $selectedVendorID) {
+            Picker("Company", selection: $selectedVendorID) {
                 Text("New rental company").tag(UUID?.none)
                 ForEach(vendors, id: \.id) { vendor in Text(vendor.name).tag(UUID?.some(vendor.id)) }
             }
@@ -255,7 +255,7 @@ struct AddRentalView: View {
 
     private var jobSiteSection: some View {
         Section("Jobsite") {
-            Picker("Jobsite", selection: $selectedJobSiteID) {
+            Picker("Site", selection: $selectedJobSiteID) {
                 Text("New jobsite").tag(UUID?.none)
                 ForEach(jobSites, id: \.id) { site in Text(site.name).tag(UUID?.some(site.id)) }
             }
@@ -327,11 +327,12 @@ struct AddRentalView: View {
 
     private var rolloverSection: some View {
         Section {
-            Picker("Rate changes", selection: $rolloverMode) {
+            Picker("When rates change", selection: $rolloverMode) {
                 ForEach(RolloverMode.allCases, id: \.self) { mode in
                     Text(mode.displayName).tag(mode)
                 }
             }
+            .pickerStyle(.menu)
             Text(rolloverMode.explanation)
                 .font(.footnote)
                 .foregroundStyle(.secondary)

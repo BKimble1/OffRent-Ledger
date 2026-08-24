@@ -6,6 +6,7 @@ struct OffRentLedgerApp: App {
 
     @State private var dependencies: AppDependencies
     @State private var router = AppRouter()
+    @State private var onboarding = OnboardingState()
     private let container: ModelContainer?
 
     init() {
@@ -23,6 +24,20 @@ struct OffRentLedgerApp: App {
         }
 
         self.container = container
+
+        // UI tests need to choose which first run they are exercising. Compiled out of Release
+        // along with every other launch override.
+        #if DEBUG
+        let onboarding = OnboardingState()
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains(LaunchArgument.resetOnboarding) {
+            onboarding.reset()
+        } else if arguments.contains(LaunchArgument.skipOnboarding) {
+            onboarding.markWelcomed()
+            onboarding.markTourSeen()
+        }
+        _onboarding = State(initialValue: onboarding)
+        #endif
         _dependencies = State(initialValue: dependencies)
     }
 
@@ -40,6 +55,7 @@ struct OffRentLedgerApp: App {
             }
             .environment(dependencies)
             .environment(router)
+            .environment(onboarding)
             .onOpenURL { url in
                 _ = router.handle(url: url)
             }

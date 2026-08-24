@@ -5,6 +5,7 @@ struct SettingsView: View {
 
     @Environment(AppDependencies.self) private var dependencies
     @Environment(AppRouter.self) private var router
+    @Environment(OnboardingState.self) private var onboarding
 
     var body: some View {
         // A real inset-grouped `List`. The hand-built version of this screen had to reimplement
@@ -26,6 +27,15 @@ struct SettingsView: View {
                     .dataAndPrivacy, "Data and privacy", "lock.shield",
                     A11yID.Settings.dataAndPrivacy
                 )
+            }
+
+            Section {
+                Button {
+                    onboarding.startTour()
+                } label: {
+                    Label("Show the tour again", systemImage: "questionmark.circle")
+                }
+                .accessibilityIdentifier(A11yID.Onboarding.replayTour)
             }
 
             Section("Legal and support") {

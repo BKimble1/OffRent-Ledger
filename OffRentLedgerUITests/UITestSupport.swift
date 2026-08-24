@@ -23,9 +23,27 @@ extension XCUIApplication {
             "-offrent-disable-animations",
             "-offrent-stub-ocr",
             "-offrent-fixed-now", fixedNow,
+            // Every existing scenario starts as a returning user. Without this the welcome sits
+            // in front of all eleven of them and none of them can see the app.
+            "-offrent-skip-onboarding",
         ]
         app.launchArguments += seed.arguments
         app.launchArguments += entitlement.arguments
+        app.launch()
+        return app
+    }
+
+    /// A first run, with the welcome screen showing.
+    static func launchedAsNewUser() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-offrent-in-memory-store",
+            "-offrent-reset-state",
+            "-offrent-disable-animations",
+            "-offrent-stub-ocr",
+            "-offrent-fixed-now", fixedNow,
+            "-offrent-reset-onboarding",
+        ]
         app.launch()
         return app
     }

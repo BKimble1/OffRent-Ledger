@@ -109,6 +109,10 @@ enum LaunchArgument {
     static let stubTextRecogniser = "-offrent-stub-ocr"
     /// ISO-8601 instant to freeze the clock at, as `-offrent-fixed-now <value>`.
     static let fixedNow = "-offrent-fixed-now"
+    /// Start from a clean first run, so the welcome screen appears.
+    static let resetOnboarding = "-offrent-reset-onboarding"
+    /// Start as a returning user, so the welcome screen does not sit in front of every test.
+    static let skipOnboarding = "-offrent-skip-onboarding"
 }
 
 /// The user's appearance choice.

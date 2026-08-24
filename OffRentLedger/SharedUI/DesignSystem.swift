@@ -225,10 +225,13 @@ struct OffRentPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.body.weight(.semibold))
-            .foregroundStyle(isEnabled ? Palette.onAccent : Color.secondary)
+            .foregroundStyle(Palette.onAccent.opacity(isEnabled ? 1 : 0.45))
+            // Disabled is the same button at a third strength, not a different grey shape. Filling
+            // it with `sunken` made it read as a dead slab on the warm page — something switched
+            // off rather than something waiting on one more field.
             .frame(maxWidth: .infinity, minHeight: Layout.controlHeight)
             .background(
-                isEnabled ? Palette.accent : Palette.sunken,
+                Palette.accent.opacity(isEnabled ? 1 : 0.32),
                 in: RoundedRectangle(cornerRadius: Radius.control)
             )
             .opacity(configuration.isPressed ? 0.82 : 1)
