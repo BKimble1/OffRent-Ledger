@@ -438,3 +438,61 @@ final class FinancialWalkthroughTests: XCTestCase {
         }
     }
 }
+
+// MARK: - Addressed versus unaddressed
+
+/// The difference between "the app has spotted something" and "the user has done something
+/// about it".
+///
+/// This existed as a bug before it existed as a test. The invoice screen refused to accept an
+/// invoice while a mismatch was open, but it counted *stored* discrepancies — and one only
+/// exists once the user has already accepted a finding or recorded a follow-up. So on the one
+/// path the guard is for, a fresh invoice with a live mismatch on screen, the count was zero and
+/// Accept went straight through without a word.
+final class UnaddressedFindingsTests: XCTestCase {
+
+    private func comparison(with types: [DiscrepancyType]) -> InvoiceComparison {
+        InvoiceComparison(
+            expectedRentalSubtotal: nil,
+            expectationBasis: "",
+            expectedBilledThroughDate: nil,
+            expectedPeriods: 0,
+            invoicedRentalSubtotal: .zero,
+            invoiceTotal: .zero,
+            lineSum: .zero,
+            findings: types.map {
+                DiscrepancyValue(
+                    type: $0,
+                    explanation: "",
+                    createdAt: Date(timeIntervalSince1970: 1_778_000_000)
+                )
+            },
+            reviewFlags: [],
+            possibleVariance: .zero
+        )
+    }
+
+    func testAFindingNothingHasBeenRecordedAgainstIsUnaddressed() {
+        let subject = comparison(with: [.rentalSubtotalDiffers])
+        XCTAssertEqual(subject.unaddressedFindings(recordedTypes: []).count, 1)
+    }
+
+    func testAFindingWithAStoredDiscrepancyOfTheSameTypeIsAddressed() {
+        let subject = comparison(with: [.rentalSubtotalDiffers])
+        XCTAssertTrue(
+            subject.unaddressedFindings(recordedTypes: [.rentalSubtotalDiffers]).isEmpty,
+            "accepting a finding must not leave it blocking the invoice forever — the comparison "
+                + "is recomputed from unchanged numbers and will keep reporting it"
+        )
+    }
+
+    func testOnlyTheMatchingTypeCounts() {
+        let subject = comparison(with: [.rentalSubtotalDiffers, .invoiceTotalDoesNotMatchLines])
+        let remaining = subject.unaddressedFindings(recordedTypes: [.rentalSubtotalDiffers])
+        XCTAssertEqual(remaining.map(\.type), [.invoiceTotalDoesNotMatchLines])
+    }
+
+    func testNoFindingsMeansNothingToAddress() {
+        XCTAssertTrue(comparison(with: []).unaddressedFindings(recordedTypes: []).isEmpty)
+    }
+}

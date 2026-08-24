@@ -390,6 +390,13 @@ struct InvoiceReviewView: View {
         try? context.save()
     }
 
+    /// Findings on screen that nothing has been recorded against yet.
+    private var unaddressedFindingCount: Int {
+        guard let comparison else { return 0 }
+        let recorded = Set((invoice?.discrepancies ?? []).map(\.type))
+        return comparison.unaddressedFindings(recordedTypes: recorded).count
+    }
+
     private func accept(_ finding: DiscrepancyValue) {
         guard let invoice else { return }
         var accepted = finding
@@ -436,7 +443,14 @@ struct InvoiceReviewView: View {
 
     private func acceptInvoice() {
         guard let invoice else { return }
-        let openCount = invoice.openDiscrepancyCount
+        // Two kinds of open, and this used to count only one of them.
+        //
+        // `openDiscrepancyCount` counts *stored* discrepancies, and one only exists after the
+        // user has already accepted a finding or recorded a follow-up against it. So on the one
+        // path this guard exists for — a fresh invoice with a live mismatch on the screen in
+        // front of somebody — the count was zero and Accept went straight through without a
+        // word. The UI suite caught it the first time it ever got this far.
+        let openCount = invoice.openDiscrepancyCount + unaddressedFindingCount
         guard openCount == 0 else {
             rejection = .cannotResolveWithOpenDiscrepancies(count: openCount)
             return

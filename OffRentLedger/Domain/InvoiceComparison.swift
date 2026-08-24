@@ -165,6 +165,17 @@ struct InvoiceComparison: Sendable, Equatable {
 
     var openFindings: [DiscrepancyValue] { findings.filter { $0.status.isOpen } }
 
+    /// Findings that nothing has been recorded against yet.
+    ///
+    /// The comparison is recomputed from the terms and the invoice every time it is read, so a
+    /// finding does not go away when the user accepts it — the numbers it was derived from have
+    /// not changed. What changes is that a `Discrepancy` of that type now exists in the store.
+    /// This is the difference between "the app has spotted something" and "the user has done
+    /// something about it", and the accept guard needs the second one.
+    func unaddressedFindings(recordedTypes: Set<DiscrepancyType>) -> [DiscrepancyValue] {
+        findings.filter { !recordedTypes.contains($0.type) }
+    }
+
     /// True when there is nothing left for the user to look at. Drives whether Resolve is offered.
     var isFullyExplained: Bool { openFindings.isEmpty && reviewFlags.isEmpty }
 }
