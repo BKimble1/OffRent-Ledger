@@ -14,32 +14,36 @@ import SwiftUI
 /// is up. Because the mark does not move between the two layers, the handover is invisible: the
 /// only thing the eye sees appear is the credit.
 ///
-/// `markFraction` is the contract between the two. `LaunchMark.png` is a square canvas with the
-/// tag occupying 76% of it (see `scripts/prepare_launch_assets.py`), and iOS fits that square to
-/// the screen's narrower dimension. Drawing the same square at the same fraction here is what
-/// keeps them in step; changing one without the other makes the tag jump at launch.
+/// `markPoints` is the contract between the two. The asset ships at 1x, 2x and 3x of that one
+/// point size (see `scripts/prepare_launch_assets.py`), and `UILaunchScreen` draws it at that
+/// size without scaling. Drawing the same number here is what keeps them in step, and
+/// `LaunchScreenTests` fails if they ever drift apart.
 struct LaunchSplashView: View {
 
-    /// Width of the mark's square canvas, as a fraction of the screen's narrower side.
-    static let markFraction: CGFloat = 0.52
+    /// The mark's size in points, matching `MARK_POINTS` in `scripts/prepare_launch_assets.py`.
+    ///
+    /// A fixed size, not a fraction of the screen. `UILaunchScreen` draws its image at the
+    /// image's own point size and does not scale it, so the only way the two layers can agree on
+    /// every device is for this one to use that same number. The previous version drew a
+    /// fraction of the screen against a single 1024-pixel asset in the 1x slot — which iOS read
+    /// as 1024 *points*, two and a half screens wide. That is the giant tag that appeared and
+    /// then jumped.
+    static let markPoints: CGFloat = 204
 
     var body: some View {
-        GeometryReader { proxy in
-            let side = min(proxy.size.width, proxy.size.height) * Self.markFraction
-            ZStack {
-                Color("LaunchBackground").ignoresSafeArea()
+        ZStack {
+            Color("LaunchBackground").ignoresSafeArea()
 
-                Image("LaunchMark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: side, height: side)
-                    .accessibilityHidden(true)
+            Image("LaunchMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: Self.markPoints, height: Self.markPoints)
+                .accessibilityHidden(true)
 
-                VStack {
-                    Spacer()
-                    credit
-                        .padding(.bottom, Space.section)
-                }
+            VStack {
+                Spacer()
+                credit
+                    .padding(.bottom, Space.section)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -72,9 +76,13 @@ struct LaunchSplashOverlay<Content: View>: View {
     @State private var isFinished = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// How long the mark holds before it starts to go. Long enough to read as deliberate, short
-    /// enough that nobody waiting on a jobsite notices it.
-    private static var hold: Duration { .milliseconds(650) }
+    /// How long the mark holds after the app is ready.
+    ///
+    /// Short, and it is a cross-fade rather than a cut. The first version held for 650ms and then
+    /// animated — which, on top of a launch image that was the wrong size, read as two separate
+    /// screens rather than one. The static launch screen and this now draw the identical mark at
+    /// the identical size, so all this does is fade the credit line away.
+    private static var hold: Duration { .milliseconds(240) }
 
     var body: some View {
         ZStack {
@@ -85,15 +93,16 @@ struct LaunchSplashOverlay<Content: View>: View {
             }
         }
         .task {
-            // Under UI test the splash is 900ms of nothing to assert against, on every launch of
-            // every test. It reuses the existing `-offrent-disable-animations` flag rather than
-            // adding a hook of its own, and like every one of those it is compiled out of Release.
+            // Under UI test the splash is time spent with nothing to assert against, on every
+            // launch of every test. It reuses the existing `-offrent-disable-animations` flag
+            // rather than adding a hook of its own, and like every one of those it is compiled
+            // out of Release.
             if AppDependencies.testOverrides().disableAnimations {
                 isFinished = true
                 return
             }
             try? await Task.sleep(for: Self.hold)
-            withAnimation(reduceMotion ? .default : Motion.standard) { isFinished = true }
+            withAnimation(reduceMotion ? .default : .easeOut(duration: 0.28)) { isFinished = true }
         }
     }
 }

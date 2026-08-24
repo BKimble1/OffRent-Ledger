@@ -283,6 +283,7 @@ struct CurrencyFieldFreeform: View {
     var identifier: String?
 
     @State private var text = ""
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack {
@@ -292,9 +293,19 @@ struct CurrencyFieldFreeform: View {
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
                 .monospacedDigit()
+                .focused($isFocused)
                 .accessibilityIdentifier(identifier ?? "decimalField.\(title)")
                 .onChange(of: text) { _, newValue in
                     value = newValue.isEmpty ? nil : MoneyMath.parse(newValue)
+                }
+                // Same reason as `CurrencyField`: a decimal pad has no return key.
+                .toolbar {
+                    if isFocused {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") { isFocused = false }
+                        }
+                    }
                 }
             if !suffix.isEmpty {
                 Text(suffix).foregroundStyle(.secondary)

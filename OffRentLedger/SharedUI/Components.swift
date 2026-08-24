@@ -287,6 +287,17 @@ struct CurrencyField: View {
                     guard !focused, let value else { return }
                     text = "\(MoneyMath.rounded(value))"
                 }
+                // The decimal pad has no return key. Without this there is no way to put it away
+                // except by tapping some other control, which on a long form means scrolling
+                // blind behind a keyboard covering half the screen.
+                .toolbar {
+                    if isFocused {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") { isFocused = false }
+                        }
+                    }
+                }
         }
         .minimumTapTarget()
         .onAppear { if let value { text = "\(MoneyMath.rounded(value))" } }

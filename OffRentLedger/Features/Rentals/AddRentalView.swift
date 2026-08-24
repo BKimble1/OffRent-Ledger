@@ -58,15 +58,19 @@ struct AddRentalView: View {
     @State private var showingFileImporter = false
     @State private var scanError: String?
     @State private var isSaving = false
+    @FocusState private var equipmentIsFocused: Bool
 
     var body: some View {
         NavigationStack {
             Form {
+                // Equipment first. The document accelerator used to be three rows above it, so
+                // the first thing on a screen called "New rental" was an optional shortcut and
+                // the field you came to fill in was below the fold.
+                equipmentSection
                 captureSection
                 vendorSection
                 jobSiteSection
                 agreementSection
-                equipmentSection
                 ratesSection
                 rolloverSection
                 notesSection
@@ -82,7 +86,12 @@ struct AddRentalView: View {
                         .accessibilityIdentifier(A11yID.AddRental.cancel)
                 }
             }
-            .onAppear { deliveryDate = dependencies.clock.now }
+            .onAppear {
+                deliveryDate = dependencies.clock.now
+                // Straight into the first field. The sheet exists to capture an equipment name;
+                // making somebody tap once before they can type it is a tap for nothing.
+                equipmentIsFocused = true
+            }
             .sheet(item: Binding(
                 get: { scanModel.map { ScanSession(model: $0) } },
                 set: { if $0 == nil { scanModel = nil } }
@@ -172,6 +181,8 @@ struct AddRentalView: View {
 
     private var captureSection: some View {
         Section {
+            // One row, not three. The scanner is the fast path when there is a contract in hand;
+            // a photo and a PDF are the fallbacks, and a menu is where iOS puts fallbacks.
             if DocumentScannerView.isSupported {
                 Button {
                     showingCamera = true
@@ -179,27 +190,37 @@ struct AddRentalView: View {
                     Label("Scan the rental contract", systemImage: "doc.viewfinder")
                 }
                 .accessibilityIdentifier(A11yID.AddRental.scanButton)
-                .minimumTapTarget()
-            }
 
-            PhotosPicker(selection: $photoItem, matching: .images) {
-                Label("Choose a photo of the contract", systemImage: "photo.on.rectangle")
+                Menu {
+                    photoPickerButton
+                    Button {
+                        showingFileImporter = true
+                    } label: {
+                        Label("Import a PDF", systemImage: "doc")
+                    }
+                } label: {
+                    Label("Use a photo or PDF instead", systemImage: "ellipsis.circle")
+                }
+            } else {
+                // No document camera on this device, so the fallbacks are the only paths and
+                // hiding them behind a menu would hide everything.
+                photoPickerButton
+                Button {
+                    showingFileImporter = true
+                } label: {
+                    Label("Import a PDF", systemImage: "doc")
+                }
             }
-            .minimumTapTarget()
-
-            Button {
-                showingFileImporter = true
-            } label: {
-                Label("Import a PDF", systemImage: "doc")
-            }
-            .minimumTapTarget()
         } header: {
-            Text("Start from a document (optional)")
+            Text("Fill this in from a document")
         } footer: {
-            Text("""
-                Everything below can be typed in by hand. Scanning only fills the fields in — you \
-                check and confirm them before anything is saved. \(AppCopy.ocrLocalOnly)
-                """)
+            Text("Optional. Values are yours to check before anything is saved. \(AppCopy.ocrLocalOnly)")
+        }
+    }
+
+    private var photoPickerButton: some View {
+        PhotosPicker(selection: $photoItem, matching: .images) {
+            Label("Choose a photo of the contract", systemImage: "photo.on.rectangle")
         }
     }
 
@@ -212,13 +233,20 @@ struct AddRentalView: View {
             .accessibilityIdentifier(A11yID.AddRental.vendorPicker)
 
             if selectedVendorID == nil {
+                // Content types so iOS offers what it already knows. A contractor adding the
+                // same rental yard for the third time should not be typing its phone number
+                // from memory.
                 TextField("Company name", text: $newVendorName)
+                    .textContentType(.organizationName)
                     .accessibilityIdentifier(A11yID.AddRental.newVendorName)
                 TextField("Branch (optional)", text: $newVendorBranch)
+                    .textContentType(.sublocality)
                 TextField("Phone (optional)", text: $newVendorPhone)
                     .keyboardType(.phonePad)
+                    .textContentType(.telephoneNumber)
                 TextField("Email (optional)", text: $newVendorEmail)
                     .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             }
@@ -257,6 +285,8 @@ struct AddRentalView: View {
     private var equipmentSection: some View {
         Section("Equipment") {
             TextField("Equipment", text: $equipmentName)
+                .focused($equipmentIsFocused)
+                .submitLabel(.next)
                 .accessibilityIdentifier(A11yID.AddRental.equipmentName)
             TextField("Class or description (optional)", text: $equipmentClass)
             TextField("Vendor equipment ID (optional)", text: $vendorEquipmentIdentifier)

@@ -81,12 +81,18 @@ struct LaunchScreenTests {
         )
     }
 
-    @Test("The splash draws the mark at the fraction the launch screen was built for")
-    func markFractionIsInStep() {
-        // `LaunchMark.png` is a square canvas with the tag at 76% of it, and iOS fits that square
-        // to the screen's narrower side. If this fraction drifts, the tag visibly jumps at the
-        // moment the SwiftUI layer takes over from the static one.
-        #expect(LaunchSplashView.markFraction > 0.3)
-        #expect(LaunchSplashView.markFraction < 0.8)
+    @Test("The splash draws the mark at exactly the size the launch image is")
+    func markSizeIsInStep() throws {
+        // `UILaunchScreen` draws its image at the image's own point size and does not scale it.
+        // If this constant and the asset disagree, the tag changes size the instant SwiftUI takes
+        // over — which is precisely what a launch screen must never do.
+        let mark = try #require(UIImage(named: "LaunchMark"))
+        #expect(
+            mark.size.width == LaunchSplashView.markPoints,
+            """
+            LaunchMark is \(mark.size.width)pt but LaunchSplashView draws \
+            \(LaunchSplashView.markPoints)pt, so the mark will jump at launch
+            """
+        )
     }
 }
