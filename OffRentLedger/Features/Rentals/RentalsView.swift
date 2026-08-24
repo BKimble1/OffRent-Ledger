@@ -23,35 +23,42 @@ struct RentalsView: View {
     @State private var limitAlert: EntitlementBlock?
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: Space.section) {
-                if !items.isEmpty { filterBar }
-
-                if filtered.isEmpty {
-                    emptyState
-                } else {
-                    if !openItems.isEmpty {
-                        group(title: "On rent and in progress", items: openItems)
-                    }
-                    if !closedItems.isEmpty {
-                        group(title: "Closed", items: closedItems)
-                    }
-                    if !archivedItems.isEmpty {
-                        group(title: "Archived", items: archivedItems)
+        // A real `List`. The hand-built scroll version reimplemented rows, separators and
+        // selection highlighting, and none of the three matched what the platform draws.
+        List {
+            if filtered.isEmpty {
+                Section { emptyState.listRowBackground(Color.clear) }
+            } else {
+                if !openItems.isEmpty {
+                    Section("On rent and in progress") {
+                        ForEach(openItems, id: \.id) { row($0) }
                     }
                 }
-
-                referenceLinks
+                if !closedItems.isEmpty {
+                    Section("Closed") { ForEach(closedItems, id: \.id) { row($0) } }
+                }
+                if !archivedItems.isEmpty {
+                    Section("Archived") { ForEach(archivedItems, id: \.id) { row($0) } }
+                }
             }
-            .padding(.horizontal, Space.comfortable)
-            .padding(.top, Space.screenTop)
-            .padding(.bottom, Space.screenBottom)
+
+            Section {
+                NavigationLink(value: RentalDestination.vendors) {
+                    Label("Rental companies", systemImage: "building.2")
+                }
+                NavigationLink(value: RentalDestination.jobSites) {
+                    Label("Jobsites", systemImage: "mappin.and.ellipse")
+                }
+            }
         }
-        .offRentScreen()
+        .listStyle(.insetGrouped)
+        .offRentFormBackground()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if !items.isEmpty { filterBar }
+        }
         .accessibilityIdentifier(A11yID.Rentals.root)
         .navigationTitle("Rentals")
-        .navigationBarTitleDisplayMode(.large)
-        .searchable(text: $search, prompt: "Equipment, vendor, jobsite or agreement")
+        .searchable(text: $search, prompt: "Equipment, vendor or jobsite")
         // The identifier goes on the searchable container: `.searchable` builds the field
         // itself, so there is no view for the test to address without this.
         .accessibilityIdentifier(A11yID.Rentals.searchField)
@@ -110,17 +117,6 @@ struct RentalsView: View {
             }
         }
 
-        var tint: Color {
-            switch self {
-            case .all: Palette.accent
-            case .onRent: Palette.accent
-            case .toCall: Palette.attention
-            case .awaitingPickup, .awaitingInvoice: Palette.waiting
-            case .toReview: Palette.review
-            case .closed: Palette.settled
-            }
-        }
-
         func contains(_ status: RentalItemStatus) -> Bool { statuses.contains(status) }
     }
 
@@ -131,8 +127,7 @@ struct RentalsView: View {
                     FilterChip(
                         title: candidate.title,
                         count: count(for: candidate),
-                        isSelected: bucket == candidate,
-                        tint: candidate.tint
+                        isSelected: bucket == candidate
                     ) {
                         withAnimation(Motion.quick) {
                             bucket = bucket == candidate ? .all : candidate
@@ -142,11 +137,9 @@ struct RentalsView: View {
                 }
             }
             .padding(.horizontal, Space.comfortable)
-            .padding(.vertical, Space.hair)
+            .padding(.vertical, Space.snug)
         }
-        // The row bleeds to both screen edges so a chip that is partly off-screen reads as
-        // "there is more this way" rather than as a clipped mistake.
-        .padding(.horizontal, -Space.comfortable)
+        .background(Palette.background)
         .accessibilityIdentifier("rentals.filterBar")
     }
 
@@ -188,38 +181,24 @@ struct RentalsView: View {
         .accessibilityIdentifier(A11yID.Rentals.filterMenu)
     }
 
-    // MARK: - Sections
-
-    private func group(title: String, items sectionItems: [RentalItem]) -> some View {
-        VStack(alignment: .leading, spacing: Space.base) {
-            SectionHeader(title: title, count: sectionItems.count)
-            ListGroup {
-                ForEach(Array(sectionItems.enumerated()), id: \.element.id) { index, item in
-                    NavigationLink(value: RentalDestination.item(id: item.id)) {
-                        row(item)
-                    }
-                    .buttonStyle(.plain)
-                    .minimumTapTarget()
-                    .accessibilityIdentifier(A11yID.Rentals.row(item.id))
-                    .accessibilityHint(item.status.explanation)
-                    if index < sectionItems.count - 1 { RowDivider() }
-                }
-            }
-        }
-    }
+    // MARK: - Rows
 
     private func row(_ item: RentalItem) -> some View {
         let annotation = annotation(for: item)
-        return RentalRow(
-            title: item.equipmentName,
-            reference: item.vendorEquipmentIdentifier,
-            vendor: item.agreement?.vendor?.name,
-            status: item.status,
-            amount: item.status.accruesRent ? item.cachedEstimatedRunningCost : nil,
-            amountIsComplete: item.cachedEstimateIsComplete,
-            note: annotation?.text,
-            noteTint: annotation?.tint
-        )
+        return NavigationLink(value: RentalDestination.item(id: item.id)) {
+            RentalRow(
+                title: item.equipmentName,
+                reference: item.vendorEquipmentIdentifier,
+                vendor: item.agreement?.vendor?.name,
+                status: item.status,
+                amount: item.status.accruesRent ? item.cachedEstimatedRunningCost : nil,
+                amountIsComplete: item.cachedEstimateIsComplete,
+                note: annotation?.text,
+                noteTint: annotation?.tint,
+                identifier: A11yID.Rentals.row(item.id)
+            )
+        }
+        .accessibilityHint(item.status.explanation)
     }
 
     private var emptyState: some View {
@@ -232,30 +211,6 @@ struct RentalsView: View {
             actionTitle: hasAnyItems ? "Clear filters" : "Add a rental",
             action: { hasAnyItems ? clearFilters() : addRental() }
         )
-    }
-
-    private var referenceLinks: some View {
-        ListGroup {
-            NavigationLink(value: RentalDestination.vendors) {
-                NavigationRow(
-                    title: "Rental companies",
-                    subtitle: vendors.count == 1 ? "1 saved" : "\(vendors.count) saved",
-                    symbol: "building.2"
-                )
-            }
-            .buttonStyle(.plain)
-            .minimumTapTarget()
-            RowDivider()
-            NavigationLink(value: RentalDestination.jobSites) {
-                NavigationRow(
-                    title: "Jobsites",
-                    subtitle: jobSites.count == 1 ? "1 saved" : "\(jobSites.count) saved",
-                    symbol: "mappin.and.ellipse"
-                )
-            }
-            .buttonStyle(.plain)
-            .minimumTapTarget()
-        }
     }
 
     // MARK: - The one useful fact per row

@@ -76,31 +76,24 @@ struct EstimateLabel: View {
     }
 }
 
-/// Status, drawn as symbol + text + colour.
+/// Status: a small coloured dot and the word.
 ///
-/// Never colour alone. Somebody with a red-green deficiency, or a phone in bright sun, still
-/// reads "Contact Vendor" — the tint is reinforcement, not the message.
+/// Never colour alone — the word carries the meaning and the dot only reinforces it, so a phone
+/// in bright sun or a red-green deficiency loses nothing. It used to be a bordered, tinted pill
+/// with a symbol in it; a list of those is a list of badges rather than a list of machines.
 struct StatusChip: View {
     let status: RentalItemStatus
     var compact = false
 
     var body: some View {
-        Label {
-            // Compact uses the short name; the accessibility label below always speaks the full
-            // one, so the abbreviation is never the only form of the word available.
-            Text(compact ? status.shortName : status.displayName)
-                .font(compact ? .caption2 : .caption)
-                .fontWeight(.medium)
-        } icon: {
+        HStack(spacing: Space.tight + 1) {
             Image(systemName: status.symbolName)
-                .font(compact ? .caption2 : .caption)
+                .font(compact ? Typography.caption : Typography.rowDetail)
+                .imageScale(.small)
+            Text(compact ? status.shortName : status.displayName)
+                .font(compact ? Typography.caption : Typography.rowDetail)
         }
-        .labelStyle(.titleAndIcon)
-        .padding(.horizontal, compact ? Space.snug : Space.base - 2)
-        .padding(.vertical, compact ? 3 : 5)
-        .background(Palette.tint(for: status).opacity(0.14), in: Capsule())
         .foregroundStyle(Palette.tint(for: status))
-        .overlay(Capsule().strokeBorder(Palette.tint(for: status).opacity(0.34), lineWidth: 1))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Status: \(status.displayName)")
         .accessibilityHint(status.explanation)
@@ -160,33 +153,27 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: Space.base) {
-            // A quiet disc rather than a large loose glyph. It gives the state a centre of
-            // gravity at a fraction of the visual weight of an illustration.
-            ZStack {
-                Circle()
-                    .fill(Palette.sunken)
-                    .frame(width: 68, height: 68)
-                Image(systemName: symbol)
-                    .font(.system(size: 27, weight: .regular))
-                    .foregroundStyle(Palette.accent)
-            }
-            .accessibilityHidden(true)
-            .padding(.bottom, Space.tight)
+            // A plain glyph. The tinted disc it used to sit in was the heaviest thing on an
+            // otherwise empty screen, which is the wrong emphasis for "there is nothing here".
+            Image(systemName: symbol)
+                .font(.system(size: 34, weight: .light))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
 
             Text(title)
-                .font(Typography.sectionTitle)
+                .font(.headline)
                 .multilineTextAlignment(.center)
             Text(message)
                 .font(Typography.rowDetail)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: 320)
+                .frame(maxWidth: 300)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .buttonStyle(.offRentPrimary)
-                    .frame(maxWidth: 260)
-                    .padding(.top, Space.tight)
+                    .frame(maxWidth: 240)
+                    .padding(.top, Space.snug)
             }
         }
         .padding(.vertical, Space.section)
@@ -235,7 +222,12 @@ struct DetailRow: View {
     }
 }
 
-/// Section header used above card groups on Today and in detail screens.
+/// Section header above a hand-built group, drawn the way a grouped `List` draws one.
+///
+/// Today is the only screen that still builds its own groups — it has a hero panel and metric
+/// tiles above them — so this exists to keep its headings identical to the real `Section` headers
+/// on every other screen. It used to be `.headline` in primary, which made Today's headings a
+/// weight heavier than the same headings in Rentals.
 struct SectionHeader: View {
     let title: String
     var subtitle: String?
@@ -243,21 +235,19 @@ struct SectionHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(title).font(Typography.sectionTitle)
+            HStack(alignment: .firstTextBaseline, spacing: Space.tight + 1) {
+                Text(title)
                 if let count, count > 0 {
                     Text("\(count)")
-                        .font(Typography.micro.weight(.semibold))
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, Space.snug - 1)
-                        .padding(.vertical, 2)
-                        .background(Palette.sunken, in: Capsule())
+                        .foregroundStyle(.tertiary)
                 }
             }
+            .font(Typography.sectionTitle)
+            .foregroundStyle(.secondary)
             if let subtitle {
                 Text(subtitle)
-                    .font(.caption)
+                    .font(Typography.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -366,6 +356,9 @@ struct SummaryPanel<Trailing: View>: View {
 }
 
 /// A small figure with a label. Three across the width of a phone; never more.
+///
+/// Compact: the value, the label, and nothing else. The tinted symbol above each one made a row
+/// of three tiles into a row of three logos.
 struct MetricTile: View {
     let value: String
     let label: String
@@ -374,13 +367,7 @@ struct MetricTile: View {
     var identifier: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.tight) {
-            if let symbol {
-                Image(systemName: symbol)
-                    .font(.system(size: Layout.symbolInline, weight: .semibold))
-                    .foregroundStyle(tint)
-                    .accessibilityHidden(true)
-            }
+        VStack(alignment: .leading, spacing: Space.hair) {
             Text(value)
                 .font(Typography.metric)
                 .monospacedDigit()
@@ -388,12 +375,12 @@ struct MetricTile: View {
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
             Text(label)
-                .font(Typography.micro)
+                .font(Typography.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
         }
-        .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .offRentCard(padding: Space.base)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(value) \(label)")
@@ -401,24 +388,21 @@ struct MetricTile: View {
     }
 }
 
-/// The leading anchor on a row: a symbol in a tinted disc.
+/// A small leading glyph on a row.
 ///
-/// Small, quiet, and the reason a list of rentals scans as a list of *machines* rather than as
-/// paragraphs of text.
+/// Plain, and secondary by default. This used to draw a tinted rounded square behind every
+/// symbol; a screen of those is a screen of orange chips, and the brief is that orange belongs to
+/// the primary action and small highlights only.
 struct RowIcon: View {
     let symbol: String
-    var tint: Color = Palette.accent
+    var tint: Color = .secondary
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: Radius.control - 1)
-                .fill(tint.opacity(0.13))
-            Image(systemName: symbol)
-                .font(.system(size: Layout.symbolInline, weight: .semibold))
-                .foregroundStyle(tint)
-        }
-        .frame(width: Layout.rowIcon, height: Layout.rowIcon)
-        .accessibilityHidden(true)
+        Image(systemName: symbol)
+            .font(.system(size: Layout.symbolInline + 2, weight: .regular))
+            .foregroundStyle(tint)
+            .frame(width: Layout.rowIcon, alignment: .leading)
+            .accessibilityHidden(true)
     }
 }
 
@@ -481,14 +465,11 @@ struct RentalRow: View {
 
     /// Two columns: what it is on the left, what it is costing on the right.
     ///
-    /// Status is the tinted symbol plus the first word of the third line, not a pill. Measured at
-    /// 393pt: a pill in the trailing column made that column about 130pt wide and left the
-    /// equipment name 190pt, which wrapped "Skid Steer Loader 75HP" and truncated the vendor. The
-    /// pill still appears at accessibility sizes and on the detail screen, where there is room.
+    /// No leading icon. A tinted glyph on every row of a list is decoration that repeats the
+    /// status word two lines below it, and it costs 40pt of the width the equipment name needs.
     private var standard: some View {
         HStack(alignment: .top, spacing: Space.base) {
-            RowIcon(symbol: status.symbolName, tint: Palette.tint(for: status))
-            VStack(alignment: .leading, spacing: Space.tight) {
+            VStack(alignment: .leading, spacing: Space.hair) {
                 Text(title)
                     .font(Typography.rowTitle)
                     .lineLimit(2)
@@ -503,34 +484,34 @@ struct RentalRow: View {
             }
             Spacer(minLength: Space.snug)
             amountView
-            Image(systemName: "chevron.right")
-                .font(Typography.micro.weight(.semibold))
-                .foregroundStyle(.tertiary)
-                .padding(.top, 3)
-                .accessibilityHidden(true)
         }
     }
 
     @ViewBuilder
     private var statusLine: some View {
         if showsStatus || note != nil {
-            HStack(spacing: Space.tight) {
+            HStack(spacing: Space.tight + 1) {
                 if showsStatus {
+                    Circle()
+                        .fill(Palette.tint(for: status))
+                        .frame(width: 7, height: 7)
+                        .accessibilityHidden(true)
                     Text(status.shortName)
-                        .font(Typography.caption.weight(.semibold))
+                        .font(Typography.caption)
                         .foregroundStyle(Palette.tint(for: status))
                         .accessibilityLabel(status.displayName)
-                    if note != nil {
-                        Text("·").font(Typography.caption).foregroundStyle(.tertiary)
-                    }
                 }
                 if let note {
+                    if showsStatus {
+                        Text("·").font(Typography.caption).foregroundStyle(.tertiary)
+                    }
                     Text(note)
                         .font(Typography.caption)
                         .foregroundStyle(noteTint ?? .secondary)
                 }
             }
             .lineLimit(1)
+            .padding(.top, 1)
         }
     }
 
@@ -593,14 +574,14 @@ struct InlineAlert: View {
 
     private var defaultSymbol: String {
         switch kind {
-        case .attention: "exclamationmark.triangle.fill"
-        case .info: "info.circle.fill"
-        case .positive: "checkmark.circle.fill"
+        case .attention: "exclamationmark.circle"
+        case .info: "info.circle"
+        case .positive: "checkmark.circle"
         }
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: Space.snug + 2) {
+        HStack(alignment: .firstTextBaseline, spacing: Space.snug) {
             Image(systemName: symbol ?? defaultSymbol)
                 .font(Typography.rowDetail)
                 .foregroundStyle(tint)
@@ -610,9 +591,7 @@ struct InlineAlert: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(Space.base)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(tint.opacity(0.09), in: RoundedRectangle(cornerRadius: Radius.control))
         .accessibilityElement(children: .combine)
     }
 }
@@ -668,8 +647,9 @@ struct VariancePanel: View {
         .background(Palette.raised, in: RoundedRectangle(cornerRadius: Radius.card))
         .overlay(
             RoundedRectangle(cornerRadius: Radius.card)
-                .strokeBorder(tint.opacity(0.42), lineWidth: 1.5)
+                .strokeBorder(Palette.hairline, lineWidth: Layout.hairline)
         )
+        .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
     }
 
     private func amountRow(_ label: String, _ value: String) -> some View {
@@ -705,7 +685,7 @@ struct StickyActionBar<Content: View>: View {
     }
 }
 
-/// A selectable filter, drawn as a pill with its count.
+/// A selectable filter, drawn as a small pill with its count.
 ///
 /// This is the status filter made visible. It used to live inside a menu behind a toolbar icon,
 /// which meant the answer to "how many of these need a phone call?" was three taps away and the
@@ -719,28 +699,27 @@ struct FilterChip: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: Space.tight + 2) {
+            HStack(spacing: Space.tight + 1) {
                 Text(title)
-                    .font(Typography.rowDetail.weight(isSelected ? .semibold : .regular))
                 if let count {
                     Text("\(count)")
-                        .font(Typography.micro.weight(.semibold))
                         .monospacedDigit()
-                        .foregroundStyle(isSelected ? Palette.onAccent.opacity(0.7) : .secondary)
+                        .foregroundStyle(isSelected ? Palette.onAccent.opacity(0.65) : .secondary)
                 }
             }
+            .font(Typography.rowDetail.weight(isSelected ? .semibold : .regular))
             .foregroundStyle(isSelected ? Palette.onAccent : Color.primary)
-            .padding(.horizontal, Space.base)
-            .padding(.vertical, Space.snug)
+            .padding(.horizontal, Space.base - 1)
+            .padding(.vertical, Space.tight + 2)
             .background(isSelected ? tint : Palette.raised, in: Capsule())
             .overlay(
                 Capsule().strokeBorder(
                     isSelected ? Color.clear : Palette.hairline, lineWidth: Layout.hairline
                 )
             )
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .minimumTapTarget()
         .accessibilityLabel(count.map { "\(title), \($0)" } ?? title)
         .accessibilityAddTraits(traits)
     }
@@ -757,7 +736,7 @@ struct NavigationRow: View {
     let title: String
     var subtitle: String?
     let symbol: String
-    var tint: Color = Palette.accent
+    var tint: Color = .secondary
 
     var body: some View {
         HStack(spacing: Space.base) {
@@ -790,7 +769,7 @@ struct ActionRow: View {
     let title: String
     var subtitle: String?
     let symbol: String
-    var tint: Color = Palette.accent
+    var tint: Color = .secondary
     /// Draws the "leaves the app" glyph — used where tapping hands off to Phone, Mail or Safari.
     var opensExternally = false
     var isEnabled = true
@@ -838,7 +817,7 @@ struct CardHeader: View {
     let title: String
     var subtitle: String?
     var symbol: String?
-    var tint: Color = Palette.accent
+    var tint: Color = .secondary
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.snug) {
@@ -849,7 +828,7 @@ struct CardHeader: View {
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(Typography.sectionTitle)
+                Text(title).font(.headline)
                 if let subtitle {
                     Text(subtitle)
                         .font(Typography.rowDetail)

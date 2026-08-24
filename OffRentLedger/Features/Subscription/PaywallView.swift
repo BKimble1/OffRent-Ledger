@@ -72,27 +72,25 @@ struct PaywallView: View {
 
     // MARK: - Sections
 
-    /// The one graphite panel on the screen, carrying why the user is looking at it.
+    /// Plain text on the page. The one dark panel in this app is on Today; a second one here made
+    /// the paywall feel like a landing page rather than a choice between two prices.
     private var header: some View {
         VStack(alignment: .leading, spacing: Space.snug) {
-            Text("\(AppConfiguration.displayName) Pro")
-                .font(Typography.caption.weight(.semibold))
-                .foregroundStyle(Palette.accent)
             Text(reason.headline)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(Palette.onGraphite)
+                .font(.title.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
             if reason == .openItemLimit {
                 Text("""
-                    The free plan tracks one open rental at a time. Resolve or archive the one you \
-                    have, or subscribe for unlimited open rentals.
+                    The free plan tracks one open rental. Resolve or archive the one you have, or \
+                    subscribe for unlimited.
                     """)
                 .font(Typography.rowDetail)
-                .foregroundStyle(Palette.onGraphiteSecondary)
+                .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .offRentPanel()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, Space.snug)
     }
 
     @ViewBuilder

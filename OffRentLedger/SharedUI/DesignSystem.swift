@@ -2,20 +2,24 @@ import SwiftUI
 
 /// The visual identity, in one place.
 ///
-/// Field-ready, calm, native. Warm construction orange for action and attention; graphite and
-/// warm stone for structure. Every screen draws from these tokens rather than reaching for a
-/// system colour or a hand-typed number, which is what keeps eleven screens looking like one app.
+/// Quiet, warm and native. A warm-white page, white cards separated by a hairline rather than by
+/// a change of fill, graphite text, and orange reserved for the primary action and small
+/// highlights. One dark panel exists in the whole app, on Today.
 ///
-/// Deliberately absent: gradients on surfaces, glass, decorative charts, invented machinery, and
-/// any colour that carries meaning on its own. Every status is label + symbol + colour, so
+/// The previous pass went the other way — soft-stone ground behind ivory cards, a graphite panel
+/// on most screens — and it read as heavy and over-designed. Separation is drawn at the edges now,
+/// which is what the platform does and what keeps a screen full of records legible.
+///
+/// Deliberately absent: gradients on surfaces, glass, decorative charts, tinted icon discs on
+/// every row, and any colour that carries meaning on its own. Every status is label + colour, so
 /// removing the colour loses nothing.
 enum Palette {
 
     // MARK: - Brand
 
-    /// Construction orange. The accent, primary actions, and "attention". Never a background
-    /// behind body text on a light surface — it fails contrast there, and `OnAccent` exists for
-    /// the one case where it *is* the background.
+    /// Construction orange. Primary actions and small highlights only — never a fill behind body
+    /// text on a light surface, where it fails contrast. `onAccent` is for the one case where it
+    /// *is* the background.
     static let accent = Color("AccentColor")
 
     /// Attention, not alarm. An item needing a phone call is not an error.
@@ -29,27 +33,26 @@ enum Palette {
 
     // MARK: - Surfaces
     //
-    // Four planes, and the order matters more than the hue. See `scripts/generate_assets.py`:
-    // the first attempt at this was warm but measured 1.11:1 between ground and card, which is
-    // invisible — the reason the app read as blank pages with text on them. These are 1.24:1.
+    // Ground to card is 1.09:1 — invisible on its own, and meant to be. The hairline is 1.42:1
+    // against the card, and that is what draws the boundary. See `scripts/generate_assets.py`.
 
-    /// The page. Soft stone in light, near-black in dark.
+    /// The page. Warm white.
     static let background = Color("SurfaceBackground")
-    /// Cards and rows that sit on the page. Warm ivory in light.
+    /// Cards and rows. White.
     static let raised = Color("SurfaceRaised")
-    /// Wells: inputs, inset groups, anything that should read as cut into the page.
+    /// Wells: search fields, inset groups, anything cut into the page.
     static let sunken = Color("SurfaceSunken")
-    /// The one dominant panel per screen. Deep graphite; carries `onGraphite` text.
+    /// The one dark panel in the app, on Today. Not a surface anything else paints with.
     static let graphite = Color("SurfaceGraphite")
 
-    /// Text and symbols on `graphite`. Fixed, not adaptive: the panel is dark in both schemes.
-    static let onGraphite = Color(red: 0.965, green: 0.945, blue: 0.910)
-    /// Secondary text on `graphite`. 7.9:1 — still comfortably readable outdoors.
-    static let onGraphiteSecondary = Color(red: 0.729, green: 0.702, blue: 0.655)
+    /// Text on `graphite`. Fixed, not adaptive: the panel is dark in both schemes.
+    static let onGraphite = Color(red: 0.976, green: 0.973, blue: 0.965)
+    /// Secondary text on `graphite`, at 8.1:1.
+    static let onGraphiteSecondary = Color(red: 0.729, green: 0.718, blue: 0.702)
     /// Text on an orange fill. Graphite, at 7.4:1 — white would be 2.4:1 and fail.
     static let onAccent = Color(red: 0.090, green: 0.102, blue: 0.122)
 
-    /// Hairlines and dividers.
+    /// Hairlines, dividers and card edges.
     static let hairline = Color("HairlineColor")
 
     static func tint(for status: RentalItemStatus) -> Color {
@@ -78,12 +81,14 @@ enum Typography {
     static let hero = Font.largeTitle.weight(.semibold)
     /// A metric inside a tile.
     static let metric = Font.title2.weight(.semibold)
-    /// Section headings.
-    static let sectionTitle = Font.headline
-    /// The primary line of a row — the equipment name.
-    static let rowTitle = Font.subheadline.weight(.semibold)
+    /// Section headings. Footnote semibold in secondary — what a grouped `List` draws, so the
+    /// one screen that builds its own groups matches the ones that do not.
+    static let sectionTitle = Font.footnote.weight(.semibold)
+    /// The primary line of a row — the equipment name. Body, as a native list row is: at
+    /// subheadline it read as a caption of something rather than as the thing itself.
+    static let rowTitle = Font.body
     /// The supporting line of a row.
-    static let rowDetail = Font.footnote
+    static let rowDetail = Font.subheadline
     /// Labels, qualifiers, counts.
     static let caption = Font.caption
     /// The smallest thing the app draws. Nothing below this.
@@ -98,23 +103,25 @@ enum Space {
     static let snug: CGFloat = 8
     static let base: CGFloat = 12
     static let comfortable: CGFloat = 16
-    static let roomy: CGFloat = 24
-    static let section: CGFloat = 28
+    static let roomy: CGFloat = 20
+    static let section: CGFloat = 24
     static let screenTop: CGFloat = 8
     static let screenBottom: CGFloat = 40
 }
 
+/// Corner radii, matched to the platform. An inset-grouped `List` draws its own group at 10pt,
+/// so a hand-built card at 14 sitting above one at 10 was visibly a different shape.
 enum Radius {
     static let control: CGFloat = 10
-    static let card: CGFloat = 14
-    static let panel: CGFloat = 20
+    static let card: CGFloat = 12
+    static let panel: CGFloat = 16
 }
 
 enum Layout {
     /// Apple's minimum comfortable target. Everything tappable clears it.
     static let minimumTapTarget: CGFloat = 44
-    static let controlHeight: CGFloat = 50
-    static let rowIcon: CGFloat = 34
+    static let controlHeight: CGFloat = 48
+    static let rowIcon: CGFloat = 28
     static let symbolInline: CGFloat = 15
     static let hairline: CGFloat = 1
 
@@ -136,8 +143,8 @@ enum Motion {
 
 extension View {
 
-    /// A raised surface. One hairline, no shadow stack, no gradient — a list of these stays
-    /// legible in bright sun on a jobsite, which a pile of translucency does not.
+    /// A card: white, a hairline, and a shadow soft enough that you notice the edge rather than
+    /// the shadow. No stacked shadows, no gradient — this has to stay legible in bright sun.
     func offRentCard(padding: CGFloat = Space.comfortable,
                      radius: CGFloat = Radius.card) -> some View {
         self
@@ -148,9 +155,10 @@ extension View {
                 RoundedRectangle(cornerRadius: radius)
                     .strokeBorder(Palette.hairline, lineWidth: Layout.hairline)
             )
+            .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
     }
 
-    /// The dominant panel. One per screen, at the top, carrying the fact the screen is about.
+    /// The one dark panel in the app. Today only.
     func offRentPanel(padding: CGFloat = Space.roomy) -> some View {
         self
             .padding(padding)
@@ -158,8 +166,7 @@ extension View {
             .background(Palette.graphite, in: RoundedRectangle(cornerRadius: Radius.panel))
     }
 
-    /// A group of rows sharing one surface, with hairlines between them — rather than each row
-    /// in its own box, which is how a list of five things becomes five floating rectangles.
+    /// Rows sharing one card, divided by hairlines.
     func offRentGroup() -> some View {
         self
             .background(Palette.raised, in: RoundedRectangle(cornerRadius: Radius.card))
@@ -167,25 +174,22 @@ extension View {
                 RoundedRectangle(cornerRadius: Radius.card)
                     .strokeBorder(Palette.hairline, lineWidth: Layout.hairline)
             )
+            .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
     }
 
-    /// The page. Every screen sets this; nothing uses `.systemGroupedBackground` any more.
+    /// The page.
     func offRentScreen() -> some View {
         background(Palette.background.ignoresSafeArea())
     }
 
     /// The page, for a `Form` or a `List`.
     ///
-    /// Fifteen screens were drawing iOS's own grouped background — a cool #F2F2F7 behind white
-    /// rows, four luminance levels apart — which is most of why the app read as blank pages with
-    /// text on them. Hiding the scroll background and painting the warm ground underneath puts
-    /// the rows on a surface they can actually be seen against.
+    /// Hides the system's cool grouped background and paints the warm-white one under it, leaving
+    /// the rows, separators, swipe actions and section behaviour exactly as the platform draws
+    /// them. Most list-shaped screens in this app are real `List`s for that reason.
     func offRentFormBackground() -> some View {
         scrollContentBackground(.hidden)
             .background(Palette.background.ignoresSafeArea())
-            // Warm ivory rows rather than pure white. Applied to the container so a form does
-            // not have to repeat it on forty rows; a row that wants something else still wins,
-            // because the nearer modifier does.
             .listRowBackground(Palette.raised)
     }
 
@@ -233,21 +237,18 @@ struct OffRentPrimaryButtonStyle: ButtonStyle {
     }
 }
 
-/// The secondary action. An outline, so a screen never has two orange buttons competing.
+/// The secondary action. Tinted text at a full-width tap target — no second outlined box
+/// competing with the primary one, which is what made these screens feel busy.
 struct OffRentSecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.body.weight(.medium))
-            .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
-            .frame(maxWidth: .infinity, minHeight: Layout.controlHeight)
-            .background(Palette.raised, in: RoundedRectangle(cornerRadius: Radius.control))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radius.control)
-                    .strokeBorder(Palette.hairline, lineWidth: Layout.hairline)
-            )
-            .opacity(configuration.isPressed ? 0.7 : 1)
+            .foregroundStyle(isEnabled ? Palette.accent : Color.secondary)
+            .frame(maxWidth: .infinity, minHeight: Layout.minimumTapTarget)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.55 : 1)
             .animation(Motion.quick, value: configuration.isPressed)
     }
 }

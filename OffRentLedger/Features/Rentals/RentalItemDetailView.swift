@@ -44,9 +44,9 @@ struct RentalItemDetailView: View {
                     )
                     .padding(.top, Space.section)
                 }
+                .offRentScreen()
             }
         }
-        .offRentScreen()
         .navigationTitle(item?.equipmentName ?? "Rental")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier(A11yID.ItemDetail.root)
@@ -69,86 +69,73 @@ struct RentalItemDetailView: View {
     // MARK: - Content
 
     private func content(for item: RentalItem) -> some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: Space.section) {
-                summary(for: item)
-                nextStep(for: item)
-                if item.status == .contactVendor { contactVendorSection(item) }
-                estimateSection(item)
-                termsSection(item)
-                offRentProofSection(item)
-                pickupSection(item)
-                invoiceSection(item)
-                identificationSection(item)
-                timelineSection(item)
-                evidenceSection(item)
-                utilitySection(item)
-            }
-            .padding(.horizontal, Space.comfortable)
-            .padding(.top, Space.screenTop)
-            .padding(.bottom, Space.screenBottom)
+        List {
+            Section { summary(for: item) }
+            nextStepSection(item)
+            if item.status == .contactVendor { contactVendorSection(item) }
+            estimateSection(item)
+            termsSection(item)
+            offRentProofSection(item)
+            pickupSection(item)
+            invoiceSection(item)
+            identificationSection(item)
+            timelineSection(item)
+            evidenceSection(item)
+            utilitySection(item)
         }
+        .listStyle(.insetGrouped)
+        .offRentFormBackground()
     }
 
     // MARK: - Summary
+    //
+    // A compact card, not a dark panel. There is one dark panel in this app and it is on Today;
+    // repeating it on every rental made the whole product feel like a slide deck.
 
     private func summary(for item: RentalItem) -> some View {
         let estimate = RentalRateEngine.estimate(
             terms: item.terms, asOf: dependencies.clock.now, calendar: dependencies.clock.calendar
         )
-        return SummaryPanel(
-            eyebrow: estimate.hasStoppedAccruing ? "Estimated rent, stopped" : "Estimated rent running",
-            subhead: identityLine(item),
-            footnote: AppCopy.estimateExplanation
-        ) {
-            VStack(alignment: .leading, spacing: Space.tight) {
-                if estimate.isComplete {
-                    Text(Formatters.currency(estimate.estimatedTotal))
-                        .font(Typography.hero)
-                        .monospacedDigit()
-                        .foregroundStyle(Palette.onGraphite)
-                        .minimumScaleFactor(0.6)
-                        .lineLimit(1)
-                    Text(AppCopy.estimateQualifier)
-                        .font(Typography.caption.weight(.semibold))
-                        .foregroundStyle(Palette.accent)
-                } else {
-                    Text("Not available")
-                        .font(Typography.hero)
-                        .foregroundStyle(Palette.onGraphiteSecondary)
-                        .minimumScaleFactor(0.6)
-                        .lineLimit(1)
-                    if let reason = estimate.blockingIssue?.message {
-                        Text(reason)
-                            .font(Typography.rowDetail)
-                            .foregroundStyle(Palette.onGraphiteSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+        return VStack(alignment: .leading, spacing: Space.snug) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(estimate.hasStoppedAccruing ? "Estimated rent" : "Estimated rent running")
+                    .font(Typography.rowDetail)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: Space.snug)
+                StatusChip(status: item.status)
+                    .accessibilityIdentifier(A11yID.ItemDetail.status)
+            }
+            if estimate.isComplete {
+                Text(Formatters.currency(estimate.estimatedTotal))
+                    .font(Typography.hero)
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .accessibilityLabel(
+                        "Estimated rent, \(Formatters.currencyAccessible(estimate.estimatedTotal))"
+                    )
+                    .accessibilityIdentifier(A11yID.ItemDetail.estimate)
+            } else {
+                Text("Not available")
+                    .font(Typography.hero)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .accessibilityIdentifier(A11yID.ItemDetail.estimate)
+                if let reason = estimate.blockingIssue?.message {
+                    Text(reason)
+                        .font(Typography.rowDetail)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(summaryLabel(for: item, estimate: estimate))
-            .accessibilityIdentifier(A11yID.ItemDetail.estimate)
-        } trailing: {
-            // The status pill is drawn in the panel's own palette rather than the status tint:
-            // slate and green at 14% on graphite are unreadable, and the tint is carried by the
-            // symbol beside the word.
-            Label {
-                Text(item.status.shortName)
-                    .font(Typography.micro.weight(.semibold))
-            } icon: {
-                Image(systemName: item.status.symbolName)
-                    .font(Typography.micro.weight(.semibold))
+            if let identity = identityLine(item) {
+                Text(identity)
+                    .font(Typography.rowDetail)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(Palette.onGraphite)
-            .padding(.horizontal, Space.snug + 2)
-            .padding(.vertical, Space.tight + 1)
-            .background(Palette.onGraphite.opacity(0.14), in: Capsule())
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Status: \(item.status.displayName)")
-            .accessibilityHint(item.status.explanation)
-            .accessibilityIdentifier(A11yID.ItemDetail.status)
         }
+        .padding(.vertical, Space.tight)
     }
 
     private func identityLine(_ item: RentalItem) -> String? {
@@ -157,123 +144,94 @@ struct RentalItemDetailView: View {
         return joined.isEmpty ? nil : joined
     }
 
-    private func summaryLabel(for item: RentalItem, estimate: RunningEstimate) -> String {
-        guard estimate.isComplete else {
-            return "Estimate not available. " + (estimate.blockingIssue?.message ?? "")
-        }
-        return "Estimated rent, \(Formatters.currencyAccessible(estimate.estimatedTotal)). "
-            + AppCopy.estimateQualifier
-    }
-
     // MARK: - Next step
-    //
-    // One card, one primary button, and the sentence that says what tapping it does and does not
-    // do. The old screen listed every available action as an undifferentiated row, which left the
-    // user to work out which of them was the next thing to do.
 
-    @ViewBuilder
-    private func nextStep(for item: RentalItem) -> some View {
-        VStack(alignment: .leading, spacing: Space.base) {
-            CardHeader(
-                title: "Next step",
-                subtitle: item.status.explanation,
-                symbol: "arrow.forward.circle.fill"
-            )
+    private func nextStepSection(_ item: RentalItem) -> some View {
+        Section {
             nextStepControl(for: item)
+        } header: {
+            Text("Next step")
+        } footer: {
+            // One explanation, not two. The mark-done sentence and the status explanation were
+            // both on screen, saying nearly the same thing a row apart.
+            Text(item.status == .active ? AppCopy.markDoneExplanation : item.status.explanation)
         }
-        .offRentCard()
     }
 
     @ViewBuilder
     private func nextStepControl(for item: RentalItem) -> some View {
         switch item.status {
         case .draft:
-            Button("Mark active") { apply(.activate, to: item) }
-                .buttonStyle(.offRentPrimary)
+            primary("Mark active") { apply(.activate, to: item) }
 
         case .active:
-            VStack(alignment: .leading, spacing: Space.snug) {
-                // Not "End rental". The button describes what the *user* did — finished with
-                // the machine — not something the app can do to a rental agreement.
-                Button("Mark equipment done") { apply(.markEquipmentDone, to: item) }
-                    .buttonStyle(.offRentPrimary)
-                    .accessibilityIdentifier(A11yID.ItemDetail.markDone)
-                    .accessibilityHint(AppCopy.markDoneExplanation)
-                Text(AppCopy.markDoneExplanation)
-                    .font(Typography.rowDetail)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            // Not "End rental". The button describes what the *user* did — finished with the
+            // machine — not something the app can do to a rental agreement.
+            primary("Mark equipment done") { apply(.markEquipmentDone, to: item) }
+                .accessibilityIdentifier(A11yID.ItemDetail.markDone)
+                .accessibilityHint(AppCopy.markDoneExplanation)
 
         case .contactVendor:
-            Button("Record vendor confirmation") {
+            primary("Record vendor confirmation") {
                 router.presentedSheet = .recordConfirmation(itemID: item.id)
             }
-            .buttonStyle(.offRentPrimary)
             .accessibilityIdentifier(A11yID.ItemDetail.recordConfirmation)
 
         case .confirmationRecorded:
-            Button("Awaiting pickup") { apply(.acknowledgeAwaitingPickup, to: item) }
-                .buttonStyle(.offRentPrimary)
+            primary("Awaiting pickup") { apply(.acknowledgeAwaitingPickup, to: item) }
 
         case .awaitingPickup:
-            Button("Record pickup") { router.presentedSheet = .recordPickup(itemID: item.id) }
-                .buttonStyle(.offRentPrimary)
+            primary("Record pickup") { router.presentedSheet = .recordPickup(itemID: item.id) }
                 .accessibilityIdentifier(A11yID.ItemDetail.recordPickup)
 
         case .pickedUp:
-            Button("Awaiting invoice") { apply(.beginAwaitingInvoice, to: item) }
-                .buttonStyle(.offRentPrimary)
+            primary("Awaiting invoice") { apply(.beginAwaitingInvoice, to: item) }
 
         case .awaitingInvoice:
-            Button("Attach final invoice") {
+            primary("Attach final invoice") {
                 router.presentedSheet = .attachInvoice(itemID: item.id)
             }
-            .buttonStyle(.offRentPrimary)
             .accessibilityIdentifier(A11yID.ItemDetail.attachInvoice)
 
         case .invoiceReview, .needsFollowUp:
-            VStack(spacing: Space.snug) {
-                if let invoice = latestInvoice(for: item) {
-                    NavigationLink(value: AuditDestination.invoice(id: invoice.id)) {
-                        Text("Review the invoice")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Palette.onAccent)
-                            .frame(maxWidth: .infinity, minHeight: Layout.controlHeight)
-                            .background(Palette.accent, in: RoundedRectangle(cornerRadius: Radius.control))
-                    }
-                    .buttonStyle(.plain)
+            if let invoice = latestInvoice(for: item) {
+                NavigationLink(value: AuditDestination.invoice(id: invoice.id)) {
+                    Label("Review the invoice", systemImage: "list.clipboard")
                 }
-                Button("Resolve") { resolve(item) }
-                    .buttonStyle(.offRentSecondary)
-                    .accessibilityIdentifier(A11yID.ItemDetail.resolve)
             }
+            Button("Resolve") { resolve(item) }
+                .accessibilityIdentifier(A11yID.ItemDetail.resolve)
 
         case .resolved:
-            VStack(spacing: Space.snug) {
-                Button("Archive") { apply(.archive, to: item) }
-                    .buttonStyle(.offRentSecondary)
-                reopenButton
-            }
+            Button("Archive") { apply(.archive, to: item) }
+            reopenButton
 
         case .archived:
             reopenButton
         }
     }
 
+    /// The one orange control on the screen.
+    private func primary(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .buttonStyle(.offRentPrimary)
+            .listRowInsets(EdgeInsets(top: Space.snug, leading: Space.comfortable,
+                                      bottom: Space.snug, trailing: Space.comfortable))
+    }
+
     private var reopenButton: some View {
         Button("Reopen") { showingReopen = true }
-            .buttonStyle(.offRentSecondary)
             .accessibilityIdentifier(A11yID.ItemDetail.reopen)
     }
 
     // MARK: - Sections
 
     private func contactVendorSection(_ item: RentalItem) -> some View {
-        VStack(alignment: .leading, spacing: Space.base) {
-            SectionHeader(title: "Contact the rental company")
-            OffRentDisclosureBanner(identifier: A11yID.ItemDetail.disclosure)
+        Section {
+            OffRentDisclosureBanner(style: .inline, identifier: A11yID.ItemDetail.disclosure)
             ContactVendorActions(item: item)
+        } header: {
+            Text("Contact the rental company")
         }
     }
 
@@ -281,25 +239,18 @@ struct RentalItemDetailView: View {
         let estimate = RentalRateEngine.estimate(
             terms: item.terms, asOf: dependencies.clock.now, calendar: dependencies.clock.calendar
         )
-        return section(
-            title: "How that was worked out",
-            subtitle: AppCopy.basedOnConfirmedTerms
-        ) {
+        return Section {
             if estimate.isComplete {
                 DetailRow(label: "Days on rent", value: Formatters.dayCount(estimate.daysOnRent))
-                RowDivider(inset: Space.comfortable)
                 DetailRow(
                     label: "\(item.terms.billingBasis.displayName) periods",
                     value: "\(estimate.periodsStarted) × \(Formatters.currency(estimate.amountPerPeriod))"
                 )
-                RowDivider(inset: Space.comfortable)
-                DetailRow(label: "Calculated as of", value: Formatters.dateAndTime(estimate.asOf))
+                DetailRow(label: "Calculated", value: Formatters.dateAndTime(estimate.asOf))
             }
             if let next = estimate.nextRolloverDate {
-                RowDivider(inset: Space.comfortable)
                 DetailRow(label: "Next rate change", value: Formatters.dateAndTime(next))
                 if let increment = estimate.expectedNextIncrement {
-                    RowDivider(inset: Space.comfortable)
                     DetailRow(
                         label: "Expected to add",
                         value: "\(Formatters.currency(increment)) (estimate)"
@@ -307,44 +258,39 @@ struct RentalItemDetailView: View {
                 }
             }
             if estimate.hasStoppedAccruing {
-                RowDivider(inset: Space.comfortable)
-                noteRow("Stopped accruing when you marked this done.", symbol: "pause.circle")
-            }
-            ForEach(estimate.issues.indices, id: \.self) { index in
-                RowDivider(inset: Space.comfortable)
-                noteRow(
-                    estimate.issues[index].message,
-                    symbol: "exclamationmark.triangle",
-                    tint: Palette.attention
+                InlineAlert(
+                    message: "Stopped accruing when you marked this done.",
+                    kind: .info, symbol: "pause.circle"
                 )
             }
+            ForEach(estimate.issues.indices, id: \.self) { index in
+                InlineAlert(message: estimate.issues[index].message)
+            }
+        } header: {
+            Text("How that was worked out")
+        } footer: {
+            Text(AppCopy.estimateExplanation)
         }
     }
 
     private func termsSection(_ item: RentalItem) -> some View {
-        section(title: "Terms you confirmed") {
+        Section("Terms you confirmed") {
             DetailRow(label: "Delivered", value: Formatters.mediumDate(item.deliveryDate))
-            RowDivider(inset: Space.comfortable)
             DetailRow(label: "Billing basis", value: item.terms.billingBasis.displayName)
-            RowDivider(inset: Space.comfortable)
-            DetailRow(label: "Rollover mode", value: item.terms.rolloverMode.displayName)
-            RowDivider(inset: Space.comfortable)
+            DetailRow(label: "Rollover", value: item.terms.rolloverMode.displayName)
             DetailRow(
                 label: "Daily rate",
                 value: item.dailyRate.map(Formatters.currency) ?? "Not confirmed"
             )
-            RowDivider(inset: Space.comfortable)
             DetailRow(
                 label: "Weekly rate",
                 value: item.weeklyRate.map(Formatters.currency) ?? "Not confirmed"
             )
-            RowDivider(inset: Space.comfortable)
             DetailRow(
                 label: "4-week rate",
                 value: item.fourWeekRate.map(Formatters.currency) ?? "Not confirmed"
             )
             if let usage = item.includedUsageNotes, !usage.isEmpty {
-                RowDivider(inset: Space.comfortable)
                 VStack(alignment: .leading, spacing: Space.tight) {
                     Text("Included usage")
                         .font(Typography.rowDetail)
@@ -352,26 +298,13 @@ struct RentalItemDetailView: View {
                     Text(usage)
                         .font(Typography.rowDetail)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("""
-                        Recorded for your reference. \(AppConfiguration.displayName) does not \
-                        calculate excess-hour charges.
-                        """)
-                        .font(Typography.micro)
+                    Text("Recorded for reference. Excess-hour charges are not calculated.")
+                        .font(Typography.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Space.comfortable)
-                .padding(.vertical, Space.base)
             }
-            RowDivider(inset: Space.comfortable)
-            NavigationLink {
-                EditRentalItemView(itemID: item.id)
-            } label: {
-                NavigationRow(title: "Edit terms", symbol: "square.and.pencil")
-            }
-            .buttonStyle(.plain)
-            .minimumTapTarget()
+            NavigationLink("Edit terms") { EditRentalItemView(itemID: item.id) }
         }
     }
 
@@ -379,34 +312,28 @@ struct RentalItemDetailView: View {
     ///
     /// The separation is the product: a confirmation number is the user's evidence that they
     /// called and the rental company agreed a stop date. Pickup is a different event, on a
-    /// different day, proving a different thing. Merging them into one "off rent" block would
-    /// quietly claim the app knows something it does not.
+    /// different day, proving a different thing.
     @ViewBuilder
     private func offRentProofSection(_ item: RentalItem) -> some View {
         if let event = latestEvent(of: .vendorConfirmationRecorded, in: item) {
-            section(
-                title: "Off-rent confirmation",
-                subtitle: "What the rental company told you."
-            ) {
+            Section {
                 DetailRow(label: "Recorded", value: Formatters.dateAndTime(event.timestamp))
                 if let number = event.confirmationNumber {
-                    RowDivider(inset: Space.comfortable)
-                    DetailRow(
-                        label: "Confirmation number", value: number, valueIsMonospaced: true
-                    )
+                    DetailRow(label: "Confirmation number", value: number, valueIsMonospaced: true)
                 }
                 if let representative = event.vendorRepresentative {
-                    RowDivider(inset: Space.comfortable)
                     DetailRow(label: "Spoke to", value: representative)
                 }
                 if let method = event.contactMethod {
-                    RowDivider(inset: Space.comfortable)
                     DetailRow(label: "How", value: method.displayName)
                 }
                 if let detail = event.detail, !detail.isEmpty {
-                    RowDivider(inset: Space.comfortable)
                     DetailRow(label: "Note", value: detail)
                 }
+            } header: {
+                Text("Off-rent confirmation")
+            } footer: {
+                Text("What the rental company told you.")
             }
         }
     }
@@ -414,16 +341,18 @@ struct RentalItemDetailView: View {
     @ViewBuilder
     private func pickupSection(_ item: RentalItem) -> some View {
         if let event = latestEvent(of: .pickupRecorded, in: item) {
-            section(title: "Pickup", subtitle: "When the equipment actually left the site.") {
+            Section {
                 DetailRow(label: "Recorded", value: Formatters.dateAndTime(event.timestamp))
                 if let detail = event.detail, !detail.isEmpty {
-                    RowDivider(inset: Space.comfortable)
                     DetailRow(label: "Note", value: detail)
                 }
                 if event.location != nil {
-                    RowDivider(inset: Space.comfortable)
-                    noteRow("Location recorded with this entry.", symbol: "mappin.and.ellipse")
+                    DetailRow(label: "Location", value: "Recorded")
                 }
+            } header: {
+                Text("Pickup")
+            } footer: {
+                Text("When the equipment actually left the site.")
             }
         }
     }
@@ -431,50 +360,37 @@ struct RentalItemDetailView: View {
     @ViewBuilder
     private func invoiceSection(_ item: RentalItem) -> some View {
         if let invoice = latestInvoice(for: item) {
-            section(title: "Invoice") {
-                DetailRow(label: "Invoice number", value: invoice.invoiceNumber ?? "Not recorded")
-                RowDivider(inset: Space.comfortable)
+            Section("Invoice") {
+                DetailRow(label: "Number", value: invoice.invoiceNumber ?? "Not recorded")
                 DetailRow(label: "Received", value: Formatters.mediumDate(invoice.receivedDate))
-                RowDivider(inset: Space.comfortable)
-                DetailRow(label: "Invoice total", value: Formatters.currency(invoice.invoiceTotal))
-                RowDivider(inset: Space.comfortable)
+                DetailRow(label: "Total", value: Formatters.currency(invoice.invoiceTotal))
                 NavigationLink(value: AuditDestination.invoice(id: invoice.id)) {
-                    NavigationRow(
-                        title: "Review this invoice",
-                        subtitle: invoice.openDiscrepancyCount > 0
-                            ? "\(invoice.openDiscrepancyCount) open to look at"
-                            : "Nothing open",
-                        symbol: "list.clipboard",
-                        tint: invoice.openDiscrepancyCount > 0 ? Palette.review : Palette.settled
-                    )
+                    LabeledContent("Review this invoice") {
+                        Text(
+                            invoice.openDiscrepancyCount > 0
+                                ? "\(invoice.openDiscrepancyCount) open"
+                                : "Nothing open"
+                        )
+                    }
                 }
-                .buttonStyle(.plain)
-                .minimumTapTarget()
             }
         }
     }
 
     private func identificationSection(_ item: RentalItem) -> some View {
-        section(title: "Identification") {
+        Section("Identification") {
             if let vendor = item.agreement?.vendor {
                 DetailRow(label: "Rental company", value: vendor.name)
-                if let branch = vendor.branch {
-                    RowDivider(inset: Space.comfortable)
-                    DetailRow(label: "Branch", value: branch)
-                }
-                RowDivider(inset: Space.comfortable)
+                if let branch = vendor.branch { DetailRow(label: "Branch", value: branch) }
             }
             if let site = item.agreement?.jobSite {
                 DetailRow(label: "Jobsite", value: site.name)
-                RowDivider(inset: Space.comfortable)
             }
             if let number = item.agreement?.agreementNumber {
                 DetailRow(label: "Agreement number", value: number, valueIsMonospaced: true)
-                RowDivider(inset: Space.comfortable)
             }
             if let identifier = item.vendorEquipmentIdentifier {
-                DetailRow(label: "Vendor equipment ID", value: identifier, valueIsMonospaced: true)
-                RowDivider(inset: Space.comfortable)
+                DetailRow(label: "Equipment ID", value: identifier, valueIsMonospaced: true)
             }
             DetailRow(
                 label: "Serial number",
@@ -486,89 +402,42 @@ struct RentalItemDetailView: View {
 
     private func timelineSection(_ item: RentalItem) -> some View {
         let recent = Array(item.sortedEvents.suffix(4).reversed())
-        return VStack(alignment: .leading, spacing: Space.base) {
-            SectionHeader(title: "Recent activity", count: item.sortedEvents.count)
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(recent.enumerated()), id: \.element.id) { index, event in
-                    TimelineRow(
-                        event: event,
-                        isFirst: index == 0,
-                        isLast: index == recent.count - 1
-                    )
-                }
-                if !recent.isEmpty { RowDivider(inset: 0) }
-                NavigationLink(value: RentalDestination.timeline(itemID: item.id)) {
-                    NavigationRow(title: "See the full timeline", symbol: "clock.arrow.circlepath")
-                }
-                .buttonStyle(.plain)
-                .minimumTapTarget()
-                .accessibilityIdentifier(A11yID.ItemDetail.timeline)
+        return Section("Recent activity") {
+            ForEach(Array(recent.enumerated()), id: \.element.id) { index, event in
+                TimelineRow(
+                    event: event,
+                    isFirst: index == 0,
+                    isLast: index == recent.count - 1
+                )
             }
-            .padding(.top, recent.isEmpty ? 0 : Space.base)
-            .offRentGroup()
+            NavigationLink(value: RentalDestination.timeline(itemID: item.id)) {
+                Text("See the full timeline")
+            }
+            .accessibilityIdentifier(A11yID.ItemDetail.timeline)
         }
     }
 
     private func evidenceSection(_ item: RentalItem) -> some View {
-        VStack(alignment: .leading, spacing: Space.base) {
-            SectionHeader(title: "Photos and documents", count: (item.assets ?? []).count)
-            VStack(alignment: .leading, spacing: 0) {
-                EvidenceGrid(assets: item.assets ?? [], fileStore: dependencies.fileStore)
-                    .padding(.horizontal, Space.comfortable)
-                    .padding(.vertical, Space.base)
-                RowDivider(inset: 0)
-                NavigationLink {
-                    EvidenceManagerView(itemID: item.id)
-                } label: {
-                    NavigationRow(title: "Add or manage attachments", symbol: "paperclip")
-                }
-                .buttonStyle(.plain)
-                .minimumTapTarget()
-            }
-            .offRentGroup()
+        Section("Photos and documents") {
+            EvidenceGrid(assets: item.assets ?? [], fileStore: dependencies.fileStore)
+            NavigationLink("Add or manage attachments") { EvidenceManagerView(itemID: item.id) }
         }
     }
 
     private func utilitySection(_ item: RentalItem) -> some View {
-        ListGroup {
-            ActionRow(
-                title: "Export evidence packet",
-                subtitle: "A PDF of this rental's record, to share yourself",
-                symbol: "square.and.arrow.up"
-            ) {
+        Section {
+            Button {
                 showingExport = true
+            } label: {
+                Label("Export evidence packet", systemImage: "square.and.arrow.up")
             }
             .accessibilityIdentifier(A11yID.ItemDetail.exportEvidence)
+        } footer: {
+            Text("A PDF of this rental's record, to share yourself.")
         }
     }
 
-    // MARK: - Section plumbing
-
-    private func section(
-        title: String, subtitle: String? = nil,
-        @ViewBuilder content: () -> some View
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Space.base) {
-            SectionHeader(title: title, subtitle: subtitle)
-            ListGroup { content() }
-        }
-    }
-
-    private func noteRow(_ message: String, symbol: String, tint: Color = .secondary) -> some View {
-        Label {
-            Text(message)
-                .font(Typography.rowDetail)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        } icon: {
-            Image(systemName: symbol)
-                .font(Typography.rowDetail)
-                .foregroundStyle(tint)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, Space.comfortable)
-        .padding(.vertical, Space.base)
-    }
+    // MARK: - Lookups
 
     private func latestEvent(of type: RentalEventType, in item: RentalItem) -> RentalEvent? {
         var latest: RentalEvent?
@@ -707,10 +576,9 @@ struct TimelineRow: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.bottom, isLast ? 0 : Space.comfortable)
+            .padding(.bottom, isLast ? 0 : Space.base)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, Space.comfortable)
         .accessibilityElement(children: .combine)
     }
 }

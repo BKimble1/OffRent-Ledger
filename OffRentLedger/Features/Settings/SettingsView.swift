@@ -7,120 +7,57 @@ struct SettingsView: View {
     @Environment(AppRouter.self) private var router
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: Space.roomy) {
-                planPanel
-
-                ListGroup {
-                    settingsRow(
-                        .reminders, title: "Reminders", symbol: "bell",
-                        identifier: A11yID.Settings.reminders
-                    )
-                    RowDivider()
-                    settingsRow(
-                        .appearance, title: "Appearance", symbol: "textformat.size",
-                        identifier: A11yID.Settings.appearance
-                    )
-                    RowDivider()
-                    settingsRow(
-                        .dataAndPrivacy, title: "Data and privacy", symbol: "lock.shield",
-                        subtitle: "Everything stays on this iPhone",
-                        identifier: A11yID.Settings.dataAndPrivacy
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: Space.base) {
-                    SectionHeader(title: "Legal and support")
-                    ListGroup {
-                        settingsRow(
-                            .privacyPolicy, title: "Privacy Policy", symbol: "hand.raised",
-                            identifier: A11yID.Settings.privacyPolicy
-                        )
-                        RowDivider()
-                        settingsRow(
-                            .terms, title: "Terms of Use", symbol: "doc.text",
-                            identifier: A11yID.Settings.terms
-                        )
-                        RowDivider()
-                        settingsRow(
-                            .support, title: "Support", symbol: "questionmark.circle",
-                            identifier: A11yID.Settings.support
-                        )
-                        RowDivider()
-                        settingsRow(
-                            .about, title: "About", symbol: "info.circle",
-                            identifier: A11yID.Settings.about
-                        )
+        // A real inset-grouped `List`. The hand-built version of this screen had to reimplement
+        // rows, separators, insets and highlight-on-tap, and got all four slightly wrong.
+        List {
+            Section {
+                NavigationLink(value: SettingsDestination.subscription) {
+                    LabeledContent("Subscription") {
+                        Text(dependencies.effectiveEntitlement.isPro ? "Pro" : "Free")
                     }
                 }
+                .accessibilityIdentifier(A11yID.Settings.subscription)
+            }
 
+            Section {
+                settingsRow(.reminders, "Reminders", "bell", A11yID.Settings.reminders)
+                settingsRow(.appearance, "Appearance", "textformat.size", A11yID.Settings.appearance)
+                settingsRow(
+                    .dataAndPrivacy, "Data and privacy", "lock.shield",
+                    A11yID.Settings.dataAndPrivacy
+                )
+            }
+
+            Section("Legal and support") {
+                settingsRow(.privacyPolicy, "Privacy Policy", "hand.raised", A11yID.Settings.privacyPolicy)
+                settingsRow(.terms, "Terms of Use", "doc.text", A11yID.Settings.terms)
+                settingsRow(.support, "Support", "questionmark.circle", A11yID.Settings.support)
+                settingsRow(.about, "About", "info.circle", A11yID.Settings.about)
+            }
+
+            Section {
+                EmptyView()
+            } footer: {
                 VStack(alignment: .leading, spacing: Space.hair) {
                     Text("\(AppConfiguration.displayName) \(AppConfiguration.versionAndBuild)")
                         .accessibilityIdentifier(A11yID.Settings.versionLabel)
                     Text(AppConfiguration.poweredByLine)
                 }
-                .font(Typography.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Space.tight)
             }
-            .padding(.horizontal, Space.comfortable)
-            .padding(.top, Space.screenTop)
-            .padding(.bottom, Space.screenBottom)
         }
-        .offRentScreen()
+        .listStyle(.insetGrouped)
+        .offRentFormBackground()
         .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.large)
         .accessibilityIdentifier(A11yID.Settings.root)
         .offRentNavigationDestinations()
     }
 
-    /// The plan, stated rather than tucked into a trailing grey word on a list row.
-    private var planPanel: some View {
-        let isPro: Bool = dependencies.effectiveEntitlement.isPro
-        return NavigationLink(value: SettingsDestination.subscription) {
-            VStack(alignment: .leading, spacing: Space.base) {
-                Text("Your plan")
-                    .font(Typography.caption.weight(.semibold))
-                    .foregroundStyle(Palette.onGraphiteSecondary)
-                HStack(alignment: .firstTextBaseline) {
-                    Text(isPro ? "\(AppConfiguration.displayName) Pro" : "Free plan")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(Palette.onGraphite)
-                    Spacer(minLength: Space.snug)
-                    Text(isPro ? "Manage" : "See Pro")
-                        .font(Typography.caption.weight(.semibold))
-                        .foregroundStyle(Palette.onGraphite)
-                        .padding(.horizontal, Space.base)
-                        .padding(.vertical, Space.tight + 1)
-                        .background(Palette.onGraphite.opacity(0.14), in: Capsule())
-                }
-                Text(
-                    isPro
-                        ? "Unlimited open rentals, invoice audit and evidence export."
-                        : "One open rental at a time. Everything you have already entered stays."
-                )
-                .font(Typography.caption)
-                .foregroundStyle(Palette.onGraphiteSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .offRentPanel(padding: Space.roomy - 4)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(A11yID.Settings.subscription)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Subscription. \(isPro ? "Pro" : "Free")")
-    }
-
     private func settingsRow(
-        _ destination: SettingsDestination, title: String, symbol: String,
-        subtitle: String? = nil, identifier: String
+        _ destination: SettingsDestination, _ title: String, _ symbol: String, _ identifier: String
     ) -> some View {
         NavigationLink(value: destination) {
-            NavigationRow(title: title, subtitle: subtitle, symbol: symbol)
+            Label(title, systemImage: symbol)
         }
-        .buttonStyle(.plain)
-        .minimumTapTarget()
         .accessibilityIdentifier(identifier)
     }
 }

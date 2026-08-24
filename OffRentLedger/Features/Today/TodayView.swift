@@ -22,9 +22,8 @@ struct TodayView: View {
                         symbol: "shippingbox",
                         title: "No open rentals",
                         message: """
-                            Add the first machine you have on rent. \(AppConfiguration.displayName) \
-                            will estimate what it is costing and remind you to get an off-rent \
-                            confirmation number when you are done with it.
+                            Add a machine and \(AppConfiguration.displayName) will estimate what \
+                            it is costing while it sits there.
                             """,
                         actionTitle: "Add a rental",
                         action: { router.presentedSheet = .addRental },
@@ -62,24 +61,23 @@ struct TodayView: View {
 
     // MARK: - Summary
     //
-    // One graphite panel carrying the number the screen is about, with the counts beneath it as
-    // tiles. This is the whole answer to "the dashboard looks like a settings screen": the most
-    // important fact now has a surface of its own instead of being one more line of text on the
-    // same white as everything else.
+    // The one dark panel in the app. It earns it here because Today exists to answer a single
+    // question with a single number; every other screen is a record, and a record does not need
+    // a hero. Compact — the panel used to run a third of the screen before anything actionable.
 
     private var summary: some View {
         VStack(spacing: Space.base) {
             SummaryPanel(
                 eyebrow: "Estimated rent running",
-                footnote: AppCopy.estimateExplanation
+                footnote: "Based on the terms you confirmed. Not an invoice."
             ) {
-                VStack(alignment: .leading, spacing: Space.tight) {
+                VStack(alignment: .leading, spacing: Space.hair) {
                     if accruing.isEmpty && totalRunning == 0 {
                         Text(Formatters.currency(0))
                             .font(Typography.hero)
                             .monospacedDigit()
                             .foregroundStyle(Palette.onGraphite)
-                        Text("Nothing is accruing right now.")
+                        Text("Nothing is accruing.")
                             .font(Typography.rowDetail)
                             .foregroundStyle(Palette.onGraphiteSecondary)
                     } else {
@@ -91,8 +89,8 @@ struct TodayView: View {
                             .minimumScaleFactor(0.6)
                             .lineLimit(1)
                         Text(AppCopy.estimateQualifier)
-                            .font(Typography.caption.weight(.semibold))
-                            .foregroundStyle(Palette.accent)
+                            .font(Typography.caption)
+                            .foregroundStyle(Palette.onGraphiteSecondary)
                     }
                 }
                 .accessibilityElement(children: .ignore)
@@ -100,35 +98,30 @@ struct TodayView: View {
                 .accessibilityIdentifier(A11yID.Today.estimatedRentRunning)
             } trailing: {
                 Text(accruing.count == 1 ? "1 on rent" : "\(accruing.count) on rent")
-                    .font(Typography.micro.weight(.medium))
-                    .foregroundStyle(Palette.onGraphite)
-                    .padding(.horizontal, Space.snug + 2)
-                    .padding(.vertical, Space.tight + 1)
-                    .background(Palette.onGraphite.opacity(0.14), in: Capsule())
+                    .font(Typography.caption)
+                    .foregroundStyle(Palette.onGraphiteSecondary)
             }
 
             if incompleteEstimateCount > 0 {
                 InlineAlert(
                     message: incompleteEstimateCount == 1
-                        ? "1 rental has no confirmed rate, so it is not included above."
-                        : "\(incompleteEstimateCount) rentals have no confirmed rate, so they are not included above."
+                        ? "1 rental has no confirmed rate and is not included."
+                        : "\(incompleteEstimateCount) rentals have no confirmed rate and are not included."
                 )
+                .padding(.horizontal, Space.tight)
             }
 
             HStack(spacing: Space.snug) {
                 MetricTile(
                     value: "\(actionQueue.count)", label: "To call",
-                    symbol: "phone.arrow.up.right", tint: Palette.attention,
                     identifier: "metric.needACall"
                 )
                 MetricTile(
                     value: "\(awaitingPickup.count)", label: "To collect",
-                    symbol: "truck.box", tint: Palette.waiting,
                     identifier: "metric.awaitingPickup"
                 )
                 MetricTile(
                     value: "\(invoicesToReview.count)", label: "To review",
-                    symbol: "doc.text.magnifyingglass", tint: Palette.review,
                     identifier: "metric.toReview"
                 )
             }
@@ -148,7 +141,7 @@ struct TodayView: View {
     private var upcomingRateChangesSection: some View {
         section(
             title: "Upcoming rate changes",
-            subtitle: "Within 48 hours, based on the dates you confirmed.",
+            subtitle: "Within 48 hours.",
             count: upcomingRateChanges.count
         ) {
             ForEach(Array(upcomingRateChanges.enumerated()), id: \.element.item.id) { index, entry in
@@ -204,7 +197,7 @@ struct TodayView: View {
     private var awaitingPickupSection: some View {
         section(
             title: "Awaiting pickup",
-            subtitle: "Off-rent recorded. Still on the jobsite.",
+            subtitle: "Off rent, still on site.",
             count: awaitingPickup.count
         ) {
             rows(awaitingPickup)
@@ -214,7 +207,7 @@ struct TodayView: View {
     private var invoicesSection: some View {
         section(
             title: "Invoices to review",
-            subtitle: "Compare against the terms you confirmed.",
+            subtitle: "Compare against your confirmed terms.",
             count: invoicesToReview.count
         ) {
             ForEach(Array(invoicesToReview.enumerated()), id: \.element.id) { index, invoice in
@@ -259,9 +252,21 @@ struct TodayView: View {
         title: String, subtitle: String?, count: Int,
         @ViewBuilder content: () -> some View
     ) -> some View {
-        VStack(alignment: .leading, spacing: Space.base) {
-            SectionHeader(title: title, subtitle: subtitle, count: count)
+        // Header above, note below — the shape a grouped `List` uses for a section footer. The
+        // note used to sit between the header and the group, which reads as a subtitle of the
+        // heading rather than as a comment on the rows.
+        VStack(alignment: .leading, spacing: Space.snug) {
+            SectionHeader(title: title, count: count)
+                .padding(.horizontal, Space.tight)
             ListGroup { content() }
+            if let subtitle {
+                Text(subtitle)
+                    .font(Typography.rowDetail)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, Space.tight)
+                    .padding(.top, Space.hair)
+            }
         }
     }
 

@@ -29,32 +29,29 @@ COLOURS = {
     "ReviewColor":       ((0.443, 0.373, 0.671), (0.663, 0.596, 0.882)),
     "SettledColor":      ((0.196, 0.471, 0.318), (0.400, 0.749, 0.541)),
     "WaitingColor":      ((0.310, 0.396, 0.478), (0.573, 0.663, 0.749)),
-    "LaunchBackground":  ((0.922, 0.894, 0.835), (0.063, 0.071, 0.082)),
-    "WidgetBackground":  ((0.922, 0.894, 0.835), (0.063, 0.071, 0.082)),
+    "LaunchBackground":  ((0.949, 0.937, 0.914), (0.063, 0.067, 0.075)),
+    "WidgetBackground":  ((0.949, 0.937, 0.914), (0.063, 0.067, 0.075)),
 
     # Surfaces.
     #
-    # The app used to paint every screen with `.systemGroupedBackground` and every card with
-    # `.secondarySystemGroupedBackground`. In light mode those are #F2F2F7 and #FFFFFF: a cool
-    # near-white behind a white card, about four luminance levels apart. That is the whole reason
-    # the app read as "blank pages with text on them" — the cards were there, they simply could
-    # not be seen, so every screen collapsed into one flat white field.
+    # Second pass. The first one over-corrected: it separated ground from card by *fill*, which
+    # meant a soft-stone page behind warm-ivory cards and a graphite panel on most screens. That
+    # reads as heavy and designed rather than as an iOS app.
     #
-    # These are warm, and they are far enough apart to read as separate planes: ivory ground,
-    # brighter raised surface, deeper sunken one, and a graphite panel for the one place per
-    # screen that should dominate.
-    # Measured, not chosen by eye. A first attempt at warm ivory ground with a near-white card
-    # came out at 1.106:1 — *worse separated* than the #F2F2F7/#FFFFFF it replaced, warmer but
-    # every bit as flat. Two surfaces only read as two planes from about 1.2:1. These are 1.24:1
-    # with graphite body text still at 13.8:1 on the ground.
+    # These separate the way the platform does: an inset-grouped `List` on a page one step darker
+    # than its rows, with the list's own separators, insets and corner radii doing the work. The
+    # ground is the warm equivalent of the system's #F2F2F7 — measured at 1.15:1 against white,
+    # against the system's own 1.12:1. That number is low on purpose. It is only invisible when
+    # there is nothing else drawing the boundary, which is exactly what went wrong when this app
+    # hand-built its groups instead of using `List`.
     #
-    # So warm ivory is the raised surface, which is what fills most of a screen, and soft stone
-    # is the ground between. Both are the brand's own tones; the ordering is what makes them work.
-    "SurfaceBackground": ((0.922, 0.894, 0.835), (0.063, 0.071, 0.082)),   # #EBE4D5 soft stone
-    "SurfaceRaised":     ((1.000, 0.992, 0.973), (0.114, 0.126, 0.149)),   # #FFFDF8 warm ivory
-    "SurfaceSunken":     ((0.871, 0.835, 0.761), (0.039, 0.043, 0.051)),   # #DED5C2 inset wells
-    "SurfaceGraphite":   ((0.090, 0.102, 0.122), (0.149, 0.165, 0.200)),   # #171A1F summary panel
-    "HairlineColor":     ((0.851, 0.816, 0.741), (0.196, 0.212, 0.243)),   # #D9D0BD
+    # Graphite survives as one colour for text and for exactly one hero panel, on Today. It is
+    # not a surface the rest of the app paints with any more.
+    "SurfaceBackground": ((0.949, 0.937, 0.914), (0.063, 0.067, 0.075)),   # #F2EFE9 warm white
+    "SurfaceRaised":     ((1.000, 1.000, 1.000), (0.110, 0.118, 0.129)),   # #FFFFFF card
+    "SurfaceSunken":     ((0.937, 0.925, 0.898), (0.153, 0.161, 0.176)),   # #EFECE5 wells
+    "SurfaceGraphite":   ((0.110, 0.122, 0.141), (0.145, 0.157, 0.180)),   # #1C1F24 the one hero
+    "HairlineColor":     ((0.863, 0.847, 0.808), (0.212, 0.224, 0.243)),   # #DCD8CE
 }
 
 
