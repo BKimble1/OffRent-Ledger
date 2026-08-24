@@ -1151,8 +1151,11 @@ def check_github_workflows() -> None:
 
     body = testflight.read_text()
 
-    # An archive with no upload is the failure this check exists for.
-    if "altool --upload-app" not in body:
+    # An archive with no upload is the failure this check exists for. Either uploader counts —
+    # `altool` is deprecated and the workflow falls back to xcodebuild's own — but at least one
+    # has to be there.
+    uploaders = ("altool --upload-app", "Set :destination upload")
+    if not any(uploader in body for uploader in uploaders):
         fail("workflows", "testflight.yml is named for TestFlight but never uploads anything")
 
     # Submission and tester assignment stay human decisions.

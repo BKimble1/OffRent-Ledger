@@ -153,6 +153,7 @@ jobs:
           # needs its terminator at column zero, and column zero ends the block — so the file
           # would silently never close.
           PLIST="$RUNNER_TEMP/ExportOptions.plist"
+          echo "PLIST=$PLIST" >> "$GITHUB_ENV"
           /usr/libexec/PlistBuddy -c "Clear dict" "$PLIST" 2>/dev/null || echo '{}' > "$PLIST"
           /usr/libexec/PlistBuddy \
             -c "Add :method string app-store-connect" \
@@ -188,11 +189,30 @@ jobs:
             exit 1
           fi
           echo "Uploading $(basename "$IPA")"
-          xcrun altool --upload-app \
-            --type ios \
-            --file "$IPA" \
-            --apiKey "$KEY_ID" \
-            --apiIssuer "$ISSUER_ID"
+
+          # `altool` is deprecated and has been disappearing from newer toolchains. When it is
+          # gone, re-export the same archive with `destination = upload`, which is xcodebuild's
+          # own uploader and takes the same authentication. Either path uploads; neither submits.
+          if xcrun --find altool >/dev/null 2>&1; then
+            xcrun altool --upload-app \
+              --type ios \
+              --file "$IPA" \
+              --apiKey "$KEY_ID" \
+              --apiIssuer "$ISSUER_ID"
+          else
+            echo "altool is not in this toolchain; uploading with xcodebuild instead."
+            /usr/libexec/PlistBuddy -c "Set :destination upload" "$PLIST" \
+              || /usr/libexec/PlistBuddy -c "Add :destination string upload" "$PLIST"
+            xcodebuild -exportArchive \
+              -archivePath "$RUNNER_TEMP/OffRentLedger.xcarchive" \
+              -exportOptionsPlist "$PLIST" \
+              -exportPath "$RUNNER_TEMP/upload" \
+              -allowProvisioningUpdates \
+              -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
+              -authenticationKeyID "$KEY_ID" \
+              -authenticationKeyIssuerID "$ISSUER_ID"
+          fi
+
           echo
           echo "Uploaded. Apple processes the build before it appears in TestFlight — usually a"
           echo "few minutes, sometimes longer. Assign it to a tester group in App Store Connect;"
@@ -202,7 +222,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: testflight-${{ env.BUILD_NUMBER }}
+          # `github.run_number`, not the BUILD_NUMBER set mid-job: when an early step fails,
+          # that variable is still empty and the artifact is named `testflight-`.
+          name: testflight-${{ github.run_number }}
           path: |
             *.log
             ${{ runner.temp }}/export/*.ipa
