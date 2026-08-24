@@ -101,9 +101,18 @@ struct AttachInvoiceRobot {
     func fill(total: String, rentalSubtotal: String) {
         app.textFields["currencyField.Invoice total"].tap()
         app.typeText(total)
+
+        // "Add a line" is below the total field and the decimal pad covers it. Tapping it with
+        // the keyboard up reports success and adds nothing, and the next step then looks for an
+        // Amount field that was never created. Dismissing first is also what a person does, and
+        // it exercises the Done button the decimal pad would otherwise have no way out of.
+        app.dismissKeyboard()
         app.buttons["Add a line"].tap()
-        app.textFields["currencyField.Amount"].tap()
+
+        app.expect(app.textFields["currencyField.Amount"]).tap()
         app.typeText(rentalSubtotal)
+        app.dismissKeyboard()
+
         // Addressed by identifier rather than by the label "Save". The sheet's primary action
         // moved to a bottom bar and reads "Save invoice"; matching on a bare label would also
         // have matched any other Save that happened to be on screen.

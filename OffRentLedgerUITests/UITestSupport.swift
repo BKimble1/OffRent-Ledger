@@ -132,6 +132,20 @@ extension XCUIApplication {
                              : lines.joined(separator: "\n")
     }
 
+    /// Dismisses the keyboard through the app's own Done affordance, if one is up.
+    ///
+    /// A decimal pad has no return key, which is why `CurrencyField` puts Done in the keyboard
+    /// toolbar. A test that skips it leaves half the sheet covered: XCUITest will happily
+    /// synthesise a tap at a control's centre while the keyboard is over that point, the tap
+    /// lands on a key, and the button the test meant to press never fires.
+    func dismissKeyboard() {
+        guard keyboards.count > 0 else { return }
+        for candidate in [toolbars.buttons["Done"], keyboards.buttons["Done"]] where candidate.exists {
+            candidate.tap()
+            return
+        }
+    }
+
     /// Turns a toggle on and proves it took.
     ///
     /// A `Toggle` in a `Form` is a single accessibility element spanning the whole row, so

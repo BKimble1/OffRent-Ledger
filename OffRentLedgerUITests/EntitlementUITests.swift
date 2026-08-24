@@ -35,7 +35,7 @@ final class EntitlementUITests: XCTestCase {
             app.buttons[A11yUI.Paywall.purchase].isEnabled,
             "no plan may be preselected"
         )
-        app.buttons[A11yUI.Paywall.annual].tap()
+        selectPlan(A11yUI.Paywall.annual, in: app)
         XCTAssertTrue(app.buttons[A11yUI.Paywall.purchase].isEnabled)
     }
 
@@ -49,12 +49,21 @@ final class EntitlementUITests: XCTestCase {
         app.expect(app.buttons["See Pro options"]).tap()
 
         app.expect(app.anyElement(A11yUI.Paywall.root))
-        app.buttons[A11yUI.Paywall.annual].tap()
-        app.buttons[A11yUI.Paywall.purchase].tap()
+        selectPlan(A11yUI.Paywall.annual, in: app)
 
-        // The StoreKit test dialog is a system sheet.
-        let subscribe = app.buttons["Subscribe"]
-        if subscribe.waitForExistence(timeout: 10) { subscribe.tap() }
+        let purchase = app.buttons[A11yUI.Paywall.purchase]
+        XCTAssertTrue(purchase.isEnabled, "choosing a plan must enable Subscribe")
+        purchase.tap()
+
+        // Not `app.buttons["Subscribe"]`. The paywall's own primary action carries that label
+        // too and matched first, so the last run tapped our own disabled button and then waited
+        // ten seconds for a purchase nothing had started.
+        let dialogSubscribe = app.buttons.matching(
+            NSPredicate(
+                format: "label == %@ AND identifier != %@", "Subscribe", A11yUI.Paywall.purchase
+            )
+        ).firstMatch
+        if dialogSubscribe.waitForExistence(timeout: 10) { dialogSubscribe.tap() }
         let confirm = app.buttons["OK"]
         if confirm.waitForExistence(timeout: 10) { confirm.tap() }
 
@@ -64,6 +73,18 @@ final class EntitlementUITests: XCTestCase {
             app.anyElement(A11yUI.AddRental.root).waitForExistence(timeout: 8),
             "Pro must allow a second open rental"
         )
+    }
+
+    /// Chooses a plan, scrolling to it first if the page is still at the top.
+    ///
+    /// The plans sit below the fold on purpose — the Subscribe bar is the thing that stays in
+    /// reach — so a tap synthesised at a plan's centre can land off the bottom of the screen.
+    /// When that happened, nothing was selected, Subscribe stayed disabled, and the failure
+    /// surfaced as a missing rentals screen two steps later.
+    private func selectPlan(_ identifier: String, in app: XCUIApplication) {
+        let plan = app.expect(app.buttons[identifier])
+        if !plan.isHittable { app.anyElement(A11yUI.Paywall.root).swipeUp() }
+        plan.tap()
     }
 
     /// 5. Losing Pro leaves every existing record usable.
