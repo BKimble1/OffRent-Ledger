@@ -18,4 +18,7 @@ enum SharedIdentifiers {
     static let snapshotDefaultsKey = "com.idlery.offrent.summarySnapshot.v1"
 
     static let widgetKind = "OffRentLedgerSummaryWidget"
+
+    /// The Control Centre / Action Button control.
+    static let quickAddControlKind = "OffRentLedgerQuickAddControl"
 }

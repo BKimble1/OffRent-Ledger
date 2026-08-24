@@ -5,5 +5,6 @@ import WidgetKit
 struct OffRentLedgerWidgetBundle: WidgetBundle {
     var body: some Widget {
         OffRentSummaryWidget()
+        OffRentQuickAddControl()
     }
 }

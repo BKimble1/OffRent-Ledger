@@ -12,11 +12,17 @@ struct OffRentSummaryWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: SharedIdentifiers.widgetKind, provider: SummaryProvider()) { entry in
             SummaryWidgetView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("OffRent Summary")
         .description("Estimated rent running, what needs a vendor call, and the next rate change.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        // The accessory families are the reason `RentalSummarySnapshot` carries counts and one
+        // aggregate figure and nothing else. A lock screen is read by whoever picks the phone
+        // up, so there is deliberately no field here that could name a machine, a jobsite or a
+        // rental company — the guarantee is structural rather than a rule to remember.
+        .supportedFamilies([
+            .systemSmall, .systemMedium, .systemLarge,
+            .accessoryRectangular, .accessoryCircular, .accessoryInline,
+        ])
     }
 }
 
@@ -59,12 +65,98 @@ struct SummaryWidgetView: View {
     let entry: SummaryEntry
     @Environment(\.widgetFamily) private var family
 
-    var body: some View {
-        if let snapshot = entry.snapshot, !entry.isPlaceholder {
-            content(snapshot)
-        } else {
-            emptyState
+    private var isAccessory: Bool {
+        switch family {
+        case .accessoryRectangular, .accessoryCircular, .accessoryInline: true
+        default: false
         }
+    }
+
+    var body: some View {
+        Group {
+            if let snapshot = entry.snapshot, !entry.isPlaceholder {
+                switch family {
+                case .accessoryInline: inlineAccessory(snapshot)
+                case .accessoryCircular: circularAccessory(snapshot)
+                case .accessoryRectangular: rectangularAccessory(snapshot)
+                default: content(snapshot)
+                }
+            } else {
+                emptyState
+            }
+        }
+        .containerBackground(for: .widget) {
+            // An accessory widget is drawn onto the wallpaper and must not paint a panel behind
+            // itself; a home screen one should.
+            if isAccessory {
+                Color.clear
+            } else {
+                // A system material rather than a named colour: the widget extension does not
+                // compile the app's asset catalog, and a missing named colour fails silently at
+                // render time rather than loudly at build time.
+                Color.clear.background(.fill.tertiary)
+            }
+        }
+    }
+
+    // MARK: - Lock screen
+
+    private func inlineAccessory(_ snapshot: RentalSummarySnapshot) -> some View {
+        Text("\(Formatters.currencyRounded(snapshot.estimatedRentRunning)) running")
+            .accessibilityLabel(
+                "Estimated rent running, \(Formatters.currencyAccessible(snapshot.estimatedRentRunning))"
+            )
+    }
+
+    private func circularAccessory(_ snapshot: RentalSummarySnapshot) -> some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            VStack(spacing: 0) {
+                Text("\(snapshot.openItemCount)")
+                    .font(.title2.weight(.semibold))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                Text("open")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityLabel(
+            "\(snapshot.openItemCount) open \(snapshot.openItemCount == 1 ? "rental" : "rentals")"
+        )
+    }
+
+    private func rectangularAccessory(_ snapshot: RentalSummarySnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text("Estimated rent running")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text(Formatters.currencyRounded(snapshot.estimatedRentRunning))
+                .font(.headline)
+                .monospacedDigit()
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+            Text(attentionLine(snapshot))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityDescription(snapshot))
+    }
+
+    /// One line for the small surfaces: the thing most worth doing, or how many are running.
+    private func attentionLine(_ snapshot: RentalSummarySnapshot) -> String {
+        if snapshot.invoicesAwaitingReviewCount > 0 {
+            return "\(snapshot.invoicesAwaitingReviewCount) to review"
+        }
+        if snapshot.awaitingPickupCount > 0 {
+            return "\(snapshot.awaitingPickupCount) awaiting pickup"
+        }
+        return "\(snapshot.openItemCount) open \(snapshot.openItemCount == 1 ? "rental" : "rentals")"
     }
 
     @ViewBuilder
@@ -88,7 +180,7 @@ struct SummaryWidgetView: View {
 
             Spacer(minLength: 0)
 
-            if family == .systemMedium {
+            if family == .systemMedium || family == .systemLarge {
                 HStack(spacing: 14) {
                     stat("\(snapshot.openItemCount)", "open")
                     stat("\(snapshot.awaitingPickupCount)", "awaiting pickup")
@@ -96,6 +188,20 @@ struct SummaryWidgetView: View {
                 }
             } else {
                 stat("\(snapshot.openItemCount)", snapshot.openItemCount == 1 ? "open rental" : "open rentals")
+            }
+
+            if family == .systemLarge {
+                Divider()
+                // The large family has room to say what to do next rather than only what is
+                // true. Still aggregate — it names no machine and no rental company.
+                Text(nextStepLine(snapshot))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Text("Tap to open \(SharedBranding.displayName)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
 
             if let next = snapshot.nextRateChangeDate {
@@ -109,6 +215,19 @@ struct SummaryWidgetView: View {
         .widgetURL(DeepLink.today.url)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityDescription(snapshot))
+    }
+
+    private func nextStepLine(_ snapshot: RentalSummarySnapshot) -> String {
+        if snapshot.invoicesAwaitingReviewCount > 0 {
+            return "An invoice is waiting to be checked against the terms you confirmed."
+        }
+        if snapshot.awaitingPickupCount > 0 {
+            return "Something is off rent and still on site. Record the pickup once it is collected."
+        }
+        if let next = snapshot.nextRateChangeDate {
+            return "The next rate change you confirmed is \(next.formatted(.dateTime.month(.abbreviated).day()))."
+        }
+        return "Nothing needs a phone call right now."
     }
 
     private func stat(_ value: String, _ label: String) -> some View {
