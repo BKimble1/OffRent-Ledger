@@ -270,6 +270,30 @@ image/PDF ──VisionTextRecognizer──▶ RecognizedDocument (raw text + lin
 confidence ≥ `FieldSuggestion.preselectThreshold` (0.80) are preselected; the rest are shown
 unchecked. Raw recognized text is retained separately from normalized suggestions.
 
+### 7.1 The on-device model
+
+The rule parser matches a label against a figure **on the same line**, which is why rate tables
+have never worked: a contract prints the labels on one row and the figures on the next. Apple's
+Foundation Models framework closes that gap, running entirely on the device
+(`FoundationModelDocumentIntelligence`, `#if canImport(FoundationModels)` and iOS 26+). A device
+or a build without it falls back to `UnavailableDocumentIntelligence`, which proposes nothing —
+scanning behaves exactly as it did before.
+
+**The model proposes; the page decides.** Nothing it returns is trusted. Every proposal goes
+through `ModelSuggestionValidator`, in the portable layer, which drops it unless:
+
+1. the line it quotes is a line the recogniser actually produced;
+2. the value appears in that text character for character, once whitespace, case and typographic
+   quotes are normalised;
+3. it parses as the type its field requires;
+4. no rule-based suggestion already claims that field — the parser is the floor, and where the two
+   disagree the app keeps the one whose reasoning it can print;
+5. its confidence is capped below `preselectThreshold`, so **nothing a model proposed ever arrives
+   ticked**. That holds by construction rather than by anybody remembering to check it.
+
+A proposal failing any of those is dropped silently. There is no "the model thought" state in
+this app.
+
 **Scan results are never auto-committed.** `ScanReviewViewModel.commit()` is the only path that
 writes, it is only reachable from the Save button, and `ScanReviewCommitTests` asserts that
 constructing the view model and disposing of it writes nothing.
@@ -287,7 +311,15 @@ no cloud OCR, no background location. The app is fully usable with every permiss
   the user opts out.
 - Location: requested **only** when the user taps "Add current location"; `requestLocation()`
   one-shot, foreground, `kCLLocationAccuracyHundredMeters`. Denial never blocks a flow. No route
-  history, ever.
+  history, ever. The captured coordinate is displayed as a reverse-geocoded place name for
+  legibility, but the **coordinate stays the record** — the name is Apple's opinion about a point
+  and arrives over the network.
+- Places: job sites are located with `MKLocalSearch`, which is a map query and carries no rental
+  data. A confirmation's location is still a measured GPS fix and never a place picked off a
+  list: "where this phone was when the call was made" and "a place the user chose" are different
+  claims, and only one of them is evidence.
+- The on-device model: `SystemLanguageModel`, local. No page, no figure and no company name
+  leaves the device, which is also why a cloud model was never an option here.
 - Photos: `PhotosPicker` (no library authorization prompt). Camera authorization requested only on
   a camera tap.
 - Deletion: per-attachment, per-rental, and "Delete all app data" (records + files + notifications
@@ -297,6 +329,19 @@ no cloud OCR, no background location. The app is fully usable with every permiss
 
 **Cancelling Pro never deletes or hides a record.** Entitlement loss only prevents creating an
 *additional* open rental item beyond the free limit.
+
+---
+
+### 8.1 What the Home Screen and Lock Screen can show
+
+`RentalSummarySnapshot` carries counts, one aggregate figure and one date, and has **no field**
+for a machine, a jobsite, a rental company or an invoice amount. That is what makes the accessory
+(Lock Screen) widget families safe: a lock screen is read by whoever picks the phone up, and the
+guarantee is structural rather than a rule to remember while writing a new layout.
+
+Supported: `systemSmall`, `systemMedium`, `systemLarge`, `accessoryRectangular`,
+`accessoryCircular`, `accessoryInline`, plus a Control Centre `ControlWidget` that opens the new
+rental form and creates nothing.
 
 ---
 

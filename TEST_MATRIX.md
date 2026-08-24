@@ -219,8 +219,19 @@ of them.
 | VoiceOver traversal | ⛔ unverified |
 | Performance with 1,000 items; scrolling; cold launch | ⛔ **not measured** |
 | Migration against a real existing store | ⛔ unverified |
+| **On-device model output against real contracts** | ⛔ unverified — the guardrail is tested, the model's own accuracy is not |
+| Foundation Models availability on real hardware | ⛔ unverified |
+| Map rendering and pin selection on device | ⛔ unverified |
+| Place search results and reverse geocoding | ⛔ unverified — needs a network and a real address |
+| Lock Screen and Control Centre widget rendering | ⛔ unverified |
 | Legal URL liveness | ⛔ unverified — the app does not claim they are live |
 | Bundle ID availability, Team ID, App Store Connect record | ⛔ unverified |
 
 **A passing StoreKit configuration test says nothing about production purchases.** The
 `.storekit` file is a local simulator fixture. Sandbox and TestFlight are separate real gates.
+
+**What "the on-device model is tested" does and does not mean.** `ModelSuggestionValidatorTests`
+and `ScanIntelligenceTests` verify the *guardrail*: that a value not printed on the page is
+dropped, that a rule-based suggestion always wins, that nothing a model proposes arrives ticked.
+None of them runs a model. How well Apple's model actually reads a rate table off a photographed
+contract is unverified here and can only be answered on hardware, with real documents.

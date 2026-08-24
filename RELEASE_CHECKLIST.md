@@ -57,8 +57,42 @@ Once this section is complete, the project is **locally complete**.
 - [ ] Wait for a reminder to fire; tap it; confirm it lands on the right rental item.
 - [ ] Tap "Add current location", deny, and confirm the flow continues.
 - [ ] Tap it again, allow, and confirm one coordinate is stored and no tracking follows.
-- [ ] Add the widget. Confirm it shows the summary and **no vendor, jobsite or equipment name**.
-- [ ] Lock the phone and look at the widget on the lock screen. Same check.
+- [ ] Add the widget in all three home-screen sizes. Confirm it shows the summary and **no
+      vendor, jobsite or equipment name**.
+- [ ] Add all three Lock Screen widgets — inline, circular and rectangular. Same check, and this
+      is the one that matters most: a lock screen is read by whoever picks the phone up.
+- [ ] Add the Control Centre button. Confirm it opens the new rental form and **creates nothing**.
+
+### The on-device model (new)
+
+- [ ] Scan a contract whose rates are printed as a **table** — labels on one row, figures on the
+      next. This is the case the rule parser cannot do and the whole reason the model exists.
+- [ ] Check every figure it proposes against the paper. Confirm none of them arrives ticked.
+- [ ] Confirm the review screen names the line each value was read from, and that the line is
+      really on the page.
+- [ ] Turn Apple Intelligence **off** in iOS Settings and scan again. Scanning must still work,
+      and the screen must say in one sentence why tables are not being read.
+- [ ] Scan on a device that cannot run the model at all. Same expectation.
+
+### Places and the map (new)
+
+- [ ] Search for a real jobsite by address and by business name. Confirm the pin lands where it
+      should.
+- [ ] Give an *existing* jobsite a place from the jobsite list, and confirm it appears on Today.
+- [ ] Confirm Today shows **no map at all** when no jobsite has a place.
+- [ ] Tap a pin, open a rental from it, and come back.
+- [ ] Record a confirmation with location allowed. Confirm the row reads as a **place name**, with
+      the coordinate underneath — and that the coordinate is what the evidence export carries.
+- [ ] Do the same with no network. The coordinate must still be recorded and displayed.
+
+### The guided walkthrough (new)
+
+- [ ] Start it from the end of the tour and from Settings.
+- [ ] Walk a rental all the way through. Confirm the bar's step follows the rental's real status,
+      including when you arrive at a screen from a notification rather than from the bar.
+- [ ] Confirm the steps that need a phone call to the rental company offer **no button**.
+- [ ] Force-quit mid-walkthrough and reopen. The guide must still be on the same step.
+- [ ] Skip it. It must not come back on the next launch.
 - [ ] Run each App Intent from Shortcuts. Confirm the confirmation intent **opens the sheet and
       records nothing**.
 - [ ] Generate an evidence packet and read **every page**. Check the disclaimer, the timeline, the
@@ -66,6 +100,13 @@ Once this section is complete, the project is **locally complete**.
 - [ ] Share the packet by AirDrop and by email.
 - [ ] Export CSV; open it in Numbers and in Excel; confirm the amount columns sum.
 - [ ] Export a backup, delete all data, re-import, confirm the preview counts are right.
+- [ ] **Upgrade path:** install the previous TestFlight build, create a rental with a jobsite,
+      then install this one over the top. Confirm the store migrates to schema V2 and nothing is
+      lost. This is the only way R10 gets closed.
+- [ ] Import a backup exported by the previous build. Job sites without a place must import
+      cleanly.
+- [ ] Turn on quiet hours, set a reminder that would land inside them, and confirm it fires
+      *before* the window opens rather than after it closes.
 - [ ] VoiceOver: traverse Today, Rentals, item detail, Contact Vendor, confirmation, pickup,
       invoice review, paywall and settings. Every control announced; no duplicate or orphaned
       elements.
