@@ -72,7 +72,7 @@ App Intents.
 ## Phase 6 — Release hardening ✅ (local work) / ⛔ (device work)
 
 Accessibility pass; legal + privacy screens and the static `Website/`; App Review audit;
-`scripts/verify_repository.py`; `codemagic.yaml` with four workflows; the real Linux test run;
+`scripts/verify_repository.py`; CI workflows (Codemagic at the time, GitHub Actions now); the real Linux test run;
 honest completed-vs-unverified reporting.
 
 **Not done, by instruction:** no App Store submission.

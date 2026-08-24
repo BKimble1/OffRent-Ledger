@@ -1,0 +1,210 @@
+# OffRent Ledger — TestFlight.
+#
+# The only workflow that signs anything or sends anything to Apple. Manual, never on a push.
+#
+# It uploads a build to TestFlight. It does not submit the app for App Store review, does not
+# assign testers, and does not create App Store Connect records — the app record and the tester
+# groups have to exist already, and after the upload the build has to be assigned to a group by
+# hand in App Store Connect.
+#
+# ## What has to be in repository secrets before this can run
+#
+#   APP_STORE_CONNECT_KEY_ID       The 10-character key id, e.g. ABCD123456.
+#   APP_STORE_CONNECT_ISSUER_ID    The issuer UUID from Users and Access → Integrations → Keys.
+#   APP_STORE_CONNECT_PRIVATE_KEY  The whole .p8 file, including the BEGIN and END lines. Apple
+#                                  lets you download it exactly once.
+#
+# The key needs the App Manager role: below that, Xcode cannot create the signing certificate and
+# profiles it needs, and the archive step fails on provisioning rather than on anything you wrote.
+#
+# There is deliberately no certificate or provisioning-profile secret. `-allowProvisioningUpdates`
+# with the same API key lets Xcode issue and download what it needs, which is three secrets to
+# rotate instead of five, and no .p12 sitting in a repository setting.
+
+name: TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Build number. Leave blank to use the run number.'
+        required: false
+        type: string
+
+env:
+  XCODE_SCHEME: OffRentLedger
+  XCODE_PROJECT: OffRentLedger.xcodeproj
+  BUNDLE_ID: com.idlery.offrent
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Archive and upload
+    # `macos-latest` rather than a pinned image label: the labels change, and a label the
+    # account does not have is a job that never starts. Pin one here if you need a specific
+    # Xcode that only a newer image carries.
+    runs-on: macos-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fail here rather than twenty minutes in on a signing error that says nothing useful.
+      - name: Check the credentials are present
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -e
+          missing=""
+          [ -n "$KEY_ID" ] || missing="$missing APP_STORE_CONNECT_KEY_ID"
+          [ -n "$ISSUER_ID" ] || missing="$missing APP_STORE_CONNECT_ISSUER_ID"
+          [ -n "$PRIVATE_KEY" ] || missing="$missing APP_STORE_CONNECT_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "Missing repository secrets:$missing"
+            echo "Add them under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "All three App Store Connect secrets are set."
+
+      - name: Select the newest installed Xcode
+        # Not a hardcoded path. Runner images gain and lose Xcode versions, and a missing
+        # `/Applications/Xcode_<version>.app` fails the job on the first line with an error about
+        # a directory rather than about the build.
+        run: |
+          set -e
+          NEWEST=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$NEWEST" ]; then
+            sudo xcode-select -switch "$NEWEST"
+          fi
+          echo "Using $(xcode-select -p)"
+          xcodebuild -version
+
+      - name: Install Python dependencies
+        # `--break-system-packages` is needed on a PEP 668 Python and rejected by older pips, so
+        # try it only if the plain install refuses.
+        run: |
+          python3 -m pip install --quiet pillow pyyaml \
+            || python3 -m pip install --quiet --break-system-packages pillow pyyaml
+
+      - name: Repository invariants
+        run: python3 scripts/verify_repository.py
+
+      - name: Portable domain tests
+        run: swift test --package-path .
+
+      # Xcode looks for the key here by id; `altool` looks in the same place. One file, both uses.
+      - name: Install the App Store Connect key
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s\n' "$PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+
+      # Every upload needs a build number App Store Connect has not seen for this version. The run
+      # number is monotonic per repository, which is exactly the property required.
+      - name: Set the build number
+        run: |
+          set -e
+          BUILD_NUMBER="${{ inputs.build_number }}"
+          [ -n "$BUILD_NUMBER" ] || BUILD_NUMBER="${{ github.run_number }}"
+          echo "Building $BUILD_NUMBER"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+
+      - name: Archive
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          STATUS=0
+          xcodebuild archive \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/OffRentLedger.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            OFFRENT_BUILD_NUMBER="$BUILD_NUMBER" \
+            | tee archive.log || STATUS=$?
+          bash scripts/ci/summarize_test_log.sh archive.log
+          exit $STATUS
+
+      - name: Export the IPA
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          # `app-store-connect` is the current name for what used to be `app-store`. It exports a
+          # store-signed IPA and uploads nothing; the upload is the next step, on purpose, so a
+          # failed upload can be retried without rebuilding.
+          # Written with PlistBuddy rather than a heredoc. A heredoc inside a YAML block scalar
+          # needs its terminator at column zero, and column zero ends the block — so the file
+          # would silently never close.
+          PLIST="$RUNNER_TEMP/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c "Clear dict" "$PLIST" 2>/dev/null || echo '{}' > "$PLIST"
+          /usr/libexec/PlistBuddy \
+            -c "Add :method string app-store-connect" \
+            -c "Add :destination string export" \
+            -c "Add :teamID string ${{ secrets.APPLE_TEAM_ID || '7GNFT94A9L' }}" \
+            -c "Add :uploadSymbols bool true" \
+            -c "Add :manageAppVersionAndBuildNumber bool false" \
+            "$PLIST"
+          cat "$PLIST"
+          STATUS=0
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/OffRentLedger.xcarchive" \
+            -exportOptionsPlist "$PLIST" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            | tee export.log || STATUS=$?
+          bash scripts/ci/summarize_test_log.sh export.log
+          ls -la "$RUNNER_TEMP/export" || true
+          exit $STATUS
+
+      - name: Upload to TestFlight
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -e
+          IPA=$(find "$RUNNER_TEMP/export" -name '*.ipa' -maxdepth 1 | head -1)
+          if [ -z "$IPA" ]; then
+            echo "No IPA was exported; nothing to upload."
+            exit 1
+          fi
+          echo "Uploading $(basename "$IPA")"
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA" \
+            --apiKey "$KEY_ID" \
+            --apiIssuer "$ISSUER_ID"
+          echo
+          echo "Uploaded. Apple processes the build before it appears in TestFlight — usually a"
+          echo "few minutes, sometimes longer. Assign it to a tester group in App Store Connect;"
+          echo "this workflow deliberately does not."
+
+      - name: Upload logs and the IPA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-${{ env.BUILD_NUMBER }}
+          path: |
+            *.log
+            ${{ runner.temp }}/export/*.ipa
+          retention-days: 14
+          if-no-files-found: ignore

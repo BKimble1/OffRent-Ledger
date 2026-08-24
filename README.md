@@ -109,5 +109,11 @@ tracking framework appears anywhere in the sources.
 
 ## CI
 
-Four Codemagic workflows. Only one of them signs or uploads, and it refuses to start until the
-credentials and App Store Connect records actually exist. None of them submits to the App Store.
+Two GitHub Actions workflows, in `.github/workflows/`.
+
+`verify.yml` runs on every push and pull request: repository invariants, the portable domain
+tests, a simulator build of the app and its widget, and the unit tests. It signs nothing.
+
+`testflight.yml` is manual, and is the only thing here that signs anything or sends anything to
+Apple. It refuses to start until the three App Store Connect secrets exist, and it uploads a
+build — it does not assign testers and does not submit for App Store review.

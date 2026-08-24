@@ -15,7 +15,7 @@ A test that is written but not executed proves nothing. This document never conf
 | | |
 |---|---|
 | **This machine** | Ubuntu 24.04 x86_64, `Swift 6.0.3`. No macOS, no Xcode, no iOS SDK, no simulator, no device. `xcodebuild` does not exist here and cannot be installed. |
-| **CI** | Codemagic `mac_mini_m2`, Xcode 26.4, iOS Simulator 26.4, `offrent-fast-verify`. Reached first on 2026-08-21 after four rounds of compile fixes. |
+| **CI** | GitHub Actions `macos-15`, Xcode 16.4, iOS Simulator, the `Verify` workflow. Previously Codemagic `mac_mini_m2`, which reached green first on 2026-08-21 after four rounds of compile fixes. |
 
 Everything in section A runs in both. Section B runs only in CI. Section D runs in neither.
 
@@ -57,7 +57,7 @@ not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SW
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
 | `python3 scripts/generate_website.py --check` | ✅ the site matches its generator; privacy and terms render from the app's own Markdown |
-| YAML parse of `codemagic.yaml` | ✅ valid; asserts no automatic App Store submission, and no `auth: integration` without a named integration |
+| YAML parse of `.github/workflows/*.yml` | ✅ valid; asserts TestFlight is manual-only, actually uploads, reads its credentials from secrets, and never submits for review |
 | plist / entitlements / .storekit / .xcscheme / asset-catalog JSON parse | ✅ all valid |
 | Swift delimiter balance across every source file | ✅ balanced |
 | Multi-line string indentation (Swift's own rule, on the targets `swift test` cannot compile) | ✅ clean |
@@ -103,7 +103,7 @@ correctly persisted store reproduces it exactly.
 
 ## B. Executed on the simulator — the app-target suite
 
-Run by `offrent-fast-verify` step 7, `xcodebuild test -only-testing:OffRentLedgerTests` against
+Run by the `Verify` workflow, `xcodebuild test -only-testing:OffRentLedgerTests` against
 the iOS 26.4 simulator. These need SwiftData, UIKit, UserNotifications and a bundle, so this
 machine cannot run them; CI can.
 
@@ -170,7 +170,7 @@ been run again since.
 ## C. Written, NOT executed — the UI suite
 
 **11 UI test methods.** They need a booted simulator running the app, which is the
-`offrent-targeted-ui` workflow, and that has not been run.
+UI scenarios below, and they have not been run.
 
 | Suite | Tests | Status | Covers |
 |---|---:|---|---|
@@ -179,7 +179,7 @@ been run again since.
 | `EntitlementUITests` | 3 | ⛔ not executed | Free limit, Pro unlock via the StoreKit test configuration, entitlement loss |
 | `AccessibilityUITests` | 4 | ⛔ not executed | Tabs labelled, estimate spoken as an estimate, disclosure readable, status spoken |
 
-To execute: run the `offrent-targeted-ui` Codemagic workflow, or on a Mac:
+To execute, on a Mac:
 
 ```
 xcodebuild test -project OffRentLedger.xcodeproj -scheme OffRentLedger \

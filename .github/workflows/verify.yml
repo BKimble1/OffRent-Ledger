@@ -1,0 +1,129 @@
+# OffRent Ledger — verification.
+#
+# Every push and pull request. Repository invariants, portable domain tests, a simulator build of
+# the app and its widget, and the unit tests. Signs nothing and publishes nothing.
+#
+# Ported from `codemagic.yaml`, which this replaces. The shared shell still lives in `scripts/ci/`
+# rather than inline: a discovery snippet with an embedded interpreter inside a YAML block scalar
+# is a quoting trap, and a file can be run and linted.
+
+name: Verify
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  XCODE_SCHEME: OffRentLedger
+  XCODE_PROJECT: OffRentLedger.xcodeproj
+
+jobs:
+  verify:
+    name: Build and test
+    # `macos-latest` rather than a pinned image label: the labels change, and a label the
+    # account does not have is a job that never starts. Pin one here if you need a specific
+    # Xcode that only a newer image carries.
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest installed Xcode
+        # Not a hardcoded path. Runner images gain and lose Xcode versions, and a missing
+        # `/Applications/Xcode_<version>.app` fails the job on the first line with an error about
+        # a directory rather than about the build.
+        run: |
+          set -e
+          NEWEST=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$NEWEST" ]; then
+            sudo xcode-select -switch "$NEWEST"
+          fi
+          echo "Using $(xcode-select -p)"
+          xcodebuild -version
+
+      - name: Install Python dependencies
+        # `--break-system-packages` is needed on a PEP 668 Python and rejected by older pips, so
+        # try it only if the plain install refuses.
+        run: |
+          python3 -m pip install --quiet pillow pyyaml \
+            || python3 -m pip install --quiet --break-system-packages pillow pyyaml
+
+      - name: Repository invariants
+        run: python3 scripts/verify_repository.py
+
+      # The portable layer carries the money, the dates, the state machine and the parsers, and it
+      # needs no simulator. It runs before anything slow so a broken rate engine fails in thirty
+      # seconds rather than in twenty minutes.
+      - name: Portable domain tests
+        run: |
+          set -o pipefail
+          swift test --package-path . 2>&1 | tee swift-test.log
+
+      - name: Generated artefacts are current
+        run: |
+          python3 scripts/generate_xcodeproj.py --check
+          python3 scripts/generate_assets.py --check
+          python3 scripts/prepare_app_icon.py --check
+          python3 scripts/prepare_launch_assets.py --check
+          swift run --package-path . offrent-docgen . --check
+
+      - name: Show the project Xcode sees
+        run: xcodebuild -list -project "$XCODE_PROJECT"
+
+      # Building the app scheme also builds the widget: the app depends on it and embeds the
+      # .appex, so a widget compile error fails this step.
+      - name: Build app and widget for the simulator
+        run: |
+          set -o pipefail
+          STATUS=0
+          xcodebuild clean build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild.log || STATUS=$?
+          # Summarise on failure too. Without this a failed build ends with pages of clang
+          # invocations and the `error:` lines are thousands of lines up, out of view — which is
+          # exactly what happened on the first two runs of the Codemagic version.
+          bash scripts/ci/summarize_test_log.sh xcodebuild.log
+          exit $STATUS
+
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          STATUS=0
+          # `generic/platform=iOS Simulator` is a build-only destination and cannot run a bundle.
+          DEVICE_ID=$(bash scripts/ci/find_simulator.sh)
+          echo "Running on simulator $DEVICE_ID"
+          xcodebuild test \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$DEVICE_ID" \
+            -only-testing:OffRentLedgerTests \
+            -resultBundlePath OffRentLedgerTests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild-tests.log || STATUS=$?
+          bash scripts/ci/summarize_test_log.sh xcodebuild-tests.log
+          exit $STATUS
+
+      - name: Upload logs and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-logs
+          path: |
+            *.log
+            OffRentLedgerTests.xcresult
+          retention-days: 14
+          if-no-files-found: ignore

@@ -97,7 +97,7 @@ def check_no_corecredit() -> None:
         "TEST_MATRIX.md", "README.md", "docs/RISK_REGISTER.md",
         "scripts/verify_repository.py", "scripts/generate_xcodeproj.py",
         "scripts/generate_assets.py", "Config/Identifiers.xcconfig",
-        "StoreKit/README.md", "codemagic.yaml",
+        "StoreKit/README.md",
     }
     banned = ["CoreCredit", "corecredit", "com.blakekimble", "QuickScanWidget", "Money at Risk"]
     for path in all_text_files():
@@ -1100,79 +1100,83 @@ def check_call_sites_resolve() -> None:
         fail("call-sites", "; ".join(detail[:6]) or result.stdout.strip()[-400:])
 
 
-def check_codemagic_config() -> None:
-    check("codemagic.yaml is internally consistent")
-    # Codemagic validates the whole file, so one bad workflow rejects the config and blocks every
-    # other workflow with it — including the fast-verify gate. That is how a publishing block for
-    # an integration nobody had configured stopped the project's first compile from running.
+def check_github_workflows() -> None:
+    """The two GitHub Actions workflows still do what their names say.
+
+    Carried over from the Codemagic version of this check, and for the same reason. The worst
+    kind of green build is a workflow named for TestFlight that archives a correctly signed .ipa
+    and stops: it succeeds, reports nothing wrong, and produces no build for anybody to install.
+    That is exactly what happened here once, and the first anyone knew was a TestFlight page with
+    nothing on it and no email.
+    """
+    check("The GitHub Actions workflows are internally consistent")
     try:
         import yaml  # noqa: PLC0415
     except ImportError:
         print("      (pyyaml not installed; skipping the parse)")
         return
 
-    path = ROOT / "codemagic.yaml"
-    try:
-        config = yaml.safe_load(path.read_text())
-    except Exception as error:
-        fail("codemagic", f"codemagic.yaml does not parse: {error}")
-        return
+    workflows = ROOT / ".github" / "workflows"
+    verify = workflows / "verify.yml"
+    testflight = workflows / "testflight.yml"
 
-    workflows = (config or {}).get("workflows") or {}
-    if not workflows:
-        fail("codemagic", "no workflows defined")
-        return
+    for path in (verify, testflight):
+        if not path.exists():
+            fail("workflows", f"{path.relative_to(ROOT)} is missing")
+            return
 
-    for name, workflow in workflows.items():
-        publishing = workflow.get("publishing") or {}
-        app_store = publishing.get("app_store_connect") or {}
+    parsed = {}
+    for path in (verify, testflight):
+        try:
+            parsed[path.name] = yaml.safe_load(path.read_text()) or {}
+        except Exception as error:
+            fail("workflows", f"{path.name} does not parse: {error}")
+            return
 
-        # `auth: integration` needs a named integration, or Codemagic rejects the file.
-        if app_store.get("auth") == "integration" and "app_store_connect" not in (
-            workflow.get("integrations") or {}
-        ):
-            fail(
-                "codemagic",
-                f"{name} uses `auth: integration` without `integrations.app_store_connect`; "
-                "this rejects the whole config, not just this workflow",
-            )
+    # `on:` is YAML 1.1's boolean true, so safe_load gives back the key `True`, not "on". Reading
+    # it by the string silently finds nothing and every trigger check below passes vacuously.
+    def triggers(document: dict) -> dict:
+        return document.get(True) or document.get("on") or {}
 
-        # Submission stays a human decision.
-        if app_store.get("submit_to_app_store"):
-            fail("codemagic", f"{name} would submit to the App Store automatically")
+    verify_on = triggers(parsed["verify.yml"])
+    if "push" not in verify_on and "pull_request" not in verify_on:
+        fail("workflows", "verify.yml runs on neither push nor pull_request, so it never gates")
 
-        # A build restricted to internal testing cannot later be selected for App Store review.
-        if app_store.get("testFlightInternalTestingOnly"):
-            fail("codemagic", f"{name} restricts the build to internal testing only")
+    flight_on = triggers(parsed["testflight.yml"])
+    for automatic in ("push", "pull_request", "schedule"):
+        if automatic in flight_on:
+            fail("workflows", f"testflight.yml would run on {automatic}; publishing stays manual")
+    if "workflow_dispatch" not in flight_on:
+        fail("workflows", "testflight.yml cannot be run by hand")
 
-        # A publishing block that carries no credentials is a block that does nothing.
-        if app_store and not app_store.get("auth"):
-            for key in ["api_key", "key_id", "issuer_id"]:
-                if not app_store.get(key):
-                    fail(
-                        "codemagic",
-                        f"{name} publishes to App Store Connect but has no {key} and no `auth`",
-                    )
+    body = testflight.read_text()
 
-    # A workflow named for TestFlight that does not upload is the worst kind of green build: it
-    # succeeds, reports nothing wrong, and produces no build for anybody to install. This one did
-    # exactly that — it archived a correctly signed .ipa into `artifacts` and stopped, and the
-    # first anyone knew was a TestFlight page with nothing on it and no email.
-    for name, workflow in workflows.items():
-        if "testflight" not in name.lower():
-            continue
-        publishing = (workflow.get("publishing") or {}).get("app_store_connect")
-        if not publishing:
-            fail(
-                "codemagic",
-                f"{name} is named for TestFlight but has no `publishing.app_store_connect`, "
-                "so it would archive and upload nothing",
-            )
+    # An archive with no upload is the failure this check exists for.
+    if "altool --upload-app" not in body:
+        fail("workflows", "testflight.yml is named for TestFlight but never uploads anything")
 
-    if "offrent-fast-verify" not in workflows:
-        fail("codemagic", "the fast-verify gate is missing")
-    if "triggering" not in workflows.get("offrent-fast-verify", {}):
-        fail("codemagic", "offrent-fast-verify has no trigger, so it would never run on its own")
+    # Submission and tester assignment stay human decisions.
+    for forbidden in ("--submit-for-review", "submit_for_review", "app-store-review"):
+        if forbidden in body:
+            fail("workflows", f"testflight.yml contains {forbidden}; submission stays manual")
+
+    # Credentials come from secrets, never from the file.
+    for secret in (
+        "APP_STORE_CONNECT_KEY_ID",
+        "APP_STORE_CONNECT_ISSUER_ID",
+        "APP_STORE_CONNECT_PRIVATE_KEY",
+    ):
+        if f"secrets.{secret}" not in body:
+            fail("workflows", f"testflight.yml does not read {secret} from secrets")
+    if "BEGIN PRIVATE KEY" in body:
+        fail("workflows", "testflight.yml has a private key in it")
+
+    if (ROOT / "codemagic.yaml").exists():
+        fail(
+            "workflows",
+            "codemagic.yaml is still here alongside the GitHub workflows; two CI systems "
+            "watching one repository is two places to look when a build fails",
+        )
 
 
 def check_docs_exist() -> None:
@@ -1231,7 +1235,7 @@ def main() -> int:
         check_app_icon,
         check_ocr_fixtures_exist,
         check_call_sites_resolve,
-        check_codemagic_config,
+        check_github_workflows,
         check_docs_exist,
     ]:
         function()

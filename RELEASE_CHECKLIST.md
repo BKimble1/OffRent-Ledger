@@ -94,18 +94,24 @@ Once this section is complete, the project is **locally complete**.
       - `com.idlery.offrent.pro.monthly` — auto-renewable, 1 month, US $14.99
       - `com.idlery.offrent.pro.annual` — auto-renewable, 1 year, US $119.99
       - Localised display names and descriptions, and a review screenshot for each.
-- [ ] Create an App Store Connect API key and a distribution certificate; add them to Codemagic as
-      the environment groups `offrent_appstore` and `offrent_signing`.
-- [ ] In Codemagic: **Teams › Integrations › App Store Connect**, add the API key and name the
-      integration. Then uncomment the `integrations:` and `publishing:` stanzas at the bottom of
-      the `offrent-testflight` workflow in `codemagic.yaml` and substitute that name.
-      **Both together, or neither.** `auth: integration` without a named integration rejects the
-      entire `codemagic.yaml`, which blocks `offrent-fast-verify` as well — that is not a
-      hypothetical, it is what happened on the first run.
-      `scripts/verify_repository.py` now fails on that combination.
-- [ ] Run `offrent-testflight`. Its preflight step will refuse until all of the above exists.
-      Until the publishing stanza is enabled the workflow archives and stops; the `.ipa` is in
-      its artifacts and can be uploaded by hand.
+- [ ] Create an App Store Connect API key with the **App Manager** role
+      (**Users and Access → Integrations → Keys**). Apple lets you download the `.p8` once.
+- [ ] Add three repository secrets under **Settings → Secrets and variables → Actions**:
+      - `APP_STORE_CONNECT_KEY_ID` — the 10-character key id
+      - `APP_STORE_CONNECT_ISSUER_ID` — the issuer UUID on the same page
+      - `APP_STORE_CONNECT_PRIVATE_KEY` — the whole `.p8`, BEGIN and END lines included
+
+      There is no certificate or provisioning-profile secret to add. The workflow archives with
+      `-allowProvisioningUpdates` and the same key, so Xcode issues and downloads what it needs.
+      Below App Manager it cannot, and the archive fails on provisioning rather than on anything
+      in the source.
+- [ ] Optionally add `APPLE_TEAM_ID`. Without it the export falls back to the team id in
+      `Config/Identifiers.xcconfig`.
+- [ ] Run the **TestFlight** workflow from the Actions tab. Its first step refuses to start until
+      all three secrets exist, rather than failing twenty minutes later on a signing error that
+      says nothing useful.
+- [ ] Assign the processed build to a tester group in App Store Connect. The workflow uploads and
+      stops; it does not assign testers and does not submit for review.
 
 After a successful signed archive, the app is **TestFlight-ready**.
 
@@ -170,8 +176,8 @@ production purchases. All of the following are separate, real gates:
 
 ## 7. Final gates before submission
 
-- [ ] `offrent-full-release` green.
-- [ ] `offrent-targeted-ui` green.
+- [ ] The **Verify** workflow green on the release commit.
+- [ ] The UI scenarios run at least once on a simulator (see TEST_MATRIX.md).
 - [ ] `swift test` green.
 - [ ] `verify_repository.py` green.
 - [ ] Every box in sections 1–6 ticked.

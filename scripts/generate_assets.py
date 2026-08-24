@@ -15,7 +15,8 @@ into the asset catalog. To regenerate that copy from the master, use
 Run: python3 scripts/generate_assets.py
 """
 
-import json, pathlib
+import json
+import sys, pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "OffRentLedger" / "Resources" / "Assets.xcassets"
@@ -87,15 +88,33 @@ def colorset(light, dark):
 
 
 def main():
+    # `--check` verifies rather than writes. Without it a CI step that runs this script would
+    # regenerate whatever had drifted and then pass, which is the opposite of a check: the
+    # palette in the repository could disagree with the palette in the script indefinitely and
+    # nothing would ever say so.
+    checking = "--check" in sys.argv
+    problems: list[str] = []
+
+    def emit(path: pathlib.Path, text: str) -> None:
+        if checking:
+            current = path.read_text() if path.exists() else None
+            if current != text:
+                problems.append(str(path.relative_to(ROOT)))
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+
     ASSETS.mkdir(parents=True, exist_ok=True)
-    (ASSETS / "Contents.json").write_text(
-        json.dumps({"info": {"author": "xcode", "version": 1}}, indent=2) + "\n"
+    emit(
+        ASSETS / "Contents.json",
+        json.dumps({"info": {"author": "xcode", "version": 1}}, indent=2) + "\n",
     )
 
     for name, (light, dark) in COLOURS.items():
         folder = ASSETS / f"{name}.colorset"
-        folder.mkdir(exist_ok=True)
-        (folder / "Contents.json").write_text(json.dumps(colorset(light, dark), indent=2) + "\n")
+        if not checking:
+            folder.mkdir(exist_ok=True)
+        emit(folder / "Contents.json", json.dumps(colorset(light, dark), indent=2) + "\n")
 
     icon_folder = ASSETS / "AppIcon.appiconset"
     icon_folder.mkdir(exist_ok=True)
@@ -106,7 +125,8 @@ def main():
             "  python3 scripts/prepare_app_icon.py\n"
             "to rebuild it from marketing/AppIcon/OffRentLedger-AppIcon-master.png."
         )
-    (icon_folder / "Contents.json").write_text(
+    emit(
+        icon_folder / "Contents.json",
         json.dumps(
             {
                 "images": [
@@ -121,13 +141,24 @@ def main():
             },
             indent=2,
         )
-        + "\n"
+        + "\n",
     )
+
+    if checking:
+        if problems:
+            print("out of date; run python3 scripts/generate_assets.py")
+            for problem in problems:
+                print(f"  {problem}")
+            return 1
+        print(f"ok: {len(COLOURS)} colour sets match the palette in this script")
+        return 0
+
     print(
         f"wrote: {ASSETS.relative_to(ROOT)} ({len(COLOURS)} colour sets; "
         "AppIcon-1024.png left untouched)"
     )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

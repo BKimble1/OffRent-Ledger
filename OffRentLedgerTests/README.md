@@ -5,7 +5,7 @@ store, the notification scheduler adapter, and StoreKit entitlement behaviour.
 
 **These run on the simulator, in CI.** They cannot run on the machine this app was written on —
 Linux, no Xcode, no iOS SDK — so for most of the build they were written but unexecuted. The
-`offrent-fast-verify` Codemagic workflow runs them now. `TEST_MATRIX.md` keeps the precise
+The GitHub Actions `Verify` workflow runs them now. `TEST_MATRIX.md` keeps the precise
 distinction between what is written, what was executed, where, and what passed.
 
 Everything that could be moved out of this target and into the Foundation-only `Domain` layer
