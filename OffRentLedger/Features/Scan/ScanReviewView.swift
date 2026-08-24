@@ -42,6 +42,10 @@ struct ScanReviewView: View {
                     reviewForm
                 }
             }
+            .offRentFormBackground()
+            .safeAreaInset(edge: .bottom) {
+                if model.phase == .reviewing { saveBar }
+            }
             .navigationTitle("Check what was read")
             .navigationBarTitleDisplayMode(.inline)
             // Replaces what used to be the view model's `deinit`. This is the better hook anyway:
@@ -57,14 +61,34 @@ struct ScanReviewView: View {
                     }
                     .accessibilityIdentifier(A11yID.Scan.cancelButton)
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { onSave(model.acceptedValues()) }
-                        .accessibilityIdentifier(A11yID.Scan.saveButton)
-                        .disabled(model.phase != .reviewing)
-                }
             }
         }
     }
+
+    /// The commit, and the count of what it will commit.
+    ///
+    /// A scan review is a list of things the user is agreeing to; the button that ends it should
+    /// say how many, because the difference between six and two ticked fields is invisible once
+    /// the list is longer than a screen.
+    private var saveBar: some View {
+        StickyActionBar {
+            VStack(spacing: Space.snug) {
+                Button {
+                    onSave(model.acceptedValues())
+                } label: {
+                    Text(selectedCount == 1 ? "Use 1 value" : "Use \(selectedCount) values")
+                }
+                .buttonStyle(.offRentPrimary)
+                .accessibilityIdentifier(A11yID.Scan.saveButton)
+                .disabled(model.phase != .reviewing)
+                Text("Nothing is saved to a rental until you tap this.")
+                    .font(Typography.micro)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var selectedCount: Int { model.selection.count }
 
     private var reviewForm: some View {
         Form {
@@ -140,14 +164,33 @@ struct ScanReviewView: View {
     }
 
     private func row(for suggestion: FieldSuggestion) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle(isOn: Binding(
-                get: { model.selection.contains(suggestion.field) },
-                set: { _ in model.toggle(suggestion.field) }
-            )) {
-                Text(suggestion.field.displayName).font(.subheadline.weight(.medium))
+        let isSelected: Bool = model.selection.contains(suggestion.field)
+        return VStack(alignment: .leading, spacing: Space.snug) {
+            // A tick rather than a switch. A switch reads as a setting that is on; this is the
+            // user saying "yes, that is what the document says", which is a different act — and
+            // the row has to show, at a glance, which values are still only suggestions.
+            Button {
+                model.toggle(suggestion.field)
+            } label: {
+                HStack(spacing: Space.snug) {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 19))
+                        .foregroundStyle(isSelected ? Palette.accent : Color.secondary)
+                    Text(suggestion.field.displayName)
+                        .font(Typography.rowTitle)
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: Space.snug)
+                    Text(isSelected ? "Confirmed" : "Suggested")
+                        .font(Typography.micro.weight(.semibold))
+                        .foregroundStyle(isSelected ? Palette.settled : .secondary)
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityIdentifier(A11yID.Scan.toggle(suggestion.field))
+            .accessibilityLabel(suggestion.field.displayName)
+            .accessibilityValue(isSelected ? "Confirmed" : "Suggested, not confirmed")
+            .accessibilityHint("Double tap to \(isSelected ? "unconfirm" : "confirm") this value.")
             .minimumTapTarget()
 
             TextField(suggestion.field.displayName, text: model.binding(for: suggestion.field))

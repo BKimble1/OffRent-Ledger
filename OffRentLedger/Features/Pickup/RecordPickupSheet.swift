@@ -31,6 +31,27 @@ struct RecordPickupSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                if let item {
+                    Section {
+                        HStack(spacing: Space.base) {
+                            RowIcon(
+                                symbol: item.status.symbolName,
+                                tint: Palette.tint(for: item.status)
+                            )
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(item.equipmentName).font(Typography.rowTitle)
+                                if let vendor = item.agreement?.vendor?.name {
+                                    Text(vendor)
+                                        .font(Typography.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+
                 Section {
                     DatePicker(
                         "Picked up",
@@ -105,14 +126,26 @@ struct RecordPickupSheet: View {
                     }
                 }
             }
+            .offRentFormBackground()
+            .safeAreaInset(edge: .bottom) {
+                StickyActionBar {
+                    VStack(spacing: Space.snug) {
+                        Button("Save pickup", action: save)
+                            .buttonStyle(.offRentPrimary)
+                            .accessibilityIdentifier(A11yID.Pickup.save)
+                        Text("Pickup is a separate record from the vendor's off-rent confirmation.")
+                            .font(Typography.micro)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
             .navigationTitle("Record pickup")
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier(A11yID.Pickup.root)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save).accessibilityIdentifier(A11yID.Pickup.save)
-                }
             }
             .onAppear { pickedUpAt = dependencies.clock.now }
         }

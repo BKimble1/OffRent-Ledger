@@ -16,7 +16,7 @@ struct TodayView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: Layout.sectionSpacing) {
+            LazyVStack(alignment: .leading, spacing: Space.section) {
                 if openItems.isEmpty {
                     EmptyStateView(
                         symbol: "shippingbox",
@@ -30,19 +30,20 @@ struct TodayView: View {
                         action: { router.presentedSheet = .addRental },
                         identifier: A11yID.Today.emptyState
                     )
-                    .padding(.top, 40)
+                    .padding(.top, Space.roomy)
                 } else {
-                    runningCostCard
+                    summary
                     if !upcomingRateChanges.isEmpty { upcomingRateChangesSection }
                     if !actionQueue.isEmpty { actionQueueSection }
                     if !awaitingPickup.isEmpty { awaitingPickupSection }
                     if !invoicesToReview.isEmpty { invoicesSection }
                 }
             }
-            .padding(.horizontal)
-            .padding(.bottom, 32)
+            .padding(.horizontal, Space.comfortable)
+            .padding(.top, Space.screenTop)
+            .padding(.bottom, Space.screenBottom)
         }
-        .background(Palette.groupedBackground)
+        .offRentScreen()
         .navigationTitle("Today")
         .navigationBarTitleDisplayMode(.large)
         .offRentNavigationDestinations()
@@ -59,143 +60,236 @@ struct TodayView: View {
         }
     }
 
-    // MARK: - Sections
+    // MARK: - Summary
+    //
+    // One graphite panel carrying the number the screen is about, with the counts beneath it as
+    // tiles. This is the whole answer to "the dashboard looks like a settings screen": the most
+    // important fact now has a surface of its own instead of being one more line of text on the
+    // same white as everything else.
 
-    private var runningCostCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(
-                title: "Estimated rent running",
-                subtitle: accruing.isEmpty
-                    ? "Nothing is accruing right now."
-                    : "\(accruing.count) \(accruing.count == 1 ? "machine is" : "machines are") still on rent."
-            )
-            EstimateLabel(amount: totalRunning, isComplete: !accruing.isEmpty || totalRunning == 0)
+    private var summary: some View {
+        VStack(spacing: Space.base) {
+            SummaryPanel(
+                eyebrow: "Estimated rent running",
+                footnote: AppCopy.estimateExplanation
+            ) {
+                VStack(alignment: .leading, spacing: Space.tight) {
+                    if accruing.isEmpty && totalRunning == 0 {
+                        Text(Formatters.currency(0))
+                            .font(Typography.hero)
+                            .monospacedDigit()
+                            .foregroundStyle(Palette.onGraphite)
+                        Text("Nothing is accruing right now.")
+                            .font(Typography.rowDetail)
+                            .foregroundStyle(Palette.onGraphiteSecondary)
+                    } else {
+                        Text(Formatters.currency(totalRunning))
+                            .font(Typography.hero)
+                            .monospacedDigit()
+                            .foregroundStyle(Palette.onGraphite)
+                            .contentTransition(.numericText())
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                        Text(AppCopy.estimateQualifier)
+                            .font(Typography.micro.weight(.semibold))
+                            .textCase(.uppercase)
+                            .tracking(0.8)
+                            .foregroundStyle(Palette.accent)
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(summaryAccessibilityLabel)
                 .accessibilityIdentifier(A11yID.Today.estimatedRentRunning)
-            Text(AppCopy.estimateExplanation)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            } trailing: {
+                Text(accruing.count == 1 ? "1 on rent" : "\(accruing.count) on rent")
+                    .font(Typography.micro.weight(.medium))
+                    .foregroundStyle(Palette.onGraphite)
+                    .padding(.horizontal, Space.snug + 2)
+                    .padding(.vertical, Space.tight + 1)
+                    .background(Palette.onGraphite.opacity(0.14), in: Capsule())
+            }
+
             if incompleteEstimateCount > 0 {
-                Label(
-                    incompleteEstimateCount == 1
-                        ? "1 rental has no confirmed rate, so it is not included."
-                        : "\(incompleteEstimateCount) rentals have no confirmed rate, so they are not included.",
-                    systemImage: "exclamationmark.triangle"
+                InlineAlert(
+                    message: incompleteEstimateCount == 1
+                        ? "1 rental has no confirmed rate, so it is not included above."
+                        : "\(incompleteEstimateCount) rentals have no confirmed rate, so they are not included above."
                 )
-                .font(.caption)
-                .foregroundStyle(Palette.attention)
+            }
+
+            HStack(spacing: Space.snug) {
+                MetricTile(
+                    value: "\(actionQueue.count)", label: "To call",
+                    symbol: "phone.arrow.up.right", tint: Palette.attention,
+                    identifier: "metric.needACall"
+                )
+                MetricTile(
+                    value: "\(awaitingPickup.count)", label: "To collect",
+                    symbol: "truck.box", tint: Palette.waiting,
+                    identifier: "metric.awaitingPickup"
+                )
+                MetricTile(
+                    value: "\(invoicesToReview.count)", label: "To review",
+                    symbol: "doc.text.magnifyingglass", tint: Palette.review,
+                    identifier: "metric.toReview"
+                )
             }
         }
-        .offRentCard()
     }
 
+    private var summaryAccessibilityLabel: String {
+        guard !accruing.isEmpty || totalRunning != 0 else {
+            return "Estimated rent running, nothing is accruing right now."
+        }
+        return "Estimated rent running, \(Formatters.currencyAccessible(totalRunning)). "
+            + AppCopy.estimateQualifier
+    }
+
+    // MARK: - Sections
+
     private var upcomingRateChangesSection: some View {
-        VStack(alignment: .leading, spacing: Layout.itemSpacing) {
-            SectionHeader(
-                title: "Upcoming rate changes",
-                subtitle: "Within 48 hours, based on the dates you confirmed.",
-                count: upcomingRateChanges.count
-            )
-            ForEach(upcomingRateChanges, id: \.item.id) { entry in
+        section(
+            title: "Upcoming rate changes",
+            subtitle: "Within 48 hours, based on the dates you confirmed.",
+            count: upcomingRateChanges.count
+        ) {
+            ForEach(Array(upcomingRateChanges.enumerated()), id: \.element.item.id) { index, entry in
                 NavigationLink(value: RentalDestination.item(id: entry.item.id)) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(entry.item.equipmentName).font(.subheadline.weight(.medium))
+                    HStack(alignment: .top, spacing: Space.base) {
+                        RowIcon(symbol: "chart.line.uptrend.xyaxis", tint: Palette.accent)
+                        VStack(alignment: .leading, spacing: Space.tight) {
+                            Text(entry.item.equipmentName).font(Typography.rowTitle)
                             Text(
                                 "\(Formatters.shortWeekdayDate(entry.date)) · "
                                     + Formatters.relative(entry.date, from: dependencies.clock.now)
                             )
-                            .font(.caption)
+                            .font(Typography.rowDetail)
                             .foregroundStyle(.secondary)
                         }
-                        Spacer(minLength: 8)
+                        Spacer(minLength: Space.snug)
                         if let increment = entry.increment {
-                            EstimateLabel(amount: increment, size: .small)
+                            VStack(alignment: .trailing, spacing: 0) {
+                                Text("+" + Formatters.currency(increment))
+                                    .font(Typography.rowTitle)
+                                    .monospacedDigit()
+                                    .foregroundStyle(Palette.accent)
+                                Text("expected")
+                                    .font(Typography.micro)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
+                        chevron
                     }
-                    .offRentCard(padding: 12)
+                    .padding(.horizontal, Space.comfortable)
+                    .padding(.vertical, Space.base)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .minimumTapTarget()
+                if index < upcomingRateChanges.count - 1 { RowDivider() }
             }
         }
         .accessibilityIdentifier(A11yID.Today.upcomingRateChanges)
     }
 
     private var actionQueueSection: some View {
-        VStack(alignment: .leading, spacing: Layout.itemSpacing) {
-            SectionHeader(
-                title: "Contact vendor",
-                subtitle: AppCopy.offRentDisclosureShort,
-                count: actionQueue.count
-            )
-            ForEach(actionQueue, id: \.id) { item in
-                itemRow(item, trailing: "Needs a confirmation number")
-            }
+        section(
+            title: "Contact vendor",
+            subtitle: AppCopy.offRentDisclosureShort,
+            count: actionQueue.count
+        ) {
+            rows(actionQueue)
         }
         .accessibilityIdentifier(A11yID.Today.actionQueue)
     }
 
     private var awaitingPickupSection: some View {
-        VStack(alignment: .leading, spacing: Layout.itemSpacing) {
-            SectionHeader(
-                title: "Awaiting pickup",
-                subtitle: "Off-rent recorded. Still on the jobsite.",
-                count: awaitingPickup.count
-            )
-            ForEach(awaitingPickup, id: \.id) { item in
-                itemRow(item, trailing: "Record pickup when it leaves")
-            }
+        section(
+            title: "Awaiting pickup",
+            subtitle: "Off-rent recorded. Still on the jobsite.",
+            count: awaitingPickup.count
+        ) {
+            rows(awaitingPickup)
         }
     }
 
     private var invoicesSection: some View {
-        VStack(alignment: .leading, spacing: Layout.itemSpacing) {
-            SectionHeader(
-                title: "Invoices to review",
-                subtitle: "Compare against the terms you confirmed.",
-                count: invoicesToReview.count
-            )
-            ForEach(invoicesToReview, id: \.id) { invoice in
+        section(
+            title: "Invoices to review",
+            subtitle: "Compare against the terms you confirmed.",
+            count: invoicesToReview.count
+        ) {
+            ForEach(Array(invoicesToReview.enumerated()), id: \.element.id) { index, invoice in
                 NavigationLink(value: AuditDestination.invoice(id: invoice.id)) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .top, spacing: Space.base) {
+                        RowIcon(symbol: "doc.text.magnifyingglass", tint: Palette.review)
+                        VStack(alignment: .leading, spacing: Space.tight) {
                             Text(invoice.invoiceNumber ?? "Invoice")
-                                .font(.subheadline.weight(.medium))
+                                .font(Typography.rowTitle)
                             Text(invoice.agreement?.vendor?.name ?? "Unknown vendor")
-                                .font(.caption)
+                                .font(Typography.rowDetail)
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer(minLength: 8)
+                        Spacer(minLength: Space.snug)
                         Text(Formatters.currency(invoice.invoiceTotal))
-                            .font(.subheadline)
+                            .font(Typography.rowTitle)
                             .monospacedDigit()
+                        chevron
                     }
-                    .offRentCard(padding: 12)
+                    .padding(.horizontal, Space.comfortable)
+                    .padding(.vertical, Space.base)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .minimumTapTarget()
+                if index < invoicesToReview.count - 1 { RowDivider() }
             }
         }
     }
 
-    private func itemRow(_ item: RentalItem, trailing: String) -> some View {
-        NavigationLink(value: RentalDestination.item(id: item.id)) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.equipmentName).font(.subheadline.weight(.medium))
-                    Text(item.agreement?.vendor?.name ?? "Unknown vendor")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(trailing).font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 8)
-                StatusChip(status: item.status, compact: true)
-            }
-            .offRentCard(padding: 12)
+    // MARK: - Row plumbing
+
+    private var chevron: some View {
+        Image(systemName: "chevron.right")
+            .font(Typography.micro.weight(.semibold))
+            .foregroundStyle(.tertiary)
+            .padding(.top, 3)
+            .accessibilityHidden(true)
+    }
+
+    private func section(
+        title: String, subtitle: String?, count: Int,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
+        VStack(alignment: .leading, spacing: Space.base) {
+            SectionHeader(title: title, subtitle: subtitle, count: count)
+            ListGroup { content() }
         }
-        .buttonStyle(.plain)
-        .minimumTapTarget()
+    }
+
+    /// Rows inside a section that is already grouped by status.
+    ///
+    /// No chip and no "needs a confirmation number" note: the section header above says both,
+    /// and repeating them cost a third of the row's width and pushed the equipment name onto
+    /// three wrapped lines at 393pt.
+    @ViewBuilder
+    private func rows(_ items: [RentalItem]) -> some View {
+        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+            NavigationLink(value: RentalDestination.item(id: item.id)) {
+                RentalRow(
+                    title: item.equipmentName,
+                    reference: item.vendorEquipmentIdentifier,
+                    vendor: item.agreement?.vendor?.name,
+                    status: item.status,
+                    amount: item.cachedEstimatedRunningCost,
+                    amountIsComplete: item.cachedEstimateIsComplete,
+                    showsStatus: false
+                )
+            }
+            .buttonStyle(.plain)
+            .minimumTapTarget()
+            if index < items.count - 1 { RowDivider() }
+        }
     }
 
     // MARK: - Derived

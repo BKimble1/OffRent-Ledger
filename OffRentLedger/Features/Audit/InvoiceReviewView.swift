@@ -55,18 +55,24 @@ struct InvoiceReviewView: View {
     }
 
     var body: some View {
-        List {
-            if let comparison {
-                varianceSection(comparison)
-                comparisonSection(comparison)
-                if !comparison.reviewFlags.isEmpty { reviewFlagsSection(comparison) }
-                if !comparison.findings.isEmpty { findingsSection(comparison) }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: Space.section) {
+                if let comparison {
+                    varianceSection(comparison)
+                    comparisonSection(comparison)
+                    if !comparison.reviewFlags.isEmpty { reviewFlagsSection(comparison) }
+                    if !comparison.findings.isEmpty { findingsSection(comparison) }
+                }
+                linesSection
+                recordedFindingsSection
+                openRentalLink
             }
-            linesSection
-            recordedFindingsSection
-            actionsSection
+            .padding(.horizontal, Space.comfortable)
+            .padding(.top, Space.screenTop)
+            .padding(.bottom, Space.screenBottom)
         }
-        .listStyle(.insetGrouped)
+        .offRentScreen()
+        .safeAreaInset(edge: .bottom) { acceptBar }
         .navigationTitle(invoice?.invoiceNumber ?? "Invoice")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingFollowUp) { followUpSheet }
@@ -90,199 +96,252 @@ struct InvoiceReviewView: View {
 
     // MARK: - Sections
 
+    /// The answer, first, and the qualification with it.
     private func varianceSection(_ comparison: InvoiceComparison) -> some View {
-        Section {
-            EstimateLabel(amount: comparison.possibleVariance)
-                .accessibilityIdentifier(A11yID.Audit.possibleVariance)
+        VStack(alignment: .leading, spacing: Space.base) {
+            VariancePanel(
+                expected: comparison.expectedRentalSubtotal,
+                invoiced: comparison.invoicedRentalSubtotal,
+                variance: comparison.possibleVariance,
+                isMatch: comparison.possibleVariance == .zero && comparison.findings.isEmpty,
+                identifier: A11yID.Audit.possibleVariance
+            )
             if comparison.possibleVariance == .zero, comparison.findings.isEmpty {
-                Label(
-                    "This invoice matches the terms you confirmed.",
-                    systemImage: "checkmark.circle"
+                InlineAlert(
+                    message: "This invoice matches the terms you confirmed.",
+                    kind: .positive
                 )
-                .font(.footnote)
-                .foregroundStyle(Palette.settled)
             }
-        } header: {
-            Text("Possible variance")
-        } footer: {
             Text(AppCopy.possibleMismatchExplanation)
+                .font(Typography.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, Space.tight)
         }
     }
 
     private func comparisonSection(_ comparison: InvoiceComparison) -> some View {
-        Section {
+        section(title: "Side by side", subtitle: comparison.expectationBasis) {
             DetailRow(
                 label: "Expected rental amount",
                 value: comparison.expectedRentalSubtotal.map(Formatters.currency) ?? "Not available"
             )
+            RowDivider(inset: Space.comfortable)
             DetailRow(
                 label: "Invoiced rental amount",
                 value: Formatters.currency(comparison.invoicedRentalSubtotal)
             )
+            RowDivider(inset: Space.comfortable)
             DetailRow(label: "Invoice total", value: Formatters.currency(comparison.invoiceTotal))
+            RowDivider(inset: Space.comfortable)
             DetailRow(label: "Sum of the lines", value: Formatters.currency(comparison.lineSum))
             if let through = comparison.expectedBilledThroughDate {
+                RowDivider(inset: Space.comfortable)
                 DetailRow(label: "Expected billed through", value: Formatters.mediumDate(through))
             }
             if let invoice, let billedThrough = invoice.billedThroughDate {
+                RowDivider(inset: Space.comfortable)
                 DetailRow(
                     label: "Invoice billed through",
                     value: Formatters.mediumDate(billedThrough)
                 )
             }
-            Text(comparison.expectationBasis)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        } header: {
-            Text("Side by side")
         }
         .accessibilityIdentifier(A11yID.Audit.comparisonTable)
     }
 
     private func reviewFlagsSection(_ comparison: InvoiceComparison) -> some View {
-        Section {
-            ForEach(comparison.reviewFlags) { flag in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(flag.category.displayName).font(.subheadline.weight(.medium))
-                        Spacer()
-                        Text(Formatters.currency(flag.amount)).monospacedDigit()
-                    }
-                    Text(flag.prompt).font(.caption).foregroundStyle(.secondary)
-                    HStack(spacing: 12) {
-                        Button("Accept") { setLineState(flag.lineID, to: .accepted) }
-                            .buttonStyle(.bordered)
-                            .minimumTapTarget()
-                        Button("Question") { setLineState(flag.lineID, to: .questioned) }
-                            .buttonStyle(.bordered)
-                            .minimumTapTarget()
-                    }
-                }
-                .padding(.vertical, 2)
-                .accessibilityIdentifier(A11yID.Audit.line(flag.lineID))
-            }
-        } header: {
-            Text(AppCopy.reviewThisCharge)
-        } footer: {
-            Text("""
+        section(
+            title: AppCopy.reviewThisCharge,
+            subtitle: """
                 \(AppConfiguration.displayName) has no basis to have an opinion about these \
                 charges, so it is not calling them mismatches. Work through them and mark each one.
-                """)
+                """
+        ) {
+            ForEach(Array(comparison.reviewFlags.enumerated()), id: \.element.id) { index, flag in
+                VStack(alignment: .leading, spacing: Space.snug) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(flag.category.displayName).font(Typography.rowTitle)
+                        Spacer(minLength: Space.snug)
+                        Text(Formatters.currency(flag.amount))
+                            .font(Typography.rowTitle)
+                            .monospacedDigit()
+                    }
+                    Text(flag.prompt)
+                        .font(Typography.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: Space.snug) {
+                        Button("Accept") { setLineState(flag.lineID, to: .accepted) }
+                            .buttonStyle(.offRentSecondary)
+                        Button("Question") { setLineState(flag.lineID, to: .questioned) }
+                            .buttonStyle(.offRentSecondary)
+                    }
+                }
+                .padding(.horizontal, Space.comfortable)
+                .padding(.vertical, Space.base)
+                .accessibilityIdentifier(A11yID.Audit.line(flag.lineID))
+                if index < comparison.reviewFlags.count - 1 { RowDivider(inset: Space.comfortable) }
+            }
         }
     }
 
     private func findingsSection(_ comparison: InvoiceComparison) -> some View {
-        Section("Possible mismatches found") {
-            ForEach(comparison.findings) { finding in
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(finding.type.displayName).font(.subheadline.weight(.medium))
+        section(title: "Possible mismatches found") {
+            ForEach(Array(comparison.findings.enumerated()), id: \.element.id) { index, finding in
+                VStack(alignment: .leading, spacing: Space.snug) {
+                    Text(finding.type.displayName).font(Typography.rowTitle)
                     if let expected = finding.expectedAmount, let invoiced = finding.invoicedAmount {
                         HStack {
                             Text("Expected \(Formatters.currency(expected))")
-                            Spacer()
+                            Spacer(minLength: Space.snug)
                             Text("Invoiced \(Formatters.currency(invoiced))")
                         }
-                        .font(.caption)
+                        .font(Typography.caption)
                         .monospacedDigit()
+                        .foregroundStyle(.secondary)
                     }
                     Text(finding.explanation)
-                        .font(.caption)
+                        .font(Typography.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 12) {
+                    HStack(spacing: Space.snug) {
                         Button("Accept this") { accept(finding) }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.offRentSecondary)
                             .accessibilityIdentifier(A11yID.Audit.acceptMismatch)
-                            .minimumTapTarget()
                         Button("Record a follow-up") { showingFollowUp = true }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.offRentSecondary)
                             .accessibilityIdentifier(A11yID.Audit.recordFollowUp)
-                            .minimumTapTarget()
                     }
                 }
-                .padding(.vertical, 2)
+                .padding(.horizontal, Space.comfortable)
+                .padding(.vertical, Space.base)
+                if index < comparison.findings.count - 1 { RowDivider(inset: Space.comfortable) }
             }
         }
     }
 
     private var linesSection: some View {
-        Section("Lines you entered") {
+        section(title: "Lines you entered") {
             if let invoice, let lines = invoice.lines, !lines.isEmpty {
-                ForEach(lines.sorted(by: { $0.sortIndex < $1.sortIndex }), id: \.id) { line in
-                    HStack {
+                let sorted: [InvoiceLine] = lines.sorted(by: { $0.sortIndex < $1.sortIndex })
+                ForEach(Array(sorted.enumerated()), id: \.element.id) { index, line in
+                    HStack(alignment: .top, spacing: Space.base) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(line.category.displayName).font(.subheadline)
+                            Text(line.category.displayName).font(Typography.rowTitle)
                             if !line.detail.isEmpty {
-                                Text(line.detail).font(.caption).foregroundStyle(.secondary)
+                                Text(line.detail)
+                                    .font(Typography.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                             if line.reviewState != .unreviewed {
                                 Text(line.reviewState.displayName)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .font(Typography.micro.weight(.semibold))
+                                    .foregroundStyle(Palette.review)
                             }
                         }
-                        Spacer()
-                        Text(Formatters.currency(line.amount)).monospacedDigit()
+                        Spacer(minLength: Space.snug)
+                        Text(Formatters.currency(line.amount))
+                            .font(Typography.rowTitle)
+                            .monospacedDigit()
                     }
+                    .padding(.horizontal, Space.comfortable)
+                    .padding(.vertical, Space.base)
+                    if index < sorted.count - 1 { RowDivider(inset: Space.comfortable) }
                 }
             } else {
                 Text("No lines were entered for this invoice.")
-                    .font(.footnote)
+                    .font(Typography.rowDetail)
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Space.comfortable)
+                    .padding(.vertical, Space.base)
             }
         }
     }
 
+    @ViewBuilder
     private var recordedFindingsSection: some View {
-        Group {
-            if let invoice, let recorded = invoice.discrepancies, !recorded.isEmpty {
-                Section("Recorded follow-ups") {
-                    ForEach(recorded, id: \.id) { discrepancy in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(discrepancy.type.displayName).font(.subheadline)
-                                Spacer()
-                                Text(discrepancy.status.displayName)
-                                    .font(.caption)
-                                    .foregroundStyle(discrepancy.status.isOpen ? Palette.attention : .secondary)
-                            }
-                            if let difference = discrepancy.difference {
-                                Text("Difference \(Formatters.currency(difference))")
-                                    .font(.caption)
-                                    .monospacedDigit()
-                            }
-                            if let notes = discrepancy.resolutionNotes, !notes.isEmpty {
-                                Text(notes).font(.caption).foregroundStyle(.secondary)
-                            }
-                            if discrepancy.status.isOpen {
-                                Button("Mark resolved") { resolve(discrepancy) }
-                                    .buttonStyle(.bordered)
-                                    .minimumTapTarget()
-                            }
+        if let invoice, let recorded = invoice.discrepancies, !recorded.isEmpty {
+            section(title: "Recorded follow-ups") {
+                ForEach(Array(recorded.enumerated()), id: \.element.id) { index, discrepancy in
+                    VStack(alignment: .leading, spacing: Space.snug) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(discrepancy.type.displayName).font(Typography.rowTitle)
+                            Spacer(minLength: Space.snug)
+                            Text(discrepancy.status.displayName)
+                                .font(Typography.caption.weight(.semibold))
+                                .foregroundStyle(
+                                    discrepancy.status.isOpen ? Palette.attention : .secondary
+                                )
                         }
-                        .padding(.vertical, 2)
+                        if let difference = discrepancy.difference {
+                            Text("Difference \(Formatters.currency(difference))")
+                                .font(Typography.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        if let notes = discrepancy.resolutionNotes, !notes.isEmpty {
+                            Text(notes)
+                                .font(Typography.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if discrepancy.status.isOpen {
+                            Button("Mark resolved") { resolve(discrepancy) }
+                                .buttonStyle(.offRentSecondary)
+                                .padding(.top, Space.tight)
+                        }
                     }
+                    .padding(.horizontal, Space.comfortable)
+                    .padding(.vertical, Space.base)
+                    if index < recorded.count - 1 { RowDivider(inset: Space.comfortable) }
                 }
-                .accessibilityIdentifier(A11yID.Audit.followUps)
+            }
+            .accessibilityIdentifier(A11yID.Audit.followUps)
+        }
+    }
+
+    @ViewBuilder
+    private var openRentalLink: some View {
+        if let item {
+            ListGroup {
+                NavigationLink(value: RentalDestination.item(id: item.id)) {
+                    NavigationRow(title: "Open the rental", symbol: "shippingbox")
+                }
+                .buttonStyle(.plain)
+                .minimumTapTarget()
             }
         }
     }
 
-    private var actionsSection: some View {
-        Section {
-            Button("Accept this invoice") { acceptInvoice() }
-                .accessibilityIdentifier(A11yID.Audit.resolveInvoice)
-                .minimumTapTarget()
-            if let item {
-                NavigationLink("Open the rental", value: RentalDestination.item(id: item.id))
-                    .minimumTapTarget()
+    /// The one decision this screen exists to let somebody make, kept in reach of the thumb.
+    private var acceptBar: some View {
+        StickyActionBar {
+            VStack(spacing: Space.snug) {
+                Button("Accept this invoice") { acceptInvoice() }
+                    .buttonStyle(.offRentPrimary)
+                    .accessibilityIdentifier(A11yID.Audit.resolveInvoice)
+                Text("""
+                    Accepting records that you looked at this invoice and were satisfied. It does \
+                    not pay anything and does not tell the vendor anything.
+                    """)
+                    .font(Typography.micro)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-        } footer: {
-            Text("""
-                Accepting records that you looked at this invoice and were satisfied. It does not \
-                pay anything and does not tell the vendor anything.
-                """)
+        }
+    }
+
+    private func section(
+        title: String, subtitle: String? = nil,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
+        VStack(alignment: .leading, spacing: Space.base) {
+            SectionHeader(title: title, subtitle: subtitle)
+            ListGroup { content() }
         }
     }
 
@@ -300,6 +359,7 @@ struct InvoiceReviewView: View {
                         """)
                 }
             }
+            .offRentFormBackground()
             .navigationTitle("Record a follow-up")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -39,6 +39,9 @@ struct EvidenceExportSheet: View {
                                 router.presentedSheet = .paywall(reason: reason)
                             }
                         )
+                        // The row carries its own padding so it can sit in a `ListGroup` on
+                        // Audit; inside a `Form` the section would add a second set.
+                        .listRowInsets(EdgeInsets())
                     }
                 }
 
@@ -126,6 +129,7 @@ struct EvidenceExportSheet: View {
                     }
                 }
             }
+            .offRentFormBackground()
             .navigationTitle("Evidence packet")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -52,6 +52,28 @@ enum RentalItemStatus: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// The same state, short enough to sit in a list row beside a note and an amount.
+    ///
+    /// Added because "Confirmation Recorded" is 21 characters: at 393pt it took a third of the
+    /// row and pushed the equipment name onto a second line. Never used on its own — the full
+    /// `displayName` remains the accessibility label and the detail-screen wording, so nothing
+    /// is only ever described by the abbreviation.
+    var shortName: String {
+        switch self {
+        case .draft: "Draft"
+        case .active: "Active"
+        case .contactVendor: "To call"
+        case .confirmationRecorded: "Confirmed"
+        case .awaitingPickup: "Pickup due"
+        case .pickedUp: "Picked up"
+        case .awaitingInvoice: "Invoice due"
+        case .invoiceReview: "Review"
+        case .needsFollowUp: "Follow-up"
+        case .resolved: "Resolved"
+        case .archived: "Archived"
+        }
+    }
+
     /// A one-line explanation of what the user is waiting on. Used as the VoiceOver hint and as
     /// the subtitle in list rows, so status is never conveyed by colour alone.
     var explanation: String {

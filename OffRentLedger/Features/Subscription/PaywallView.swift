@@ -29,19 +29,23 @@ struct PaywallView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: Space.roomy) {
                     header
                     entitlementStatus
                     featureList
                     reassurance
                     productList
-                    purchaseButton
                     secondaryActions
                     terms
                 }
-                .padding()
+                .padding(.horizontal, Space.comfortable)
+                .padding(.top, Space.comfortable)
+                .padding(.bottom, Space.screenBottom)
             }
-            .background(Palette.groupedBackground)
+            .offRentScreen()
+            // Subscribe stays in reach: the plans are two thirds of the way down a screen that
+            // scrolls, and a purchase button below the terms is a purchase button nobody finds.
+            .safeAreaInset(edge: .bottom) { purchaseBar }
             .navigationTitle("\(AppConfiguration.displayName) Pro")
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier(A11yID.Paywall.root)
@@ -68,21 +72,29 @@ struct PaywallView: View {
 
     // MARK: - Sections
 
+    /// The one graphite panel on the screen, carrying why the user is looking at it.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Space.snug) {
+            Text("\(AppConfiguration.displayName) Pro")
+                .font(Typography.micro.weight(.semibold))
+                .textCase(.uppercase)
+                .tracking(0.8)
+                .foregroundStyle(Palette.accent)
             Text(reason.headline)
                 .font(.title2.weight(.semibold))
+                .foregroundStyle(Palette.onGraphite)
                 .fixedSize(horizontal: false, vertical: true)
             if reason == .openItemLimit {
                 Text("""
                     The free plan tracks one open rental at a time. Resolve or archive the one you \
                     have, or subscribe for unlimited open rentals.
                     """)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(Typography.rowDetail)
+                .foregroundStyle(Palette.onGraphiteSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .offRentPanel()
     }
 
     @ViewBuilder
@@ -109,16 +121,17 @@ struct PaywallView: View {
     }
 
     private var featureList: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Space.comfortable) {
             ForEach(ProFeature.allCases, id: \.self) { feature in
-                HStack(alignment: .top, spacing: 10) {
+                HStack(alignment: .top, spacing: Space.base) {
                     Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: Layout.symbolInline + 3))
                         .foregroundStyle(Palette.accent)
                         .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(feature.displayName).font(.subheadline.weight(.medium))
+                    VStack(alignment: .leading, spacing: Space.hair) {
+                        Text(feature.displayName).font(Typography.rowTitle)
                         Text(feature.explanation)
-                            .font(.caption)
+                            .font(Typography.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -197,12 +210,23 @@ struct PaywallView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: Space.snug)
                 Text(product.displayPrice)
                     .font(.headline)
                     .monospacedDigit()
             }
-            .offRentCard(padding: 14)
+            .padding(Space.comfortable - 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.raised, in: RoundedRectangle(cornerRadius: Radius.card))
+            // The selected plan gets a real border rather than only a filled radio dot. At arm's
+            // length in a truck the dot is four points of difference.
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.card)
+                    .strokeBorder(
+                        selectedProductID == product.id ? Palette.accent : Palette.hairline,
+                        lineWidth: selectedProductID == product.id ? 2 : Layout.hairline
+                    )
+            )
         }
         .buttonStyle(.plain)
         .minimumTapTarget()
@@ -212,26 +236,36 @@ struct PaywallView: View {
         .accessibilityAddTraits(selectedProductID == product.id ? [.isSelected, .isButton] : .isButton)
     }
 
-    private var purchaseButton: some View {
-        Button {
-            Task { await purchase() }
-        } label: {
-            HStack {
-                if isPurchasing { ProgressView().tint(.white) }
-                Text(isPurchasing ? "Working…" : "Subscribe")
-                    .frame(maxWidth: .infinity)
+    private var purchaseBar: some View {
+        StickyActionBar {
+            VStack(spacing: Space.snug) {
+                Button {
+                    Task { await purchase() }
+                } label: {
+                    HStack(spacing: Space.snug) {
+                        if isPurchasing { ProgressView().tint(Palette.onAccent) }
+                        Text(isPurchasing ? "Working…" : "Subscribe")
+                    }
+                }
+                // `.borderedProminent` painted white on the accent orange: 2.4:1, which fails at
+                // any size. The house style puts graphite on orange at 7.4:1.
+                .buttonStyle(.offRentPrimary)
+                .accessibilityIdentifier(A11yID.Paywall.purchase)
+                // Nothing is preselected, so this stays disabled until the user chooses. A
+                // default selection on a purchase button is a nudge toward a charge they did
+                // not pick.
+                .disabled(selectedProductID == nil || isPurchasing)
+                if selectedProductID == nil {
+                    Text("Choose a plan above.")
+                        .font(Typography.micro)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .accessibilityIdentifier(A11yID.Paywall.purchase)
-        // Nothing is preselected, so this stays disabled until the user chooses. A default
-        // selection on a purchase button is a nudge toward a charge they did not pick.
-        .disabled(selectedProductID == nil || isPurchasing)
     }
 
     private var secondaryActions: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Space.base) {
             Button("Restore purchases") {
                 Task {
                     await service.restore()

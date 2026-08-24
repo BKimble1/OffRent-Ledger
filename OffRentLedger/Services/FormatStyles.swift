@@ -44,6 +44,11 @@ enum Formatters {
         date.formatted(.dateTime.month(.abbreviated).day().year().hour().minute())
     }
 
+    /// `Fri`
+    static func weekday(_ date: Date) -> String {
+        date.formatted(.dateTime.weekday(.abbreviated))
+    }
+
     /// `Mon, May 11`
     static func shortWeekdayDate(_ date: Date) -> String {
         date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())

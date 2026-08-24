@@ -221,6 +221,29 @@ final class StatusTransitionTests: XCTestCase {
         XCTAssertEqual(explanations.count, RentalItemStatus.allCases.count)
     }
 
+    func testShortNamesAreDistinctAndFitInAListRow() {
+        // The list row abbreviates the status. Two states sharing an abbreviation would make the
+        // Rentals screen lie about which one a rental is in, and a long one takes the width back
+        // off the equipment name — which is the reason the short form exists at all.
+        let short = RentalItemStatus.allCases.map(\.shortName)
+        XCTAssertEqual(Set(short).count, RentalItemStatus.allCases.count, "short names collide")
+        for status in RentalItemStatus.allCases {
+            XCTAssertFalse(status.shortName.isEmpty, "\(status) has no short name")
+            XCTAssertLessThanOrEqual(
+                status.shortName.count, 12,
+                "\(status).shortName is \(status.shortName.count) characters; the row has room "
+                    + "for about twelve"
+            )
+        }
+    }
+
+    func testShortNamesDoNotClaimTheAppActed() {
+        let text = RentalItemStatus.allCases.map(\.shortName).joined(separator: " ").lowercased()
+        for phrase in ["ended", "notified", "cancelled", "terminated"] {
+            XCTAssertFalse(text.contains(phrase), "banned phrase in short status name: \(phrase)")
+        }
+    }
+
     func testNoStatusOrEventLabelClaimsTheAppActed() {
         // Belt and braces alongside verify_repository.py: the vocabulary itself must not imply
         // the app ended a rental or contacted anyone.

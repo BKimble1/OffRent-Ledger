@@ -44,6 +44,8 @@ struct RecordConfirmationSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                if let item { Section { subjectRow(item) } }
+
                 Section {
                     OffRentDisclosureBanner(identifier: A11yID.Confirmation.disclosure)
                         .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
@@ -129,6 +131,8 @@ struct RecordConfirmationSheet: View {
                     }
                 }
             }
+            .offRentFormBackground()
+            .safeAreaInset(edge: .bottom) { saveBar }
             .navigationTitle("Vendor confirmation")
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier(A11yID.Confirmation.root)
@@ -136,15 +140,55 @@ struct RecordConfirmationSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
-                        .accessibilityIdentifier(A11yID.Confirmation.save)
-                        // Disabled rather than failing on tap: the one thing that must never
-                        // happen here is a confirmation saved without the user affirming it.
-                        .disabled(!canSave)
-                }
             }
             .onAppear { confirmedAt = dependencies.clock.now }
+        }
+    }
+
+    /// Which machine this is about.
+    ///
+    /// The sheet used to open onto "Confirmation number" with nothing naming the rental. On a
+    /// jobsite with four machines from the same yard, that is one wrong record away from useless.
+    private func subjectRow(_ item: RentalItem) -> some View {
+        HStack(spacing: Space.base) {
+            RowIcon(symbol: item.status.symbolName, tint: Palette.tint(for: item.status))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.equipmentName).font(Typography.rowTitle)
+                if let subtitle = subjectSubtitle(item) {
+                    Text(subtitle).font(Typography.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func subjectSubtitle(_ item: RentalItem) -> String? {
+        let parts: [String?] = [item.vendorEquipmentIdentifier, item.agreement?.vendor?.name]
+        let joined: String = parts.compactMap { $0 }.joined(separator: " · ")
+        return joined.isEmpty ? nil : joined
+    }
+
+    /// Save, with the reason it is unavailable when it is.
+    ///
+    /// Disabled rather than failing on tap: the one thing that must never happen here is a
+    /// confirmation saved without the user affirming it. A disabled button that does not say why
+    /// is its own problem, so the bar carries the sentence.
+    private var saveBar: some View {
+        StickyActionBar {
+            VStack(spacing: Space.snug) {
+                Button("Save confirmation", action: save)
+                    .buttonStyle(.offRentPrimary)
+                    .accessibilityIdentifier(A11yID.Confirmation.save)
+                    .disabled(!canSave)
+                if !canSave {
+                    Text("Tick \"\(AppCopy.confirmationAffirmation)\" above to save.")
+                        .font(Typography.micro)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
     }
 

@@ -24,63 +24,91 @@ struct ContactVendorActions: View {
     private var vendor: Vendor? { item.agreement?.vendor }
 
     var body: some View {
-        Group {
+        // One grouped surface rather than a column of loose buttons. These four are the same
+        // kind of thing — a handoff the user drives — so they read as a list of ways to reach
+        // the vendor, not as four unrelated controls.
+        ListGroup {
             if let phone = vendor?.phone, let url = telURL(phone) {
-                Button {
+                ActionRow(
+                    title: "Call \(vendor?.name ?? "the rental company")",
+                    subtitle: phone,
+                    symbol: "phone",
+                    opensExternally: true
+                ) {
                     openURL(url)
                     // Opening the dialler is recorded as an *attempt*, because that is all the
                     // app can observe. Whether anybody answered is something only the user knows.
-                    recordAttempt(method: .phone, note: "Opened the dialler from \(AppConfiguration.displayName).")
-                } label: {
-                    Label("Call \(vendor?.name ?? "vendor")", systemImage: "phone")
+                    recordAttempt(
+                        method: .phone,
+                        note: "Opened the dialler from \(AppConfiguration.displayName)."
+                    )
                 }
                 .accessibilityIdentifier(A11yID.ContactVendor.call)
-                .minimumTapTarget()
+                RowDivider()
             }
 
             if let email = vendor?.email, let url = mailtoURL(email) {
-                Button {
+                ActionRow(
+                    title: "Email the rental company",
+                    subtitle: "Opens a draft asking for a confirmation number",
+                    symbol: "envelope",
+                    opensExternally: true
+                ) {
                     openURL(url)
-                    recordAttempt(method: .email, note: "Opened an email draft from \(AppConfiguration.displayName).")
-                } label: {
-                    Label("Email the rental company", systemImage: "envelope")
+                    recordAttempt(
+                        method: .email,
+                        note: "Opened an email draft from \(AppConfiguration.displayName)."
+                    )
                 }
                 .accessibilityIdentifier(A11yID.ContactVendor.email)
-                .minimumTapTarget()
+                RowDivider()
             }
 
             if let link = vendor?.link, let url = URL(string: link), url.scheme != nil {
-                Button {
+                ActionRow(
+                    title: "Open the vendor's site or app",
+                    symbol: "safari",
+                    opensExternally: true
+                ) {
                     openURL(url)
                     recordAttempt(method: .vendorWebsite, note: "Opened the vendor link.")
-                } label: {
-                    Label("Open the vendor's site or app", systemImage: "safari")
                 }
                 .accessibilityIdentifier(A11yID.ContactVendor.openLink)
-                .minimumTapTarget()
+                RowDivider()
             }
 
-            Button {
+            ActionRow(
+                title: "Record a contact attempt",
+                subtitle: "Adds a timeline entry. Does not change the status.",
+                symbol: "phone.arrow.up.right"
+            ) {
                 showingAttemptSheet = true
-            } label: {
-                Label("Record a contact attempt", systemImage: "phone.arrow.up.right")
             }
             .accessibilityIdentifier(A11yID.ContactVendor.logAttempt)
             .accessibilityHint("Adds a timeline entry. It does not change the status of this rental.")
-            .minimumTapTarget()
+            RowDivider()
 
-            Button {
+            ActionRow(
+                title: "Record the vendor's confirmation",
+                subtitle: "Once you have a confirmation number",
+                symbol: "checkmark.rectangle.stack"
+            ) {
                 router.presentedSheet = .recordConfirmation(itemID: item.id)
-            } label: {
-                Label("Record the vendor's confirmation", systemImage: "checkmark.rectangle.stack")
             }
             .accessibilityIdentifier(A11yID.ContactVendor.recordConfirmation)
-            .minimumTapTarget()
 
             if vendor?.phone == nil, vendor?.email == nil, vendor?.link == nil {
-                Text("No phone, email or link is saved for this rental company. Add one on the vendor's page to reach it from here.")
-                    .font(.footnote)
+                RowDivider()
+                Text("""
+                    No phone, email or link is saved for this rental company. Add one on the \
+                    vendor's page to reach it from here.
+                    """)
+                    .font(Typography.rowDetail)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Space.comfortable)
+                    .padding(.vertical, Space.base)
             }
         }
         .sheet(isPresented: $showingAttemptSheet) { attemptSheet }
@@ -105,6 +133,7 @@ struct ContactVendorActions: View {
                         """)
                 }
             }
+            .offRentFormBackground()
             .navigationTitle("Contact attempt")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

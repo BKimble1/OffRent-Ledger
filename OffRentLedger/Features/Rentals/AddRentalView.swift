@@ -71,6 +71,8 @@ struct AddRentalView: View {
                 rolloverSection
                 notesSection
             }
+            .offRentFormBackground()
+            .safeAreaInset(edge: .bottom) { saveBar }
             .navigationTitle("New rental")
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier(A11yID.AddRental.root)
@@ -78,11 +80,6 @@ struct AddRentalView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .accessibilityIdentifier(A11yID.AddRental.cancel)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
-                        .accessibilityIdentifier(A11yID.AddRental.save)
-                        .disabled(!canSave || isSaving)
                 }
             }
             .onAppear { deliveryDate = dependencies.clock.now }
@@ -132,6 +129,42 @@ struct AddRentalView: View {
             } message: {
                 Text((scanError ?? "") + "\n\nYou can still enter everything by hand.")
             }
+        }
+    }
+
+    /// Save, where the thumb is, on a form eight sections long.
+    ///
+    /// One primary action rather than a `Save` in the navigation bar: on this form the button is
+    /// forty points from the top and the last field is two thousand points from it, and a
+    /// disabled toolbar button gives no clue what is missing. This one says.
+    private var saveBar: some View {
+        StickyActionBar {
+            VStack(spacing: Space.snug) {
+                Button("Save rental", action: save)
+                    .buttonStyle(.offRentPrimary)
+                    .accessibilityIdentifier(A11yID.AddRental.save)
+                    .disabled(!canSave || isSaving)
+                if let missing = missingBeforeSave {
+                    Text(missing)
+                        .font(Typography.micro)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    /// What is still needed, named. `nil` once the form can be saved.
+    private var missingBeforeSave: String? {
+        let hasEquipment: Bool = !equipmentName.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasVendor: Bool = selectedVendorID != nil
+            || !newVendorName.trimmingCharacters(in: .whitespaces).isEmpty
+        switch (hasEquipment, hasVendor) {
+        case (true, true): return nil
+        case (false, true): return "Add the equipment name to save."
+        case (true, false): return "Add the rental company to save."
+        case (false, false): return "Add the equipment name and the rental company to save."
         }
     }
 

@@ -19,6 +19,7 @@ import json
 import pathlib
 import plistlib
 import re
+import shutil
 import subprocess
 import sys
 import xml.dom.minidom
@@ -186,6 +187,80 @@ def check_required_disclosure() -> None:
             continue
         if "OffRentDisclosureBanner" not in matches[0].read_text():
             fail("disclosure", f"{name} does not render OffRentDisclosureBanner")
+
+
+def check_every_swift_file_parses() -> None:
+    """Every Swift file in the repository is syntactically valid.
+
+    `swiftc -parse` runs the parser alone: it needs no SwiftUI, no SwiftData and no module map,
+    so it works on a Linux container with no Xcode. It does not type-check — that still needs a
+    real build — but it catches the whole class of failure that cost several CI rounds during
+    this project: an unbalanced brace, a malformed multi-line string literal, a `Section` written
+    with a modifier that does not exist as written.
+
+    Skipped, loudly, when no Swift toolchain is on PATH, so the check cannot silently pass.
+    """
+    check("Every Swift file parses")
+    swiftc = shutil.which("swiftc") or "/opt/swift/usr/bin/swiftc"
+    if not pathlib.Path(swiftc).exists():
+        print("    (no swiftc on this machine — parse check skipped)")
+        return
+    roots = ["OffRentLedger", "OffRentLedgerWidget", "OffRentShared",
+             "OffRentLedgerTests", "OffRentLedgerUITests", "Tests", "Tools"]
+    files: list[pathlib.Path] = []
+    for root in roots:
+        directory = ROOT / root
+        if directory.exists():
+            files.extend(sorted(directory.rglob("*.swift")))
+    for path in files:
+        result = subprocess.run(
+            [swiftc, "-parse", str(path)], capture_output=True, text=True, check=False
+        )
+        if result.returncode != 0 or result.stderr.strip():
+            first = (result.stderr.strip().splitlines() or ["unknown parse failure"])[0]
+            fail("swift-parse", f"{path.relative_to(ROOT)}: {first}")
+
+
+def check_no_duplicate_top_level_types() -> None:
+    """No two Swift files in a target may declare the same top-level type.
+
+    Added after a redesign introduced a generic `TimelineRow<Content>` in the shared component
+    file while a concrete `TimelineRow` already existed in the detail screen. Swift calls that an
+    invalid redeclaration and the whole target fails; without a macOS toolchain here, nothing else
+    in this repository would have caught it before Codemagic did.
+    """
+    check("No duplicate top-level type declarations")
+    pattern = re.compile(
+        r"^(?:public |internal |private |fileprivate |final |@[\w()]+\s+)*"
+        r"(?:struct|class|enum|actor|protocol)\s+([A-Z]\w*)",
+        re.MULTILINE,
+    )
+    # The app target compiles OffRentLedger + OffRentShared; the widget compiles
+    # OffRentLedgerWidget + OffRentShared. A name may repeat across app and widget, but not
+    # within either.
+    targets = {
+        "app": ["OffRentLedger", "OffRentShared"],
+        "widget": ["OffRentLedgerWidget", "OffRentShared"],
+        "tests": ["OffRentLedgerTests"],
+        "uitests": ["OffRentLedgerUITests"],
+    }
+    for target, roots in targets.items():
+        seen: dict[str, str] = {}
+        for root in roots:
+            for path in sorted((ROOT / root).rglob("*.swift")):
+                text = path.read_text(encoding="utf-8")
+                # Only top-level declarations: nested types are legal duplicates.
+                for match in pattern.finditer(text):
+                    if match.start() != 0 and text[match.start() - 1] != "\n":
+                        continue
+                    name = match.group(1)
+                    where = str(path.relative_to(ROOT))
+                    if name in seen and seen[name] != where:
+                        fail(
+                            "duplicate-type",
+                            f"{target}: '{name}' is declared in both {seen[name]} and {where}",
+                        )
+                    seen[name] = where
 
 
 def check_estimates_are_labelled() -> None:
@@ -1068,6 +1143,8 @@ def main() -> int:
         check_banned_phrases,
         check_end_rental_label,
         check_required_disclosure,
+        check_every_swift_file_parses,
+        check_no_duplicate_top_level_types,
         check_estimates_are_labelled,
         check_domain_is_portable,
         check_status_assignment_is_confined,

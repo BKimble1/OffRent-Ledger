@@ -116,6 +116,7 @@ struct DataAndPrivacyView: View {
                 privacyPoint("Location is asked for once, when you tap for it, and never in the background")
             }
         }
+        .offRentFormBackground()
         .navigationTitle("Data and privacy")
         .navigationBarTitleDisplayMode(.inline)
         .task { storageBytes = await dependencies.fileStore.totalBytesOnDisk() }
@@ -321,6 +322,7 @@ struct ImportPreviewView: View {
                     }
                 }
             }
+            .offRentFormBackground()
             .navigationTitle("Review this import")
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier(A11yID.Settings.importPreview)

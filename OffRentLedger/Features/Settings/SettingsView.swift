@@ -7,80 +7,123 @@ struct SettingsView: View {
     @Environment(AppRouter.self) private var router
 
     var body: some View {
-        List {
-            Section {
-                NavigationLink(value: SettingsDestination.subscription) {
-                    HStack {
-                        Label("Subscription", systemImage: "star.circle")
-                        Spacer()
-                        Text(dependencies.effectiveEntitlement.isPro ? "Pro" : "Free")
-                            .foregroundStyle(.secondary)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: Space.roomy) {
+                planPanel
+
+                ListGroup {
+                    settingsRow(
+                        .reminders, title: "Reminders", symbol: "bell",
+                        identifier: A11yID.Settings.reminders
+                    )
+                    RowDivider()
+                    settingsRow(
+                        .appearance, title: "Appearance", symbol: "textformat.size",
+                        identifier: A11yID.Settings.appearance
+                    )
+                    RowDivider()
+                    settingsRow(
+                        .dataAndPrivacy, title: "Data and privacy", symbol: "lock.shield",
+                        subtitle: "Everything stays on this iPhone",
+                        identifier: A11yID.Settings.dataAndPrivacy
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: Space.base) {
+                    SectionHeader(title: "Legal and support")
+                    ListGroup {
+                        settingsRow(
+                            .privacyPolicy, title: "Privacy Policy", symbol: "hand.raised",
+                            identifier: A11yID.Settings.privacyPolicy
+                        )
+                        RowDivider()
+                        settingsRow(
+                            .terms, title: "Terms of Use", symbol: "doc.text",
+                            identifier: A11yID.Settings.terms
+                        )
+                        RowDivider()
+                        settingsRow(
+                            .support, title: "Support", symbol: "questionmark.circle",
+                            identifier: A11yID.Settings.support
+                        )
+                        RowDivider()
+                        settingsRow(
+                            .about, title: "About", symbol: "info.circle",
+                            identifier: A11yID.Settings.about
+                        )
                     }
                 }
-                .accessibilityIdentifier(A11yID.Settings.subscription)
-                .minimumTapTarget()
-            }
 
-            Section {
-                NavigationLink(value: SettingsDestination.reminders) {
-                    Label("Reminders", systemImage: "bell")
-                }
-                .accessibilityIdentifier(A11yID.Settings.reminders)
-                .minimumTapTarget()
-
-                NavigationLink(value: SettingsDestination.appearance) {
-                    Label("Appearance", systemImage: "textformat.size")
-                }
-                .accessibilityIdentifier(A11yID.Settings.appearance)
-                .minimumTapTarget()
-
-                NavigationLink(value: SettingsDestination.dataAndPrivacy) {
-                    Label("Data and privacy", systemImage: "lock.shield")
-                }
-                .accessibilityIdentifier(A11yID.Settings.dataAndPrivacy)
-                .minimumTapTarget()
-            }
-
-            Section {
-                NavigationLink(value: SettingsDestination.privacyPolicy) {
-                    Label("Privacy Policy", systemImage: "hand.raised")
-                }
-                .accessibilityIdentifier(A11yID.Settings.privacyPolicy)
-                .minimumTapTarget()
-
-                NavigationLink(value: SettingsDestination.terms) {
-                    Label("Terms of Use", systemImage: "doc.text")
-                }
-                .accessibilityIdentifier(A11yID.Settings.terms)
-                .minimumTapTarget()
-
-                NavigationLink(value: SettingsDestination.support) {
-                    Label("Support", systemImage: "questionmark.circle")
-                }
-                .accessibilityIdentifier(A11yID.Settings.support)
-                .minimumTapTarget()
-            } header: {
-                Text("Legal and support")
-            }
-
-            Section {
-                NavigationLink(value: SettingsDestination.about) {
-                    Label("About", systemImage: "info.circle")
-                }
-                .accessibilityIdentifier(A11yID.Settings.about)
-                .minimumTapTarget()
-            } footer: {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Space.hair) {
                     Text("\(AppConfiguration.displayName) \(AppConfiguration.versionAndBuild)")
                         .accessibilityIdentifier(A11yID.Settings.versionLabel)
                     Text(AppConfiguration.poweredByLine)
                 }
-                .font(.caption)
+                .font(Typography.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Space.tight)
             }
+            .padding(.horizontal, Space.comfortable)
+            .padding(.top, Space.screenTop)
+            .padding(.bottom, Space.screenBottom)
         }
+        .offRentScreen()
         .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.large)
         .accessibilityIdentifier(A11yID.Settings.root)
         .offRentNavigationDestinations()
+    }
+
+    /// The plan, stated rather than tucked into a trailing grey word on a list row.
+    private var planPanel: some View {
+        let isPro: Bool = dependencies.effectiveEntitlement.isPro
+        return NavigationLink(value: SettingsDestination.subscription) {
+            VStack(alignment: .leading, spacing: Space.base) {
+                Text("Your plan")
+                    .font(Typography.micro.weight(.semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+                    .foregroundStyle(Palette.onGraphiteSecondary)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(isPro ? "\(AppConfiguration.displayName) Pro" : "Free plan")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(Palette.onGraphite)
+                    Spacer(minLength: Space.snug)
+                    Text(isPro ? "Manage" : "See Pro")
+                        .font(Typography.caption.weight(.semibold))
+                        .foregroundStyle(Palette.onGraphite)
+                        .padding(.horizontal, Space.base)
+                        .padding(.vertical, Space.tight + 1)
+                        .background(Palette.onGraphite.opacity(0.14), in: Capsule())
+                }
+                Text(
+                    isPro
+                        ? "Unlimited open rentals, invoice audit and evidence export."
+                        : "One open rental at a time. Everything you have already entered stays."
+                )
+                .font(Typography.caption)
+                .foregroundStyle(Palette.onGraphiteSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .offRentPanel(padding: Space.roomy - 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(A11yID.Settings.subscription)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Subscription. \(isPro ? "Pro" : "Free")")
+    }
+
+    private func settingsRow(
+        _ destination: SettingsDestination, title: String, symbol: String,
+        subtitle: String? = nil, identifier: String
+    ) -> some View {
+        NavigationLink(value: destination) {
+            NavigationRow(title: title, subtitle: subtitle, symbol: symbol)
+        }
+        .buttonStyle(.plain)
+        .minimumTapTarget()
+        .accessibilityIdentifier(identifier)
     }
 }
 
@@ -143,6 +186,7 @@ struct SubscriptionSettingsView: View {
                 }
             }
         }
+        .offRentFormBackground()
         .navigationTitle("Subscription")
         .navigationBarTitleDisplayMode(.inline)
         .alert(
@@ -241,6 +285,7 @@ struct ReminderSettingsView: View {
                 }
             }
         }
+        .offRentFormBackground()
         .navigationTitle("Reminders")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -317,6 +362,7 @@ struct AppearanceSettingsView: View {
                     """)
             }
         }
+        .offRentFormBackground()
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
         // The scheme itself is applied at the root, not here: `.preferredColorScheme` affects the

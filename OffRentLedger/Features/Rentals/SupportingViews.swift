@@ -13,14 +13,25 @@ struct RentalTimelineView: View {
     }
 
     var body: some View {
-        List {
+        ScrollView {
             if let item = items.first {
-                ForEach(item.sortedEvents.reversed(), id: \.id) { event in
-                    TimelineRow(event: event)
+                let events: [RentalEvent] = Array(item.sortedEvents.reversed())
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+                        TimelineRow(
+                            event: event,
+                            isFirst: index == 0,
+                            isLast: index == events.count - 1
+                        )
+                    }
                 }
+                .padding(.vertical, Space.comfortable)
+                .offRentGroup()
+                .padding(.horizontal, Space.comfortable)
+                .padding(.vertical, Space.base)
             }
         }
-        .listStyle(.plain)
+        .offRentScreen()
         .navigationTitle("Timeline")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
@@ -70,6 +81,7 @@ struct AgreementDetailView: View {
                 }
             }
         }
+        .offRentFormBackground()
         .navigationTitle("Agreement")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -102,6 +114,7 @@ struct VendorListView: View {
                 try? context.save()
             }
         }
+        .offRentFormBackground()
         .navigationTitle("Rental companies")
         .overlay {
             if vendors.isEmpty {
@@ -165,6 +178,7 @@ struct VendorEditView: View {
                     .lineLimit(2...6)
                 }
             }
+            .offRentFormBackground()
             .navigationTitle("Rental company")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -201,6 +215,7 @@ struct JobSiteListView: View {
                 try? context.save()
             }
         }
+        .offRentFormBackground()
         .navigationTitle("Jobsites")
         .overlay {
             if jobSites.isEmpty {
@@ -278,6 +293,7 @@ struct EditRentalItemView: View {
                 }
             }
         }
+        .offRentFormBackground()
         .navigationTitle("Edit terms")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -433,6 +449,7 @@ struct EvidenceManagerView: View {
                 }
             }
         }
+        .offRentFormBackground()
         .navigationTitle("Attachments")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: photoItems) { _, newItems in

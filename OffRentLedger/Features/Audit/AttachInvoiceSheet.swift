@@ -153,6 +153,7 @@ struct AttachInvoiceSheet: View {
                 expectationSection
                 notesSection
             }
+            .offRentFormBackground()
             .navigationTitle("Attach invoice")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -56,6 +56,7 @@ struct LegalDocumentView: View {
             }
             .padding()
         }
+        .offRentFormBackground()
         .navigationTitle(document.title)
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("legal.\(document.rawValue)")
@@ -132,6 +133,7 @@ struct SupportView: View {
                 )
             }
         }
+        .offRentFormBackground()
         .navigationTitle("Support")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -194,6 +196,7 @@ struct AboutView: View {
                 Text("Built with Apple's own frameworks. No third-party SDKs are included.")
             }
         }
+        .offRentFormBackground()
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
     }
