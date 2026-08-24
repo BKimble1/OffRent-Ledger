@@ -9,10 +9,15 @@
 #
 # ## What has to be in repository secrets before this can run
 #
-#   APP_STORE_CONNECT_KEY_ID       The 10-character key id, e.g. ABCD123456.
-#   APP_STORE_CONNECT_ISSUER_ID    The issuer UUID from Users and Access → Integrations → Keys.
-#   APP_STORE_CONNECT_PRIVATE_KEY  The whole .p8 file, including the BEGIN and END lines. Apple
-#                                  lets you download it exactly once.
+#   ASC_KEY_ID       The 10-character key id, e.g. ABCD123456.
+#   ASC_ISSUER_ID    The issuer UUID from Users and Access → Integrations → Keys.
+#   ASC_PRIVATE_KEY  The whole .p8 file, including the BEGIN and END lines. Apple lets you
+#                    download it exactly once.
+#   APPLE_TEAM_ID    Optional; falls back to the team in Config/Identifiers.xcconfig.
+#
+# `APP_STORE_CONNECT_*` are accepted as aliases. The first version of this workflow invented
+# those longer names without checking what the repository already had, and then reported the
+# credentials as missing when they had been sitting there the whole time.
 #
 # The key needs the App Manager role: below that, Xcode cannot create the signing certificate and
 # profiles it needs, and the archive step fails on provisioning rather than on anything you wrote.
@@ -55,15 +60,15 @@ jobs:
       # Fail here rather than twenty minutes in on a signing error that says nothing useful.
       - name: Check the credentials are present
         env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY || secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
         run: |
           set -e
           missing=""
-          [ -n "$KEY_ID" ] || missing="$missing APP_STORE_CONNECT_KEY_ID"
-          [ -n "$ISSUER_ID" ] || missing="$missing APP_STORE_CONNECT_ISSUER_ID"
-          [ -n "$PRIVATE_KEY" ] || missing="$missing APP_STORE_CONNECT_PRIVATE_KEY"
+          [ -n "$KEY_ID" ] || missing="$missing ASC_KEY_ID"
+          [ -n "$ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
+          [ -n "$PRIVATE_KEY" ] || missing="$missing ASC_PRIVATE_KEY"
           if [ -n "$missing" ]; then
             echo "Missing repository secrets:$missing"
             echo "Add them under Settings → Secrets and variables → Actions."
@@ -100,8 +105,8 @@ jobs:
       # Xcode looks for the key here by id; `altool` looks in the same place. One file, both uses.
       - name: Install the App Store Connect key
         env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
+          PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY || secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
         run: |
           set -e
           mkdir -p ~/.appstoreconnect/private_keys
@@ -120,8 +125,8 @@ jobs:
 
       - name: Archive
         env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -o pipefail
           STATUS=0
@@ -142,8 +147,8 @@ jobs:
 
       - name: Export the IPA
         env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -o pipefail
           # `app-store-connect` is the current name for what used to be `app-store`. It exports a
@@ -179,8 +184,8 @@ jobs:
 
       - name: Upload to TestFlight
         env:
-          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -e
           IPA=$(find "$RUNNER_TEMP/export" -name '*.ipa' -maxdepth 1 | head -1)

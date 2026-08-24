@@ -1163,14 +1163,15 @@ def check_github_workflows() -> None:
         if forbidden in body:
             fail("workflows", f"testflight.yml contains {forbidden}; submission stays manual")
 
-    # Credentials come from secrets, never from the file.
-    for secret in (
-        "APP_STORE_CONNECT_KEY_ID",
-        "APP_STORE_CONNECT_ISSUER_ID",
-        "APP_STORE_CONNECT_PRIVATE_KEY",
+    # Credentials come from secrets, never from the file. Each one is read under the name this
+    # repository actually uses, with the longer alias accepted.
+    for names in (
+        ("ASC_KEY_ID", "APP_STORE_CONNECT_KEY_ID"),
+        ("ASC_ISSUER_ID", "APP_STORE_CONNECT_ISSUER_ID"),
+        ("ASC_PRIVATE_KEY", "APP_STORE_CONNECT_PRIVATE_KEY"),
     ):
-        if f"secrets.{secret}" not in body:
-            fail("workflows", f"testflight.yml does not read {secret} from secrets")
+        if not any(f"secrets.{name}" in body for name in names):
+            fail("workflows", f"testflight.yml reads none of {' or '.join(names)} from secrets")
     if "BEGIN PRIVATE KEY" in body:
         fail("workflows", "testflight.yml has a private key in it")
 

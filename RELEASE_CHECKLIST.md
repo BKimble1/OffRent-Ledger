@@ -97,9 +97,11 @@ Once this section is complete, the project is **locally complete**.
 - [ ] Create an App Store Connect API key with the **App Manager** role
       (**Users and Access → Integrations → Keys**). Apple lets you download the `.p8` once.
 - [ ] Add three repository secrets under **Settings → Secrets and variables → Actions**:
-      - `APP_STORE_CONNECT_KEY_ID` — the 10-character key id
-      - `APP_STORE_CONNECT_ISSUER_ID` — the issuer UUID on the same page
-      - `APP_STORE_CONNECT_PRIVATE_KEY` — the whole `.p8`, BEGIN and END lines included
+      - `ASC_KEY_ID` — the 10-character key id
+      - `ASC_ISSUER_ID` — the issuer UUID on the same page
+      - `ASC_PRIVATE_KEY` — the whole `.p8`, BEGIN and END lines included
+
+      `APP_STORE_CONNECT_*` are accepted as aliases.
 
       There is no certificate or provisioning-profile secret to add. The workflow archives with
       `-allowProvisioningUpdates` and the same key, so Xcode issues and downloads what it needs.
