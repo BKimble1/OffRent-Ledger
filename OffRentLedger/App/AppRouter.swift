@@ -118,6 +118,7 @@ enum SettingsDestination: Hashable {
     case reminders
     case appearance
     case dataAndPrivacy
+    case backupAndTransfer
     case privacyPolicy
     case terms
     case support

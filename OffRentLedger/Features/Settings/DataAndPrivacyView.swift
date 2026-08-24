@@ -1,28 +1,24 @@
 import SwiftData
 import SwiftUI
-import UniformTypeIdentifiers
 
-/// Export, import, and deletion.
+/// What is on this iPhone, what the app never does with it, and how to remove all of it.
 ///
-/// The two rules this screen exists to honour: a user can always take their data out, and a user
-/// can always delete it. Neither is behind a subscription, at any entitlement state.
+/// Export and import moved to `BackupAndTransferView`. Keeping the thing that saves your records
+/// on the same screen as the thing that erases them was a filing decision, not a design one, and
+/// it hid the backup from everybody who was not already looking for it.
+///
+/// The rule this screen still honours: a user can always delete their data, at any entitlement
+/// state, without asking anybody.
 struct DataAndPrivacyView: View {
 
     @Environment(AppDependencies.self) private var dependencies
-    @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
 
     @Query private var items: [RentalItem]
 
-    @State private var exportedCSV: URL?
-    @State private var exportedBackup: URL?
-    @State private var showingImporter = false
-    @State private var pendingImport: (archive: BackupArchive, preview: ImportPreview)?
-    @State private var importFailure: String?
     @State private var showingDeleteConfirmation = false
     @State private var deleteConfirmationText = ""
     @State private var storageBytes: Int64 = 0
-    @State private var busy = false
 
     private var exportService: ExportService {
         ExportService(context: context, clock: dependencies.clock, fileStore: dependencies.fileStore)
@@ -45,52 +41,16 @@ struct DataAndPrivacyView: View {
             }
 
             Section {
-                Button {
-                    Task { await exportCSV() }
-                } label: {
-                    Label("Export a CSV summary", systemImage: "tablecells")
+                NavigationLink(value: SettingsDestination.backupAndTransfer) {
+                    Label("Backup and transfer", systemImage: "arrow.down.doc")
                 }
-                .accessibilityIdentifier(A11yID.Settings.exportCSV)
-                .minimumTapTarget()
-                if let exportedCSV {
-                    ShareLink(item: exportedCSV) { Label("Share the CSV", systemImage: "square.and.arrow.up") }
-                        .minimumTapTarget()
-                }
-
-                Button {
-                    Task { await exportBackup() }
-                } label: {
-                    Label("Export a full backup file", systemImage: "arrow.down.doc")
-                }
-                .accessibilityIdentifier(A11yID.Settings.exportBackup)
-                .minimumTapTarget()
-                if let exportedBackup {
-                    ShareLink(item: exportedBackup) { Label("Share the backup", systemImage: "square.and.arrow.up") }
-                        .minimumTapTarget()
-                }
+                .accessibilityIdentifier(A11yID.Settings.backupAndTransfer)
             } header: {
-                Text("Export")
+                Text("Getting your data out")
             } footer: {
                 Text("""
-                    Both are yours to keep and neither needs a subscription. The backup is readable \
-                    JSON — you can open it in any text editor and see exactly what is in it.
-                    """)
-            }
-
-            Section {
-                Button {
-                    showingImporter = true
-                } label: {
-                    Label("Import a backup file", systemImage: "arrow.up.doc")
-                }
-                .accessibilityIdentifier(A11yID.Settings.importBackup)
-                .minimumTapTarget()
-            } header: {
-                Text("Import")
-            } footer: {
-                Text("""
-                    You will see exactly what would be added before anything is written. Importing \
-                    only adds — it never overwrites or deletes what you already have.
+                    Exporting a backup, moving to a new iPhone and importing a file all live \
+                    there. Neither export needs a subscription.
                     """)
             }
 
@@ -120,36 +80,6 @@ struct DataAndPrivacyView: View {
         .navigationTitle("Data and privacy")
         .navigationBarTitleDisplayMode(.inline)
         .task { storageBytes = await dependencies.fileStore.totalBytesOnDisk() }
-        .fileImporter(
-            isPresented: $showingImporter,
-            allowedContentTypes: [.json],
-            allowsMultipleSelection: false
-        ) { result in
-            handleImportSelection(result)
-        }
-        .sheet(item: Binding(
-            get: { pendingImport.map { ImportSession(archive: $0.archive, preview: $0.preview) } },
-            set: { if $0 == nil { pendingImport = nil } }
-        )) { session in
-            ImportPreviewView(
-                preview: session.preview,
-                onConfirm: {
-                    applyImport(session.archive)
-                    pendingImport = nil
-                },
-                onCancel: { pendingImport = nil }
-            )
-        }
-        .alert(
-            "Import failed",
-            isPresented: Binding(
-                get: { importFailure != nil }, set: { if !$0 { importFailure = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(importFailure ?? "")
-        }
         .alert("Delete all data?", isPresented: $showingDeleteConfirmation) {
             // Typed confirmation, not just a red button. This is the one irreversible action in
             // the app and a mis-tap costs somebody every record they have.
@@ -171,72 +101,7 @@ struct DataAndPrivacyView: View {
             .foregroundStyle(.secondary)
     }
 
-    private struct ImportSession: Identifiable {
-        let archive: BackupArchive
-        let preview: ImportPreview
-        var id: Date { preview.archiveGeneratedAt }
-    }
-
     // MARK: - Actions
-
-    private func exportCSV() async {
-        guard !busy else { return }
-        busy = true
-        defer { busy = false }
-
-        let entitlement = dependencies.effectiveEntitlement
-        // The full-history export is Pro; a single rental's CSV is not, and neither is the
-        // backup. Nobody is locked out of their own records.
-        if !EntitlementPolicy.isAllowed(.fullHistoryExport, entitlement: entitlement),
-           items.count > 1 {
-            router.presentedSheet = .paywall(reason: .historyExport)
-            return
-        }
-
-        guard let csv = try? exportService.makeCSVForAllItems() else { return }
-        let url = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("OffRentLedger-rentals.csv")
-        try? csv.write(to: url, atomically: true, encoding: .utf8)
-        exportedCSV = url
-    }
-
-    private func exportBackup() async {
-        guard !busy else { return }
-        busy = true
-        defer { busy = false }
-        guard let data = try? exportService.encodeArchive() else { return }
-        let url = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("OffRentLedger-backup.json")
-        try? data.write(to: url, options: .atomic)
-        exportedBackup = url
-    }
-
-    private func handleImportSelection(_ result: Result<[URL], Error>) {
-        guard case let .success(urls) = result, let url = urls.first else { return }
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-
-        guard let data = try? Data(contentsOf: url) else {
-            importFailure = "That file could not be opened."
-            return
-        }
-        guard let outcome = try? exportService.preview(archiveData: data) else {
-            importFailure = "That file could not be read."
-            return
-        }
-        switch outcome {
-        case let .success(pair): pendingImport = pair
-        case let .failure(failure): importFailure = failure.message
-        }
-    }
-
-    private func applyImport(_ archive: BackupArchive) {
-        do {
-            try exportService.apply(archive: archive)
-        } catch {
-            importFailure = "The import did not finish. \(error.localizedDescription)"
-        }
-    }
 
     private func deleteAll() async {
         deleteConfirmationText = ""

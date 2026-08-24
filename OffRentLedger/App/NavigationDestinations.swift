@@ -34,6 +34,7 @@ struct OffRentNavigationDestinations: ViewModifier {
                 case .reminders: ReminderSettingsView()
                 case .appearance: AppearanceSettingsView()
                 case .dataAndPrivacy: DataAndPrivacyView()
+                case .backupAndTransfer: BackupAndTransferView()
                 case .privacyPolicy: LegalDocumentView(document: .privacy)
                 case .terms: LegalDocumentView(document: .terms)
                 case .support: SupportView()

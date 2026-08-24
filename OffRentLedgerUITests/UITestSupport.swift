@@ -132,6 +132,13 @@ extension XCUIApplication {
                              : lines.joined(separator: "\n")
     }
 
+    /// Pops one screen off the current navigation stack.
+    func back() {
+        let backButton = navigationBars.buttons["BackButton"]
+        if backButton.exists { backButton.tap(); return }
+        navigationBars.buttons.element(boundBy: 0).tap()
+    }
+
     /// Dismisses the keyboard through the app's own Done affordance, if one is up.
     ///
     /// A decimal pad has no return key, which is why `CurrencyField` puts Done in the keyboard

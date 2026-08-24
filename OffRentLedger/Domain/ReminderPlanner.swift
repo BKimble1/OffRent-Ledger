@@ -57,6 +57,13 @@ struct ReminderSettings: Codable, Sendable, Equatable {
     var disputeWindowLeadDays: Int
     /// Reminders are pinned to this hour of the day so none of them fires at 3am.
     var preferredHour: Int
+    /// Start of the window in which nothing fires, as an hour of the day.
+    var quietHoursStart: Int
+    /// End of that window. Wraps past midnight when it is smaller than the start, which is the
+    /// normal case: 21 to 7.
+    var quietHoursEnd: Int
+    /// Whether the quiet window is honoured at all.
+    var quietHoursEnabled: Bool
 
     static let `default` = ReminderSettings(
         enabledKinds: [],
@@ -66,10 +73,83 @@ struct ReminderSettings: Codable, Sendable, Equatable {
         invoiceReviewAfterDays: 2,
         defaultDisputeWindowDays: 15,
         disputeWindowLeadDays: 3,
-        preferredHour: 8
+        preferredHour: 8,
+        quietHoursStart: 21,
+        quietHoursEnd: 7,
+        quietHoursEnabled: true
     )
 
     func isEnabled(_ kind: ReminderKind) -> Bool { enabledKinds.contains(kind) }
+
+    /// True when `hour` falls inside the quiet window, including a window that wraps midnight.
+    func isQuiet(hour: Int) -> Bool {
+        guard quietHoursEnabled, quietHoursStart != quietHoursEnd else { return false }
+        if quietHoursStart < quietHoursEnd {
+            return hour >= quietHoursStart && hour < quietHoursEnd
+        }
+        // 21 to 7: quiet late in the evening or early in the morning.
+        return hour >= quietHoursStart || hour < quietHoursEnd
+    }
+
+    // MARK: - Codable
+
+    // Written by hand so that settings saved by an earlier build still decode. Adding a stored
+    // property to a synthesised `Codable` makes every previously saved value fail to decode,
+    // which here would silently reset somebody's reminders to none — the exact failure that is
+    // invisible until a reminder does not arrive.
+    private enum CodingKeys: String, CodingKey {
+        case enabledKinds, rolloverLeadHours, confirmationNagAfterHours, awaitingPickupAfterDays
+        case invoiceReviewAfterDays, defaultDisputeWindowDays, disputeWindowLeadDays, preferredHour
+        case quietHoursStart, quietHoursEnd, quietHoursEnabled
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = ReminderSettings.default
+        func value<T: Decodable>(_ key: CodingKeys, _ backup: T) -> T {
+            (try? container.decodeIfPresent(T.self, forKey: key)) .flatMap { $0 } ?? backup
+        }
+        enabledKinds = value(.enabledKinds, fallback.enabledKinds)
+        rolloverLeadHours = value(.rolloverLeadHours, fallback.rolloverLeadHours)
+        confirmationNagAfterHours = value(.confirmationNagAfterHours, fallback.confirmationNagAfterHours)
+        awaitingPickupAfterDays = value(.awaitingPickupAfterDays, fallback.awaitingPickupAfterDays)
+        invoiceReviewAfterDays = value(.invoiceReviewAfterDays, fallback.invoiceReviewAfterDays)
+        defaultDisputeWindowDays = value(.defaultDisputeWindowDays, fallback.defaultDisputeWindowDays)
+        disputeWindowLeadDays = value(.disputeWindowLeadDays, fallback.disputeWindowLeadDays)
+        preferredHour = value(.preferredHour, fallback.preferredHour)
+        quietHoursStart = value(.quietHoursStart, fallback.quietHoursStart)
+        quietHoursEnd = value(.quietHoursEnd, fallback.quietHoursEnd)
+        quietHoursEnabled = value(.quietHoursEnabled, fallback.quietHoursEnabled)
+    }
+
+    init(
+        enabledKinds: Set<ReminderKind>,
+        rolloverLeadHours: Int,
+        confirmationNagAfterHours: Int,
+        awaitingPickupAfterDays: Int,
+        invoiceReviewAfterDays: Int,
+        defaultDisputeWindowDays: Int,
+        disputeWindowLeadDays: Int,
+        preferredHour: Int,
+        quietHoursStart: Int = ReminderSettings.defaultQuietHoursStart,
+        quietHoursEnd: Int = ReminderSettings.defaultQuietHoursEnd,
+        quietHoursEnabled: Bool = true
+    ) {
+        self.enabledKinds = enabledKinds
+        self.rolloverLeadHours = rolloverLeadHours
+        self.confirmationNagAfterHours = confirmationNagAfterHours
+        self.awaitingPickupAfterDays = awaitingPickupAfterDays
+        self.invoiceReviewAfterDays = invoiceReviewAfterDays
+        self.defaultDisputeWindowDays = defaultDisputeWindowDays
+        self.disputeWindowLeadDays = disputeWindowLeadDays
+        self.preferredHour = preferredHour
+        self.quietHoursStart = quietHoursStart
+        self.quietHoursEnd = quietHoursEnd
+        self.quietHoursEnabled = quietHoursEnabled
+    }
+
+    static let defaultQuietHoursStart = 21
+    static let defaultQuietHoursEnd = 7
 }
 
 /// One notification the app intends to have scheduled.
@@ -87,6 +167,17 @@ struct PlannedReminder: Sendable, Equatable, Identifiable {
 
     static func identifier(kind: ReminderKind, itemID: UUID, fireDate: Date) -> String {
         "\(kind.rawValue)|\(itemID.uuidString)|\(Int(fireDate.timeIntervalSince1970))"
+    }
+
+    /// The same reminder at a different moment.
+    ///
+    /// The identifier has to move with the date or the OS would keep the old pending request and
+    /// the reminder would fire at the time quiet hours were meant to avoid.
+    func rescheduled(to newFireDate: Date) -> PlannedReminder {
+        var moved = self
+        moved.fireDate = newFireDate
+        moved.id = PlannedReminder.identifier(kind: kind, itemID: itemID, fireDate: newFireDate)
+        return moved
     }
 }
 
@@ -158,9 +249,14 @@ enum ReminderPlanner {
                 guard let reminder = reminder(
                     kind: kind, context: context, settings: settings, now: now, calendar: calendar
                 ) else { continue }
+                let moved = reminder.rescheduled(
+                    to: respectingQuietHours(
+                        reminder.fireDate, settings: settings, now: now, calendar: calendar
+                    )
+                )
                 // A reminder for a moment that has already passed is noise on next launch.
-                guard reminder.fireDate > now else { continue }
-                planned.append(reminder)
+                guard moved.fireDate > now else { continue }
+                planned.append(moved)
             }
         }
 
@@ -292,6 +388,43 @@ enum ReminderPlanner {
         components.minute = 0
         components.second = 0
         return calendar.date(from: components) ?? date
+    }
+
+    /// Moves a fire time out of the user's quiet hours — earlier where possible, later otherwise.
+    ///
+    /// Earlier is the deliberate direction. Every reminder in this app warns about something with
+    /// a deadline: a rate about to roll over, a review window about to close. A warning delivered
+    /// after the thing it warned about is worse than one delivered a few hours early, so a
+    /// reminder that lands inside the quiet window is pulled back to the moment the window opens.
+    /// Only when that moment has already passed does it move forward to the window's end.
+    static func respectingQuietHours(
+        _ date: Date, settings: ReminderSettings, now: Date, calendar: Calendar
+    ) -> Date {
+        let hour = calendar.component(.hour, from: date)
+        guard settings.isQuiet(hour: hour) else { return date }
+
+        let wraps = settings.quietHoursStart > settings.quietHoursEnd
+        let startedYesterday = wraps && hour < settings.quietHoursEnd
+        let endsTomorrow = wraps && hour >= settings.quietHoursStart
+
+        let startDay = startedYesterday
+            ? calendar.addingDaysPreservingTimeOfDay(-1, to: date) : date
+        let endDay = endsTomorrow
+            ? calendar.addingDaysPreservingTimeOfDay(1, to: date) : date
+
+        if let windowOpens = at(hour: settings.quietHoursStart, on: startDay, calendar: calendar),
+           windowOpens > now {
+            return windowOpens
+        }
+        return at(hour: settings.quietHoursEnd, on: endDay, calendar: calendar) ?? date
+    }
+
+    private static func at(hour: Int, on date: Date, calendar: Calendar) -> Date? {
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
+        components.hour = min(23, max(0, hour))
+        components.minute = 0
+        components.second = 0
+        return calendar.date(from: components)
     }
 
     /// A bare amount for notification text, where an attributed "estimate" qualifier cannot be

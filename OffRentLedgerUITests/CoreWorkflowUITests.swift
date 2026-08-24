@@ -85,9 +85,9 @@ final class CoreWorkflowUITests: XCTestCase {
         app.expect(app.buttons[A11yUI.ItemDetail.attachInvoice]).tap()
         AttachInvoiceRobot(app: app).fill(total: "1710.00", rentalSubtotal: "1710.00")
 
-        app.expect(app.staticTexts[A11yUI.Audit.possibleVariance])
-        XCTAssertTrue(
-            app.staticTexts["$0.00"].exists,
+        let variance = app.expect(app.staticTexts[A11yUI.Audit.possibleVariance])
+        XCTAssertEqual(
+            variance.label, "$0.00",
             "a matching invoice must show zero possible variance"
         )
         app.buttons[A11yUI.Audit.resolveInvoice].tap()

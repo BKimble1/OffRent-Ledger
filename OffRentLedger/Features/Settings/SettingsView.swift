@@ -24,6 +24,10 @@ struct SettingsView: View {
                 settingsRow(.reminders, "Reminders", "bell", A11yID.Settings.reminders)
                 settingsRow(.appearance, "Appearance", "textformat.size", A11yID.Settings.appearance)
                 settingsRow(
+                    .backupAndTransfer, "Backup and transfer", "arrow.down.doc",
+                    A11yID.Settings.backupAndTransfer
+                )
+                settingsRow(
                     .dataAndPrivacy, "Data and privacy", "lock.shield",
                     A11yID.Settings.dataAndPrivacy
                 )
@@ -143,146 +147,6 @@ struct SubscriptionSettingsView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(restoreMessage ?? "")
-        }
-    }
-}
-
-struct ReminderSettingsView: View {
-    @Environment(AppDependencies.self) private var dependencies
-    @Environment(AppRouter.self) private var router
-    @State private var authorizationDenied = false
-
-    var body: some View {
-        @Bindable var dependencies = dependencies
-
-        return List {
-            Section {
-                Text(AppCopy.notificationsExplanation)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Section("Remind me about") {
-                ForEach(ReminderKind.allCases, id: \.self) { kind in
-                    reminderToggle(kind)
-                }
-            }
-
-            if dependencies.reminderSettings.isEnabled(.rateRollover) {
-                Section("Rate changes") {
-                    Stepper(
-                        "\(dependencies.reminderSettings.rolloverLeadHours) hours before",
-                        value: $dependencies.reminderSettings.rolloverLeadHours,
-                        in: 0...168, step: 6
-                    )
-                    .minimumTapTarget()
-                }
-            }
-
-            if dependencies.reminderSettings.isEnabled(.confirmationOutstanding) {
-                Section("Missing confirmation") {
-                    Stepper(
-                        "\(dependencies.reminderSettings.confirmationNagAfterHours) hours after marking done",
-                        value: $dependencies.reminderSettings.confirmationNagAfterHours,
-                        in: 1...72, step: 1
-                    )
-                    .minimumTapTarget()
-                }
-            }
-
-            Section("When reminders arrive") {
-                Stepper(
-                    "Around \(dependencies.reminderSettings.preferredHour):00",
-                    value: $dependencies.reminderSettings.preferredHour,
-                    in: 5...21, step: 1
-                )
-                .minimumTapTarget()
-                Text("Day-scale reminders are pinned to this hour so none of them wakes you at 3am.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Stepper(
-                    "Default review window: \(dependencies.reminderSettings.defaultDisputeWindowDays) days",
-                    value: $dependencies.reminderSettings.defaultDisputeWindowDays,
-                    in: 0...90, step: 1
-                )
-                .minimumTapTarget()
-            } header: {
-                Text("Invoice review window")
-            } footer: {
-                Text("""
-                    This is a number you enter, not something \(AppConfiguration.displayName) knows. \
-                    Check each vendor's own terms — you can override it per agreement.
-                    """)
-            }
-
-            if authorizationDenied {
-                Section {
-                    Label(
-                        "Notifications are turned off for \(AppConfiguration.displayName) in iOS Settings. Reminders will not appear until you turn them back on.",
-                        systemImage: "bell.slash"
-                    )
-                    .font(.footnote)
-                    .foregroundStyle(Palette.attention)
-                }
-            }
-        }
-        .offRentFormBackground()
-        .navigationTitle("Reminders")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private func reminderToggle(_ kind: ReminderKind) -> some View {
-        let entitlement = dependencies.effectiveEntitlement
-        let locked = kind.requiresPro && !entitlement.isPro
-
-        return Toggle(isOn: Binding(
-            get: { dependencies.reminderSettings.isEnabled(kind) },
-            set: { enabled in
-                guard !locked else {
-                    router.presentedSheet = .paywall(reason: .advancedReminders)
-                    return
-                }
-                Task { await setEnabled(enabled, for: kind) }
-            }
-        )) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(kind.displayName)
-                    if locked {
-                        Label("Pro", systemImage: "lock.fill")
-                            .font(.caption2)
-                            .foregroundStyle(Palette.accent)
-                    }
-                }
-                Text(kind.explanation)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .minimumTapTarget()
-    }
-
-    private func setEnabled(_ enabled: Bool, for kind: ReminderKind) async {
-        if enabled {
-            // Permission is requested here and nowhere else — only after the user has actually
-            // asked for a reminder. An app that prompts on launch gets denied on launch.
-            let status = await dependencies.notifications.authorizationStatus()
-            if status == .notDetermined {
-                let granted = await dependencies.notifications.requestAuthorization()
-                authorizationDenied = !granted
-                guard granted else { return }
-            } else if status == .denied {
-                authorizationDenied = true
-                return
-            }
-            dependencies.reminderSettings.enabledKinds.insert(kind)
-        } else {
-            dependencies.reminderSettings.enabledKinds.remove(kind)
         }
     }
 }

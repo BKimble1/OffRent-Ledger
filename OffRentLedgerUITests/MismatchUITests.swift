@@ -41,9 +41,13 @@ final class MismatchUITests: XCTestCase {
         app.expect(app.buttons[A11yUI.ItemDetail.attachInvoice]).tap()
         AttachInvoiceRobot(app: app).fill(total: "1995.00", rentalSubtotal: "1995.00")
 
-        app.expect(app.staticTexts[A11yUI.Audit.possibleVariance])
-        XCTAssertTrue(
-            app.staticTexts["$285.00"].exists,
+        // Asserted on the figure's own label rather than by searching for a static text called
+        // "$285.00". The amount carries an explicit identifier, so the string subscript matches
+        // that identifier and never its text — and reading the label is the stronger check
+        // anyway: it fails on a wrong number, not only on a missing one.
+        let variance = app.expect(app.staticTexts[A11yUI.Audit.possibleVariance])
+        XCTAssertEqual(
+            variance.label, "$285.00",
             "one extra day at $285 must be surfaced as the possible variance"
         )
 

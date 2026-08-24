@@ -14,6 +14,16 @@ protocol NotificationScheduling: Sendable {
     func synchronise(to planned: [PlannedReminder]) async -> ScheduleOutcome
     func cancelAll() async
     func pendingIdentifiers() async -> Set<String>
+    /// Schedules one throwaway notification so somebody can see that reminders reach this phone.
+    /// Returns false when permission is not granted, so the caller can say why nothing happened.
+    func scheduleTestReminder(after seconds: TimeInterval) async -> Bool
+}
+
+/// Test reminders are identified by this prefix so `synchronise` leaves them alone. Without it
+/// the next reschedule — which happens on any edit — would cancel the test before it fired.
+enum TestReminder {
+    static let identifierPrefix = "offrent.test."
+    static let delay: TimeInterval = 10
 }
 
 struct ScheduleOutcome: Sendable, Equatable {
@@ -65,7 +75,9 @@ struct UserNotificationScheduler: NotificationScheduling {
             return .empty
         }
 
+        // A pending test reminder is not part of the plan and must survive it.
         let existing = await pendingIdentifiers()
+            .filter { !$0.hasPrefix(TestReminder.identifierPrefix) }
         let wanted = Set(planned.map(\.id))
 
         let obsolete = existing.subtracting(wanted)
@@ -99,6 +111,34 @@ struct UserNotificationScheduler: NotificationScheduling {
 
     func cancelAll() async {
         center.removeAllPendingNotificationRequests()
+    }
+
+    func scheduleTestReminder(after seconds: TimeInterval) async -> Bool {
+        guard await authorizationStatus() == .authorized else { return false }
+        let content = UNMutableNotificationContent()
+        content.title = "\(SharedBranding.displayName) reminders are working"
+        content.body = """
+            This is the test you asked for. A real reminder names the machine and what to do \
+            about it.
+            """
+        content.sound = .default
+        content.interruptionLevel = .active
+        let request = UNNotificationRequest(
+            identifier: TestReminder.identifierPrefix + UUID().uuidString,
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(
+                timeInterval: max(1, seconds), repeats: false
+            )
+        )
+        do {
+            try await center.add(request)
+            return true
+        } catch {
+            Self.logger.error(
+                "Test reminder failed: \(String(describing: error), privacy: .public)"
+            )
+            return false
+        }
     }
 
     private func request(for reminder: PlannedReminder) -> UNNotificationRequest {
@@ -190,6 +230,17 @@ final class RecordingNotificationScheduler: NotificationScheduling, @unchecked S
     }
 
     func cancelAll() async { clearPending() }
+
+    func scheduleTestReminder(after seconds: TimeInterval) async -> Bool {
+        recordTestReminder()
+    }
+
+    private func recordTestReminder() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard status == .authorized else { return false }
+        pending.insert(TestReminder.identifierPrefix + "recorded")
+        return true
+    }
 
     private func clearPending() {
         lock.lock(); defer { lock.unlock() }

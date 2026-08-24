@@ -101,6 +101,7 @@ enum A11yUI {
     enum Settings {
         static let subscription = "settings.subscription"
         static let dataAndPrivacy = "settings.dataAndPrivacy"
+        static let backupAndTransfer = "settings.backupAndTransfer"
         static let exportBackup = "settings.exportBackup"
         static let deleteAllData = "settings.deleteAllData"
     }

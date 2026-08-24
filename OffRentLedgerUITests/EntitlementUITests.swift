@@ -81,10 +81,33 @@ final class EntitlementUITests: XCTestCase {
     /// reach — so a tap synthesised at a plan's centre can land off the bottom of the screen.
     /// When that happened, nothing was selected, Subscribe stayed disabled, and the failure
     /// surfaced as a missing rentals screen two steps later.
-    private func selectPlan(_ identifier: String, in app: XCUIApplication) {
+    private func selectPlan(
+        _ identifier: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
         let plan = app.expect(app.buttons[identifier])
-        if !plan.isHittable { app.anyElement(A11yUI.Paywall.root).swipeUp() }
-        plan.tap()
+        let purchase = app.buttons[A11yUI.Paywall.purchase]
+
+        // Three attempts, scrolling between them. The plans sit below the fold and the Subscribe
+        // bar is pinned over the bottom of the page, so a tap synthesised at a plan's centre can
+        // land on the bar instead of the plan — which reports as a successful tap and selects
+        // nothing. Selection is the condition, not the tap.
+        for _ in 0..<3 {
+            if purchase.isEnabled { return }
+            if plan.isHittable { plan.tap() }
+            if purchase.isEnabled { return }
+            app.anyElement(A11yUI.Paywall.root).swipeUp()
+        }
+        XCTFail(
+            """
+            choosing \(identifier) never enabled Subscribe.
+            Identified elements on screen:
+            \(app.identifiedElements())
+            """,
+            file: file, line: line
+        )
     }
 
     /// 5. Losing Pro leaves every existing record usable.
@@ -99,14 +122,19 @@ final class EntitlementUITests: XCTestCase {
         app.buttons[A11yUI.ItemDetail.markDone].tap()
         app.expect(app.buttons[A11yUI.ItemDetail.recordConfirmation])
 
+        // Two screens now: taking your data out is a tool and lives on its own, and deleting it
+        // stayed with the privacy statement.
         app.tab(A11yUI.Tab.settings).tap()
-        app.expect(app.anyElement(A11yUI.Settings.dataAndPrivacy)).tap()
+        app.expect(app.anyElement(A11yUI.Settings.backupAndTransfer)).tap()
         XCTAssertTrue(
-            app.expect(app.buttons[A11yUI.Settings.exportBackup]).isEnabled,
+            app.expect(app.anyElement(A11yUI.Settings.exportBackup)).isEnabled,
             "exporting a backup must never require a subscription"
         )
+
+        app.back()
+        app.expect(app.anyElement(A11yUI.Settings.dataAndPrivacy)).tap()
         XCTAssertTrue(
-            app.buttons[A11yUI.Settings.deleteAllData].isEnabled,
+            app.expect(app.buttons[A11yUI.Settings.deleteAllData]).isEnabled,
             "deleting your own data must never require a subscription"
         )
     }

@@ -26,40 +26,64 @@ enum LegalDocument: String, Identifiable, CaseIterable {
         case .terms: AppConfiguration.plannedTermsURL
         }
     }
+
+    /// One line saying what the document is for, above the clauses.
+    var summary: String {
+        switch self {
+        case .privacy:
+            """
+            Short version: your records stay on this iPhone. There is no account, no server and \
+            no analytics. The long version is below.
+            """
+        case .terms:
+            """
+            Short version: this app keeps your records. It does not contact rental companies, \
+            end rentals, or decide what you owe. The long version is below.
+            """
+        }
+    }
 }
 
-/// Renders the legal text that ships inside the app.
+/// The legal text that ships inside the app, laid out as a document rather than dumped as one
+/// block of Markdown.
 ///
-/// The text is bundled rather than fetched. A privacy policy behind a URL is a privacy policy that
-/// 404s during App Review, disappears when a domain lapses, and cannot be read on a jobsite with
-/// no signal. `AppConfiguration.legalURLsAreLive` is `false`, so nothing here presents a web
-/// address as though it works.
+/// The text is bundled rather than fetched. A privacy policy behind a URL is a privacy policy
+/// that 404s during App Review, disappears when a domain lapses, and cannot be read on a jobsite
+/// with no signal — so the copy in the app is the copy that counts, and the web link below is a
+/// convenience rather than the source.
+///
+/// Parsing is `LegalDocumentOutline`, in the portable layer, under test against these exact
+/// files. What is left here is layout: a summary, a contents list that actually goes somewhere,
+/// and one card per clause.
 struct LegalDocumentView: View {
 
     let document: LegalDocument
     @Environment(\.openURL) private var openURL
 
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Space.comfortable) {
-                // On a card rather than straight onto the page. Two thousand words of legal text
-                // with nothing behind it is the same blank-page problem the rest of this pass
-                // fixed; the card gives the column an edge and a measure.
-                Text(markdown)
-                    .font(.callout)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .offRentCard(padding: Space.roomy - 4)
+    private var outline: LegalDocumentOutline {
+        LegalDocumentOutline(markdown: Self.bundledMarkdown(for: document) ?? "")
+    }
 
-                if AppConfiguration.legalURLsAreLive, let url = document.plannedURL {
-                    Button("Read this online") { openURL(url) }
-                        .buttonStyle(.offRentSecondary)
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.section) {
+                    let outline = self.outline
+                    if outline.isEmpty {
+                        missingDocument
+                    } else {
+                        header(outline)
+                        contents(outline, proxy: proxy)
+                        ForEach(outline.clauses) { clause in
+                            clauseCard(clause).id(clause.id)
+                        }
+                        footer
+                    }
                 }
+                .padding(.horizontal, Space.comfortable)
+                .padding(.top, Space.base)
+                .padding(.bottom, Space.screenBottom)
             }
-            .padding(.horizontal, Space.comfortable)
-            .padding(.top, Space.base)
-            .padding(.bottom, Space.screenBottom)
         }
         .offRentScreen()
         .navigationTitle(document.title)
@@ -67,142 +91,171 @@ struct LegalDocumentView: View {
         .accessibilityIdentifier("legal.\(document.rawValue)")
     }
 
-    /// The bundled text, rendered as Markdown.
-    ///
-    /// The fallback is not decoration. If the resource is somehow missing from the bundle, a
-    /// screen saying "Privacy Policy" with nothing under it is an App Review rejection and a
-    /// broken promise; a short honest message with a support address is neither.
-    private var markdown: AttributedString {
-        guard let url = Bundle.main.url(forResource: document.resourceName, withExtension: "md"),
-              let raw = try? String(contentsOf: url, encoding: .utf8),
-              let attributed = try? AttributedString(
-                markdown: raw,
-                options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-              )
-        else {
-            return AttributedString(
-                """
-                This document could not be loaded from the app bundle. \
-                Please contact \(AppConfiguration.supportEmail) and we will send it to you.
-                """
-            )
-        }
-        return attributed
-    }
-}
+    // MARK: - Pieces
 
-struct SupportView: View {
-    @Environment(\.openURL) private var openURL
+    private func header(_ outline: LegalDocumentOutline) -> some View {
+        VStack(alignment: .leading, spacing: Space.snug) {
+            Text(outline.title.isEmpty ? document.title : outline.title)
+                .font(.title2.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
 
-    var body: some View {
-        List {
-            Section {
-                if let url = AppConfiguration.supportMailtoURL {
-                    Button {
-                        openURL(url)
-                    } label: {
-                        Label(AppConfiguration.supportEmail, systemImage: "envelope")
-                    }
-                    .minimumTapTarget()
+            Text(document.summary)
+                .font(Typography.rowDetail)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !outline.preamble.isEmpty {
+                RowDivider(inset: 0)
+                ForEach(Array(outline.preamble.enumerated()), id: \.offset) { _, line in
+                    inline(line)
+                        .font(Typography.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-            } header: {
-                Text("Get in touch")
-            } footer: {
-                Text("""
-                    \(AppConfiguration.companyName). Tell us what you were doing and what happened \
-                    — \(AppConfiguration.displayName) collects no diagnostics of its own, so your \
-                    description is all we have to go on.
-                    """)
-            }
-
-            Section("Common questions") {
-                faq(
-                    "Does \(AppConfiguration.displayName) contact my rental company?",
-                    "No. It never has and it does not in this version. It helps you record what you did, reminds you to get a confirmation number, and keeps the evidence together. Calling the yard is still your job."
-                )
-                faq(
-                    "Are the amounts what I owe?",
-                    "No. They are estimates built from the rates and dates you entered. Your invoice and your rental agreement are what count."
-                )
-                faq(
-                    "Does a possible mismatch mean I was overcharged?",
-                    "No. It means the invoice differs from the terms you told the app about. That could be the vendor, your entry, or a term the app cannot see."
-                )
-                faq(
-                    "Where is my data?",
-                    "On this iPhone. There is no account and no server. If you delete the app without exporting first, it is gone."
-                )
-                faq(
-                    "What happens if I cancel Pro?",
-                    "Nothing you have is removed or hidden. You keep editing, resolving, exporting and deleting everything. You just cannot open a new rental beyond the free limit."
-                )
             }
         }
-        .offRentFormBackground()
-        .navigationTitle("Support")
-        .navigationBarTitleDisplayMode(.inline)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .offRentCard()
     }
 
-    private func faq(_ question: String, _ answer: String) -> some View {
-        DisclosureGroup(question) {
-            Text(answer)
-                .font(.footnote)
+    private func contents(
+        _ outline: LegalDocumentOutline, proxy: ScrollViewProxy
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            CardHeader(title: "Contents")
+                .padding(.bottom, Space.tight)
+            ForEach(outline.clauses) { clause in
+                if clause.id > 0 { RowDivider(inset: 0) }
+                Button {
+                    withAnimation { proxy.scrollTo(clause.id, anchor: .top) }
+                } label: {
+                    HStack(spacing: Space.snug) {
+                        Text(clause.listLabel)
+                            .font(Typography.rowTitle)
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: Space.snug)
+                        Image(systemName: "arrow.down")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, Space.snug)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .offRentCard()
+    }
+
+    private func clauseCard(_ clause: LegalDocumentOutline.Clause) -> some View {
+        VStack(alignment: .leading, spacing: Space.base) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.snug) {
+                if let number = clause.number {
+                    Text(number)
+                        .font(Typography.caption.monospacedDigit())
+                        .foregroundStyle(Palette.accent)
+                        .frame(minWidth: 18, alignment: .leading)
+                }
+                Text(clause.title)
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            ForEach(Array(clause.blocks.enumerated()), id: \.offset) { _, block in
+                switch block {
+                case .paragraph(let text):
+                    inline(text)
+                        .font(.callout)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                case .bullets(let items):
+                    VStack(alignment: .leading, spacing: Space.tight) {
+                        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                            HStack(alignment: .top, spacing: Space.snug) {
+                                Text("•")
+                                    .font(.callout)
+                                    .foregroundStyle(Palette.accent)
+                                    .accessibilityHidden(true)
+                                inline(item)
+                                    .font(.callout)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .offRentCard()
+    }
+
+    private var footer: some View {
+        VStack(spacing: Space.base) {
+            if let url = document.plannedURL {
+                Button {
+                    openURL(url)
+                } label: {
+                    Label("Read this on the web", systemImage: "safari")
+                }
+                .buttonStyle(.offRentSecondary)
+                .accessibilityIdentifier(A11yID.Settings.legalWebLink)
+            }
+            if let mail = AppConfiguration.supportMailtoURL {
+                Button("Ask a question about this") { openURL(mail) }
+                    .font(Typography.rowDetail)
+                    .foregroundStyle(.secondary)
+                    .minimumTapTarget()
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Not decoration. A screen headed "Privacy Policy" with nothing under it is an App Review
+    /// rejection and a broken promise; a short honest message with an address to write to is
+    /// neither.
+    private var missingDocument: some View {
+        VStack(alignment: .leading, spacing: Space.base) {
+            Text("This document could not be loaded")
+                .font(.headline)
+            Text("""
+                It ships inside the app, so this should not happen. Write to \
+                \(AppConfiguration.supportEmail) and we will send you a copy.
+                """)
+                .font(Typography.rowDetail)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .font(.subheadline)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .offRentCard()
+    }
+
+    // MARK: - Text
+
+    /// Renders `**bold**` and `*emphasis*` without turning line breaks into paragraph breaks.
+    private func inline(_ markdown: String) -> Text {
+        guard let attributed = try? AttributedString(
+            markdown: markdown,
+            options: AttributedString.MarkdownParsingOptions(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace
+            )
+        ) else {
+            return Text(markdown)
+        }
+        return Text(attributed)
+    }
+
+    static func bundledMarkdown(for document: LegalDocument) -> String? {
+        guard let url = Bundle.main.url(forResource: document.resourceName, withExtension: "md")
+        else { return nil }
+        return try? String(contentsOf: url, encoding: .utf8)
     }
 }
 
-struct AboutView: View {
-    var body: some View {
-        List {
-            Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(AppConfiguration.displayName).font(.title3.weight(.semibold))
-                    Text("Version \(AppConfiguration.versionAndBuild)")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
-            }
-
-            Section {
-                Text("""
-                    Know what every equipment rental is costing, capture the vendor's off-rent \
-                    confirmation, track pickup, and check the final invoice — across every rental \
-                    yard.
-                    """)
-                .font(.subheadline)
-                .fixedSize(horizontal: false, vertical: true)
-            } header: {
-                Text("What this is")
-            }
-
-            Section {
-                Text(AppCopy.generalDisclaimer)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(AppCopy.offRentDisclosure)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } header: {
-                Text("What this is not")
-            }
-
-            Section {
-                DetailRow(label: "Company", value: AppConfiguration.companyName)
-                Text(AppConfiguration.poweredByLine)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } footer: {
-                Text("Built with Apple's own frameworks. No third-party SDKs are included.")
-            }
-        }
-        .offRentFormBackground()
-        .navigationTitle("About")
-        .navigationBarTitleDisplayMode(.inline)
-    }
+#Preview {
+    NavigationStack { LegalDocumentView(document: .terms) }
 }
