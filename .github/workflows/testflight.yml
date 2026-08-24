@@ -123,10 +123,14 @@ jobs:
           echo "Building $BUILD_NUMBER"
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
 
+      # Archive unsigned; sign at export.
+      #
+      # Archiving with automatic signing made Xcode go looking for an **iOS App Development**
+      # profile and fail with "your team has no devices from which to generate a provisioning
+      # profile" — a runner is not a registered device and never will be. Development signing is
+      # not what a TestFlight build needs anyway. `-exportArchive` below applies App Store
+      # distribution signing, and the API key lets it create and download those profiles itself.
       - name: Archive
-        env:
-          KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
-          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -o pipefail
           STATUS=0
@@ -136,11 +140,8 @@ jobs:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -archivePath "$RUNNER_TEMP/OffRentLedger.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8 \
-            -authenticationKeyID "$KEY_ID" \
-            -authenticationKeyIssuerID "$ISSUER_ID" \
             OFFRENT_BUILD_NUMBER="$BUILD_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO \
             | tee archive.log || STATUS=$?
           bash scripts/ci/summarize_test_log.sh archive.log
           exit $STATUS
@@ -163,6 +164,7 @@ jobs:
           /usr/libexec/PlistBuddy \
             -c "Add :method string app-store-connect" \
             -c "Add :destination string export" \
+            -c "Add :signingStyle string automatic" \
             -c "Add :teamID string ${{ secrets.APPLE_TEAM_ID || '7GNFT94A9L' }}" \
             -c "Add :uploadSymbols bool true" \
             -c "Add :manageAppVersionAndBuildNumber bool false" \
