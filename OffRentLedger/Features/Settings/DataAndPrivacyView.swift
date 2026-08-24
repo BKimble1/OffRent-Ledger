@@ -72,7 +72,7 @@ struct DataAndPrivacyView: View {
                 privacyPoint("No server — nothing is uploaded")
                 privacyPoint("No analytics, advertising or tracking")
                 privacyPoint("No third-party crash reporting")
-                privacyPoint("Scanning and text recognition run on this iPhone only")
+                privacyPoint("Scanning, text recognition and the on-device model all run on this iPhone only")
                 privacyPoint("Location is asked for once, when you tap for it, and never in the background")
             }
         }

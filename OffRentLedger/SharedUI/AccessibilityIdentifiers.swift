@@ -114,6 +114,8 @@ enum A11yID {
         static let saveButton = "scan.review.save"
         static let cancelButton = "scan.review.cancel"
         static let rawTextToggle = "scan.review.rawText"
+        static let pagePreview = "scan.review.pages"
+        static let pageViewer = "scan.review.page"
         static func field(_ field: SuggestedField) -> String { "scan.review.field.\(field.rawValue)" }
         static func toggle(_ field: SuggestedField) -> String { "scan.review.toggle.\(field.rawValue)" }
     }

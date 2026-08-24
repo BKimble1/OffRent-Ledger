@@ -412,7 +412,8 @@ struct AddRentalView: View {
         let model = ScanReviewViewModel(
             kind: .rentalContract,
             recognizer: dependencies.textRecognizer,
-            calendar: dependencies.clock.calendar
+            calendar: dependencies.clock.calendar,
+            intelligence: dependencies.documentIntelligence
         )
         scanModel = model
         configure(model)

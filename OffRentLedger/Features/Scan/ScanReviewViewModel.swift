@@ -18,6 +18,10 @@ final class ScanReviewViewModel {
     enum Phase: Equatable {
         case idle
         case recognising
+        /// The rule parser has finished and the on-device model is still reading. The review
+        /// screen is already usable in this phase — waiting for the model before showing
+        /// anything would make every scan feel slower than the one before it.
+        case reading
         case reviewing
         case failed(String)
     }
@@ -25,6 +29,13 @@ final class ScanReviewViewModel {
     private(set) var phase: Phase = .idle
     private(set) var result: ParseResult?
     private(set) var document: RecognizedDocument?
+
+    /// The scanned pages, kept in memory so the review screen can show what it read.
+    ///
+    /// In memory and nowhere else. This type still cannot write a file — the pages reach disk
+    /// only if the user saves the rental they belong to, through the evidence store, which is a
+    /// different object entirely.
+    private(set) var pageImageData: [Data] = []
 
     /// Which suggestions the user has ticked. Seeded from `isPreselected`, then owned entirely by
     /// the user.
@@ -35,18 +46,34 @@ final class ScanReviewViewModel {
 
     let kind: DocumentKind
     private let recognizer: any DocumentTextRecognizing
+    private let intelligence: any DocumentIntelligence
     private let calendar: Calendar
+
+    /// How many suggestions came from the on-device model rather than from a rule. Shown on the
+    /// review screen, because a user deserves to know which of these an algorithm matched and
+    /// which a model proposed.
+    private(set) var modelSuggestionCount = 0
 
     /// `@ObservationIgnored` because the in-flight task is not UI state — and, more to the point,
     /// because `@Observable` turns an unmarked stored property into a computed one, which cannot
     /// be touched from a `deinit` on a `@MainActor` type.
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    init(kind: DocumentKind, recognizer: any DocumentTextRecognizing, calendar: Calendar) {
+    init(
+        kind: DocumentKind,
+        recognizer: any DocumentTextRecognizing,
+        calendar: Calendar,
+        intelligence: any DocumentIntelligence = UnavailableDocumentIntelligence()
+    ) {
         self.kind = kind
         self.recognizer = recognizer
         self.calendar = calendar
+        self.intelligence = intelligence
     }
+
+    /// Whether this device can read tables as well as lines, and why not when it cannot.
+    var intelligenceIsAvailable: Bool { intelligence.isAvailable }
+    var intelligenceUnavailableReason: String? { intelligence.unavailableReason }
 
     // No `deinit { task?.cancel() }`. `deinit` is nonisolated, this type is `@MainActor`, and
     // reaching isolated state from there does not compile. `ScanReviewView` cancels in
@@ -55,6 +82,7 @@ final class ScanReviewViewModel {
     // MARK: - Pipeline
 
     func recognise(imageData: [Data], source: DocumentSource) {
+        pageImageData = imageData
         run { [recognizer] in try await recognizer.recognize(imageData: imageData, source: source) }
     }
 
@@ -79,7 +107,33 @@ final class ScanReviewViewModel {
                 self.result = parsed
                 // Only the confident ones arrive ticked. Everything else is visible but off.
                 self.selection = Set(parsed.preselected.map(\.field))
-                self.phase = .reviewing
+                self.phase = self.intelligence.isAvailable ? .reading : .reviewing
+
+                // The model runs after the rules, on what the rules did not find, and adds only
+                // what survives validation against the page. Nothing it returns is ticked, and a
+                // failure leaves the screen exactly as the rule parser left it.
+                if self.intelligence.isAvailable {
+                    let proposals = await self.intelligence.propose(
+                        from: document, kind: self.kind
+                    )
+                    try Task.checkCancellation()
+                    let extra = ModelSuggestionValidator.validate(
+                        proposals,
+                        against: document,
+                        existing: parsed.suggestions,
+                        calendar: self.calendar
+                    )
+                    if !extra.isEmpty {
+                        var merged = parsed
+                        merged.suggestions.append(contentsOf: extra)
+                        merged.unmatchedLines = merged.unmatchedLines.filter { line in
+                            !extra.contains { $0.provenance.sourceLine == line }
+                        }
+                        self.result = merged
+                        self.modelSuggestionCount = extra.count
+                    }
+                    self.phase = .reviewing
+                }
             } catch is CancellationError {
                 // Deliberately silent: the user started another scan.
             } catch {

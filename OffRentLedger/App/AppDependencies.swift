@@ -14,6 +14,7 @@ final class AppDependencies {
     let clock: any Clock
     let fileStore: any FileStoring
     let textRecognizer: any DocumentTextRecognizing
+    let documentIntelligence: any DocumentIntelligence
     let notifications: any NotificationScheduling
     let location: any OneTimeLocationProviding
     let evidenceRenderer: any EvidenceRendering
@@ -32,6 +33,7 @@ final class AppDependencies {
         clock: any Clock,
         fileStore: any FileStoring,
         textRecognizer: any DocumentTextRecognizing,
+        documentIntelligence: any DocumentIntelligence = UnavailableDocumentIntelligence(),
         notifications: any NotificationScheduling,
         location: any OneTimeLocationProviding,
         evidenceRenderer: any EvidenceRendering,
@@ -42,6 +44,7 @@ final class AppDependencies {
         self.clock = clock
         self.fileStore = fileStore
         self.textRecognizer = textRecognizer
+        self.documentIntelligence = documentIntelligence
         self.notifications = notifications
         self.location = location
         self.evidenceRenderer = evidenceRenderer
@@ -62,6 +65,11 @@ final class AppDependencies {
             textRecognizer: overrides.stubTextRecogniser
                 ? StubTextRecognizer.skidSteerContract
                 : VisionTextRecognizer(),
+            // Off under test. A model's output is not deterministic, and a UI test that depends
+            // on one is a UI test that fails on a Tuesday.
+            documentIntelligence: overrides.stubTextRecogniser
+                ? UnavailableDocumentIntelligence(unavailableReason: "Disabled for testing.")
+                : DocumentIntelligenceFactory.make(),
             notifications: UserNotificationScheduler(),
             location: CoreLocationOneShotProvider(),
             evidenceRenderer: PDFEvidenceRenderer(),

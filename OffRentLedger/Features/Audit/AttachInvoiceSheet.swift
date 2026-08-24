@@ -240,7 +240,8 @@ struct AttachInvoiceSheet: View {
         let model = ScanReviewViewModel(
             kind: .vendorInvoice,
             recognizer: dependencies.textRecognizer,
-            calendar: dependencies.clock.calendar
+            calendar: dependencies.clock.calendar,
+            intelligence: dependencies.documentIntelligence
         )
         scanModel = model
         configure(model)

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The review screen every scan passes through.
 ///
@@ -10,6 +11,8 @@ struct ScanReviewView: View {
     @Bindable var model: ScanReviewViewModel
     let onSave: ([SuggestedField: SuggestedValue]) -> Void
     let onCancel: () -> Void
+
+    @State private var enlargedPage: Int?
 
     var body: some View {
         NavigationStack {
@@ -38,13 +41,13 @@ struct ScanReviewView: View {
                         action: { onSave([:]) }
                     )
 
-                case .reviewing:
+                case .reviewing, .reading:
                     reviewForm
                 }
             }
             .offRentFormBackground()
             .safeAreaInset(edge: .bottom) {
-                if model.phase == .reviewing { saveBar }
+                if model.phase == .reviewing || model.phase == .reading { saveBar }
             }
             .navigationTitle("Check what was read")
             .navigationBarTitleDisplayMode(.inline)
@@ -80,7 +83,7 @@ struct ScanReviewView: View {
                 }
                 .buttonStyle(.offRentPrimary)
                 .accessibilityIdentifier(A11yID.Scan.saveButton)
-                .disabled(model.phase != .reviewing)
+                .disabled(model.phase == .recognising || model.phase == .idle)
                 Text("Nothing is saved to a rental until you tap this.")
                     .font(Typography.micro)
                     .foregroundStyle(.secondary)
@@ -92,7 +95,18 @@ struct ScanReviewView: View {
 
     private var reviewForm: some View {
         Form {
+            if !model.pageImageData.isEmpty {
+                Section {
+                    pagePreview
+                } header: {
+                    Text("What was scanned")
+                } footer: {
+                    Text("Tap a page to look at it closely. Nothing here is saved unless you save the rental.")
+                }
+            }
+
             Section {
+                summaryLine
                 Label(AppCopy.scanReviewExplanation, systemImage: "exclamationmark.circle")
                     .font(.footnote)
                     .accessibilityIdentifier(A11yID.Scan.explanation)
@@ -159,6 +173,87 @@ struct ScanReviewView: View {
         }
     }
 
+    /// The pages, as a strip. Reading a value off a screen and checking it against the page it
+    /// came from used to mean closing the sheet and reopening the photo.
+    private var pagePreview: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Space.snug) {
+                ForEach(Array(model.pageImageData.enumerated()), id: \.offset) { index, data in
+                    if let image = UIImage(data: data) {
+                        Button {
+                            enlargedPage = index
+                        } label: {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 92, height: 120)
+                                .clipShape(RoundedRectangle(cornerRadius: Radius.control))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Radius.control)
+                                        .strokeBorder(Palette.hairline, lineWidth: Layout.hairline)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Page \(index + 1) of \(model.pageImageData.count)")
+                        .accessibilityHint("Double tap to look at it closely.")
+                    }
+                }
+            }
+            .padding(.vertical, Space.tight)
+        }
+        .accessibilityIdentifier(A11yID.Scan.pagePreview)
+        .fullScreenCover(item: Binding(
+            get: { enlargedPage.map { EnlargedPage(index: $0) } },
+            set: { if $0 == nil { enlargedPage = nil } }
+        )) { page in
+            PageViewer(
+                data: model.pageImageData[page.index],
+                pageNumber: page.index + 1,
+                onClose: { enlargedPage = nil }
+            )
+        }
+    }
+
+    private struct EnlargedPage: Identifiable {
+        let index: Int
+        var id: Int { index }
+    }
+
+    /// What was found, and by what. A user is entitled to know which of these an algorithm
+    /// matched on a line and which a model proposed from a table.
+    @ViewBuilder
+    private var summaryLine: some View {
+        let total = model.suggestions.count
+        let fromModel = model.modelSuggestionCount
+        VStack(alignment: .leading, spacing: 2) {
+            Text(
+                total == 0
+                    ? "Nothing was recognised on this page."
+                    : "\(total) value\(total == 1 ? "" : "s") found across \(model.document?.pageCount ?? 1) page\(( model.document?.pageCount ?? 1) == 1 ? "" : "s")."
+            )
+            .font(Typography.rowDetail)
+
+            if model.phase == .reading {
+                Label("Still reading the tables on this iPhone…", systemImage: "sparkles")
+                    .font(Typography.caption)
+                    .foregroundStyle(.secondary)
+            } else if fromModel > 0 {
+                Label(
+                    "\(fromModel) of these came from reading the layout rather than a single line, and none of them is ticked.",
+                    systemImage: "sparkles"
+                )
+                .font(Typography.caption)
+                .foregroundStyle(.secondary)
+            } else if let reason = model.intelligenceUnavailableReason, total > 0 {
+                Text(reason + " Rate tables may not be read.")
+                    .font(Typography.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
+    }
+
     private var confidentSuggestions: [FieldSuggestion] {
         model.suggestions.filter(\.isPreselected)
     }
@@ -201,9 +296,13 @@ struct ScanReviewView: View {
             // Provenance, shown rather than hidden. "Read from: 7 DAY RATE: $985.00" is the
             // difference between a user trusting a value and guessing about it.
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(suggestion.confidenceDescription) · read from:")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Text(
+                    suggestion.provenance.rule == ModelSuggestionValidator.ruleName
+                        ? "\(suggestion.confidenceDescription) · read from the layout of:"
+                        : "\(suggestion.confidenceDescription) · read from:"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
                 Text(suggestion.provenance.sourceLine)
                     .font(.caption2.monospaced())
                     .foregroundStyle(.secondary)
