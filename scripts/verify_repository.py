@@ -350,7 +350,9 @@ def check_status_assignment_is_confined() -> None:
     check("Only RentalWorkflowService assigns rental status")
     allowed = {
         "OffRentLedger/Persistence/RentalWorkflowService.swift",
-        "OffRentLedger/Persistence/SchemaV1.swift",  # the property's own declaration and init
+        # The property's own declaration and initialiser, in every schema version.
+        "OffRentLedger/Persistence/SchemaV1.swift",
+        "OffRentLedger/Persistence/SchemaV2.swift",
     }
     # `=` and not `==`: a predicate comparing the column is a read, not an assignment. And the
     # discrepancy model's own status is deliberately named `discrepancyStatusRaw` so that this

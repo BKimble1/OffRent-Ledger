@@ -53,6 +53,8 @@ struct AddRentalView: View {
 
     // Scanning
     @State private var scanModel: ScanReviewViewModel?
+    @State private var chosenPlace: ChosenPlace?
+    @State private var showingPlaceSearch = false
     @State private var showingCamera = false
     @State private var photoItem: PhotosPickerItem?
     @State private var showingFileImporter = false
@@ -91,6 +93,16 @@ struct AddRentalView: View {
                 // Straight into the first field. The sheet exists to capture an equipment name;
                 // making somebody tap once before they can type it is a tap for nothing.
                 equipmentIsFocused = true
+            }
+            .sheet(isPresented: $showingPlaceSearch) {
+                PlaceSearchView(initialQuery: newJobSiteName) { place in
+                    chosenPlace = place
+                    // The place names the site when the user has not. Somebody who searched for
+                    // "Ridgeline Business Park" has already told us what to call it.
+                    if newJobSiteName.trimmingCharacters(in: .whitespaces).isEmpty {
+                        newJobSiteName = place.name
+                    }
+                }
             }
             .sheet(item: Binding(
                 get: { scanModel.map { ScanSession(model: $0) } },
@@ -264,6 +276,25 @@ struct AddRentalView: View {
             if selectedJobSiteID == nil {
                 TextField("Jobsite name (optional)", text: $newJobSiteName)
                     .accessibilityIdentifier(A11yID.AddRental.newJobSiteName)
+
+                // A place is what puts this rental on the Today map. Optional, like the name:
+                // plenty of rentals never leave one yard and never need one.
+                if let chosenPlace {
+                    LabeledContent("Place") {
+                        Text(chosenPlace.singleLine)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Button("Remove the place", role: .destructive) { self.chosenPlace = nil }
+                        .accessibilityIdentifier(A11yID.Place.clear)
+                } else {
+                    Button {
+                        showingPlaceSearch = true
+                    } label: {
+                        Label("Find this site on a map", systemImage: "mappin.and.ellipse")
+                    }
+                    .accessibilityIdentifier(A11yID.Place.choose)
+                }
             }
         }
     }
@@ -472,8 +503,16 @@ struct AddRentalView: View {
         var site: JobSite?
         if let selectedJobSiteID {
             site = jobSites.first { $0.id == selectedJobSiteID }
-        } else if let name = newJobSiteName.nilIfBlank {
-            let created = JobSite(name: name, createdAt: now, modifiedAt: now)
+        } else if let name = newJobSiteName.nilIfBlank ?? chosenPlace?.name {
+            let created = JobSite(
+                name: name,
+                address: chosenPlace?.address.nilIfBlank,
+                placeName: chosenPlace?.name,
+                latitude: chosenPlace?.latitude,
+                longitude: chosenPlace?.longitude,
+                createdAt: now,
+                modifiedAt: now
+            )
             context.insert(created)
             site = created
         }

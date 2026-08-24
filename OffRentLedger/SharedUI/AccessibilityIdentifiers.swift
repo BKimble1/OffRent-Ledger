@@ -19,6 +19,8 @@ enum A11yID {
         static let actionQueue = "today.actionQueue"
         static let emptyState = "today.emptyState"
         static let addRental = "today.addRental"
+        static let map = "today.map"
+        static let mapSelection = "today.map.selection"
     }
 
     enum Rentals {
@@ -29,6 +31,9 @@ enum A11yID {
         static let searchField = "rentals.search"
         static let filterMenu = "rentals.filterMenu"
         static func row(_ id: UUID) -> String { "rentals.row.\(id.uuidString)" }
+        static let jobSiteRow = "rentals.jobSite.row"
+        static let jobSiteName = "rentals.jobSite.name"
+        static let jobSiteSave = "rentals.jobSite.save"
     }
 
     enum AddRental {
@@ -141,6 +146,15 @@ enum A11yID {
         static let dismiss = "paywall.dismiss"
         static let entitlementStatus = "paywall.entitlementStatus"
         static let dataReassurance = "paywall.dataReassurance"
+    }
+
+    enum Place {
+        static let root = "place.root"
+        static let searchField = "place.search"
+        static let result = "place.result"
+        static let cancel = "place.cancel"
+        static let choose = "place.choose"
+        static let clear = "place.clear"
     }
 
     enum Onboarding {

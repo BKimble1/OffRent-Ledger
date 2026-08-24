@@ -32,6 +32,7 @@ struct RecordConfirmationSheet: View {
     @State private var capturedLocation: LocationSnapshotRecord?
     @State private var locationDenied = false
     @State private var isCapturingLocation = false
+    @State private var locationName: String?
     @State private var rejection: TransitionRejection?
 
     init(itemID: UUID) {
@@ -195,17 +196,26 @@ struct RecordConfirmationSheet: View {
     private var locationRow: some View {
         Group {
             if let capturedLocation {
+                // The name, when one can be found; the coordinate underneath either way. Two
+                // decimal-degree numbers tell a contractor nothing about whether the phone was
+                // at the right yard, which is the only question this row exists to answer.
                 DetailRow(
                     label: "Location",
-                    value: String(
-                        format: "%.4f, %.4f (±%.0f m)",
-                        capturedLocation.latitude,
-                        capturedLocation.longitude,
-                        capturedLocation.horizontalAccuracyMetres
-                    )
+                    value: locationName ?? Self.coordinateText(capturedLocation)
                 )
-                Button("Remove location", role: .destructive) { self.capturedLocation = nil }
-                    .minimumTapTarget()
+                Text(
+                    locationName == nil
+                        ? "Accurate to about \(Int(capturedLocation.horizontalAccuracyMetres)) m."
+                        : "\(Self.coordinateText(capturedLocation)) · accurate to about \(Int(capturedLocation.horizontalAccuracyMetres)) m."
+                )
+                .font(Typography.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                Button("Remove location", role: .destructive) {
+                    self.capturedLocation = nil
+                    self.locationName = nil
+                }
+                .minimumTapTarget()
             } else {
                 Button {
                     Task { await captureLocation() }
@@ -247,6 +257,16 @@ struct RecordConfirmationSheet: View {
         // coordinate — which is exactly what the disclosure promised.
         capturedLocation = snapshot
         locationDenied = snapshot == nil
+        // Display only, and never blocking: the record is saved with or without a name.
+        if let snapshot {
+            locationName = await PlaceNameResolver.describe(
+                latitude: snapshot.latitude, longitude: snapshot.longitude
+            )
+        }
+    }
+
+    private static func coordinateText(_ snapshot: LocationSnapshotRecord) -> String {
+        String(format: "%.4f, %.4f", snapshot.latitude, snapshot.longitude)
     }
 
     private func save() {

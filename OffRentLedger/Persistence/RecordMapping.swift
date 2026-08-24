@@ -28,14 +28,16 @@ extension JobSite {
     var record: JobSiteRecord {
         JobSiteRecord(
             id: id, name: name, projectIdentifier: projectIdentifier, address: address,
-            notes: notes, createdAt: createdAt, modifiedAt: modifiedAt
+            notes: notes, placeName: placeName, latitude: latitude, longitude: longitude,
+            createdAt: createdAt, modifiedAt: modifiedAt
         )
     }
 
     convenience init(record: JobSiteRecord) {
         self.init(
             id: record.id, name: record.name, projectIdentifier: record.projectIdentifier,
-            address: record.address, notes: record.notes,
+            address: record.address, notes: record.notes, placeName: record.placeName,
+            latitude: record.latitude, longitude: record.longitude,
             createdAt: record.createdAt, modifiedAt: record.modifiedAt
         )
     }

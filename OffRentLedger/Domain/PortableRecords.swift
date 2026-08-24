@@ -29,8 +29,43 @@ struct JobSiteRecord: Codable, Sendable, Equatable, Identifiable {
     var projectIdentifier: String?
     var address: String?
     var notes: String?
+    /// All three optional and all three decoded leniently, so a backup written before job sites
+    /// had a place still imports.
+    var placeName: String?
+    var latitude: Double?
+    var longitude: Double?
     var createdAt: Date
     var modifiedAt: Date
+
+    init(
+        id: UUID,
+        name: String,
+        projectIdentifier: String? = nil,
+        address: String? = nil,
+        notes: String? = nil,
+        placeName: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        createdAt: Date,
+        modifiedAt: Date
+    ) {
+        self.id = id
+        self.name = name
+        self.projectIdentifier = projectIdentifier
+        self.address = address
+        self.notes = notes
+        self.placeName = placeName
+        self.latitude = latitude
+        self.longitude = longitude
+        self.createdAt = createdAt
+        self.modifiedAt = modifiedAt
+    }
+
+    /// A coordinate only when both halves are present.
+    var coordinate: (latitude: Double, longitude: Double)? {
+        guard let latitude, let longitude else { return nil }
+        return (latitude, longitude)
+    }
 }
 
 struct AgreementRecord: Codable, Sendable, Equatable, Identifiable {

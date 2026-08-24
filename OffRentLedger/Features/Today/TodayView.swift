@@ -32,6 +32,7 @@ struct TodayView: View {
                     .padding(.top, Space.roomy)
                 } else {
                     summary
+                    TodayMapPanel(items: openItems)
                     if !upcomingRateChanges.isEmpty { upcomingRateChangesSection }
                     if !actionQueue.isEmpty { actionQueueSection }
                     if !awaitingPickup.isEmpty { awaitingPickupSection }

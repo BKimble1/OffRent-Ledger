@@ -221,24 +221,42 @@ struct VendorEditView: View {
 struct JobSiteListView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \JobSite.name) private var jobSites: [JobSite]
+    @State private var editing: JobSite?
 
     var body: some View {
         List {
             ForEach(jobSites, id: \.id) { site in
-                HStack(spacing: Space.base) {
-                    RowIcon(symbol: "mappin.and.ellipse")
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(site.name).font(Typography.rowTitle)
-                        if let project = site.projectIdentifier {
-                            Text(project)
+                Button {
+                    editing = site
+                } label: {
+                    HStack(spacing: Space.base) {
+                        RowIcon(
+                            symbol: site.coordinate == nil
+                                ? "mappin.and.ellipse" : "mappin.circle.fill",
+                            tint: site.coordinate == nil ? .secondary : Palette.accent
+                        )
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(site.name)
+                                .font(Typography.rowTitle)
+                                .foregroundStyle(.primary)
+                            // The subtitle says whether this site is on the map, because that is
+                            // the one thing about a jobsite the user can now change and the one
+                            // thing that decides whether it appears on Today.
+                            Text(site.placeName ?? site.address ?? site.projectIdentifier ?? "No place set")
                                 .font(Typography.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(Typography.micro.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
                     }
-                    Spacer(minLength: 0)
+                    .contentShape(Rectangle())
                 }
-                .accessibilityElement(children: .combine)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(A11yID.Rentals.jobSiteRow)
             }
             .onDelete { offsets in
                 // Nullify, not cascade: deleting a jobsite label must not delete the rentals that
@@ -256,6 +274,105 @@ struct JobSiteListView: View {
                     title: "No jobsites yet",
                     message: "They are created as you add rentals."
                 )
+            }
+        }
+        .sheet(item: $editing) { site in
+            JobSiteEditView(site: site)
+        }
+    }
+}
+
+/// One jobsite: what it is called, and where it is.
+///
+/// This screen exists because of the map. Before it there was nowhere to give an existing
+/// jobsite a place, so every site created before this version would have stayed off the map
+/// forever with no way for anybody to fix it.
+struct JobSiteEditView: View {
+    @Bindable var site: JobSite
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @Environment(AppDependencies.self) private var dependencies
+    @State private var showingPlaceSearch = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Name") {
+                    TextField("Jobsite name", text: $site.name)
+                        .accessibilityIdentifier(A11yID.Rentals.jobSiteName)
+                    TextField(
+                        "Project number (optional)",
+                        text: Binding(
+                            get: { site.projectIdentifier ?? "" },
+                            set: { site.projectIdentifier = $0.nilIfBlank }
+                        )
+                    )
+                    .autocorrectionDisabled()
+                }
+
+                Section {
+                    if site.coordinate != nil {
+                        LabeledContent("Place") {
+                            Text(site.placeName ?? site.address ?? "Set")
+                                .multilineTextAlignment(.trailing)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let address = site.address, site.placeName != nil {
+                            Text(address)
+                                .font(Typography.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Button("Change the place") { showingPlaceSearch = true }
+                            .accessibilityIdentifier(A11yID.Place.choose)
+                        Button("Remove the place", role: .destructive) {
+                            site.placeName = nil
+                            site.latitude = nil
+                            site.longitude = nil
+                        }
+                        .accessibilityIdentifier(A11yID.Place.clear)
+                    } else {
+                        Button {
+                            showingPlaceSearch = true
+                        } label: {
+                            Label("Find this site on a map", systemImage: "mappin.and.ellipse")
+                        }
+                        .accessibilityIdentifier(A11yID.Place.choose)
+                    }
+                } header: {
+                    Text("Where it is")
+                } footer: {
+                    Text("""
+                        Search for the address or the yard rather than typing coordinates. A site \
+                        with a place appears on the Today map; one without still works everywhere \
+                        else.
+                        """)
+                }
+            }
+            .offRentFormBackground()
+            .navigationTitle("Jobsite")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        site.modifiedAt = dependencies.clock.now
+                        try? context.save()
+                        dismiss()
+                    }
+                    .accessibilityIdentifier(A11yID.Rentals.jobSiteSave)
+                }
+            }
+            .sheet(isPresented: $showingPlaceSearch) {
+                PlaceSearchView(initialQuery: site.name) { place in
+                    site.placeName = place.name
+                    site.address = place.address.nilIfBlank ?? site.address
+                    site.latitude = place.latitude
+                    site.longitude = place.longitude
+                    if site.name.trimmingCharacters(in: .whitespaces).isEmpty {
+                        site.name = place.name
+                    }
+                }
             }
         }
     }

@@ -1,10 +1,12 @@
 import Foundation
 import SwiftData
 
-/// Version 1 of the persisted schema.
+/// Version 2 of the persisted schema: job sites can carry a place.
 ///
-/// Versioned from the first release rather than "when we need it". A `VersionedSchema` added
-/// later cannot describe the store that already shipped, so v1 has to exist before v1 ships.
+/// V2 differs from V1 in three optional attributes on `JobSiteModel` and nothing else, which is
+/// what makes the migration lightweight. V1 stays beside it, unchanged and unused by app code,
+/// because a `VersionedSchema` is a description of a store that exists on somebody's phone and
+/// editing it in place would leave that store undescribed.
 ///
 /// Two rules shape these types:
 ///
@@ -15,9 +17,9 @@ import SwiftData
 /// 2. **Enums are stored as their raw strings.** A stored enum case that is later renamed takes
 ///    the store with it; a raw string is inspectable, migratable and survives a typo in a way an
 ///    opaque encoding does not.
-enum OffRentSchemaV1: VersionedSchema {
+enum OffRentSchemaV2: VersionedSchema {
 
-    static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
+    static var versionIdentifier: Schema.Version { Schema.Version(2, 0, 0) }
 
     static var models: [any PersistentModel.Type] {
         [
@@ -88,10 +90,24 @@ enum OffRentSchemaV1: VersionedSchema {
         var createdAt: Date = Date()
         var modifiedAt: Date = Date()
 
+        // The place, chosen from a map search rather than typed as two numbers. All three are
+        // optional and all three are new in V2: a job site that has only ever been a name still
+        // reads, and still works everywhere except the map.
+        var placeName: String?
+        var latitude: Double?
+        var longitude: Double?
+
         /// Nullify, not cascade. A jobsite is a label; deleting "Ridgeline Phase 2" must not take
         /// the rentals that happened there with it.
         @Relationship(deleteRule: .nullify, inverse: \RentalAgreementModel.jobSite)
         var agreements: [RentalAgreementModel]? = []
+
+        /// A coordinate only when both halves are present. Half a coordinate is not a place, and
+        /// (0, 0) is in the Atlantic.
+        var coordinate: (latitude: Double, longitude: Double)? {
+            guard let latitude, let longitude else { return nil }
+            return (latitude, longitude)
+        }
 
         init(
             id: UUID = UUID(),
@@ -99,6 +115,9 @@ enum OffRentSchemaV1: VersionedSchema {
             projectIdentifier: String? = nil,
             address: String? = nil,
             notes: String? = nil,
+            placeName: String? = nil,
+            latitude: Double? = nil,
+            longitude: Double? = nil,
             createdAt: Date,
             modifiedAt: Date
         ) {
@@ -107,6 +126,9 @@ enum OffRentSchemaV1: VersionedSchema {
             self.projectIdentifier = projectIdentifier
             self.address = address
             self.notes = notes
+            self.placeName = placeName
+            self.latitude = latitude
+            self.longitude = longitude
             self.createdAt = createdAt
             self.modifiedAt = modifiedAt
             self.agreements = []
@@ -657,3 +679,12 @@ enum OffRentSchemaV1: VersionedSchema {
 
 // Short names for the rest of the app. When SchemaV2 arrives these aliases point at V2 and the
 // call sites do not change.
+typealias Vendor = OffRentSchemaV2.VendorModel
+typealias JobSite = OffRentSchemaV2.JobSiteModel
+typealias RentalAgreement = OffRentSchemaV2.RentalAgreementModel
+typealias RentalItem = OffRentSchemaV2.RentalItemModel
+typealias RentalEvent = OffRentSchemaV2.RentalEventModel
+typealias EvidenceAsset = OffRentSchemaV2.EvidenceAssetModel
+typealias VendorInvoice = OffRentSchemaV2.VendorInvoiceModel
+typealias InvoiceLine = OffRentSchemaV2.InvoiceLineModel
+typealias Discrepancy = OffRentSchemaV2.DiscrepancyModel
