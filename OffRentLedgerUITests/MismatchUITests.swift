@@ -55,13 +55,24 @@ final class MismatchUITests: XCTestCase {
             "one extra day at $285 must be surfaced as the possible variance"
         )
 
-        // Resolve must be refused while the mismatch is open.
-        app.tapWhenHittable(app.buttons[A11yUI.Audit.resolveInvoice])
-        XCTAssertTrue(app.alerts.element.waitForExistence(timeout: 5))
-        app.alerts.buttons["OK"].tap()
+        // Accepting must be refused while the mismatch is open — and refused *before* the tap,
+        // not after it.
+        //
+        // This used to assert that tapping Accept raised an alert. That was the old contract, and
+        // the screenshots showed why it was the wrong one: the control looked live, and on the
+        // one record where the refusal path did not fire it was a button that swallowed the tap
+        // in silence. §8 of the brief is explicit — either allow it, or disable it with a
+        // specific explanation. So the assertion moved to the stronger place: the state the user
+        // can see without touching anything.
+        let accept = app.expect(app.buttons[A11yUI.Audit.resolveInvoice])
+        XCTAssertFalse(
+            accept.isEnabled,
+            "Accept must be disabled while a possible mismatch is open, not enabled and inert"
+        )
+        let reason = app.expect(app.staticTexts[A11yUI.Audit.resolveBlockedReason])
         XCTAssertTrue(
-            app.alerts.element.waitForNonExistence(timeout: 5),
-            "the refusal alert must actually go away before anything else is tapped"
+            reason.label.contains("possible mismatch"),
+            "the disabled control must name what is blocking it: \(reason.label)"
         )
 
         // This one is in scrollable content and drifts under the pinned Accept bar and the

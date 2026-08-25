@@ -46,6 +46,11 @@ struct RentalFormView: View {
             rolloverSection
             notesSection
         }
+        // A swipe on the form puts the keyboard away, which is what every iOS form does and
+        // what this one could not do at all: only the currency fields had a Done button, so on a
+        // plain text keyboard the rows below the caret stayed underneath the pinned Save bar
+        // with no way to reach them. The UI suite found it by failing to tap the company row.
+        .scrollDismissesKeyboard(.interactively)
         .offRentFormBackground()
         .sheet(isPresented: $choosingCompany) {
             CompanyPickerView(selection: $draft.companyID)

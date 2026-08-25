@@ -218,12 +218,34 @@ extension XCUIApplication {
     /// toolbar. A test that skips it leaves half the sheet covered: XCUITest will happily
     /// synthesise a tap at a control's centre while the keyboard is over that point, the tap
     /// lands on a key, and the button the test meant to press never fires.
+    /// Puts the keyboard away, whatever kind it is.
+    ///
+    /// A decimal pad has no return key, which is why the app adds a `Done` toolbar to every
+    /// currency field. A *text* keyboard has no `Done` — so the original version of this helper
+    /// silently did nothing on the New Rental form, the keyboard stayed up, and the company row
+    /// underneath the pinned Save bar could never be tapped. The failure surfaced several steps
+    /// from its cause as "element never came clear of the bars".
     func dismissKeyboard() {
         guard keyboards.count > 0 else { return }
+
         for candidate in [toolbars.buttons["Done"], keyboards.buttons["Done"]] where candidate.exists {
             candidate.tap()
-            return
+            if keyboards.count == 0 { return }
         }
+
+        // A text keyboard's return key. Its label follows `submitLabel`, so every plausible one
+        // is tried rather than assuming "return".
+        for label in ["Return", "return", "Next", "next", "Done", "Search", "Go"] {
+            let key = keyboards.buttons[label]
+            if key.exists {
+                key.tap()
+                if keyboards.count == 0 { return }
+            }
+        }
+
+        // Last resort: the form scrolls the keyboard away. `scrollDismissesKeyboard` is on the
+        // rental form for exactly this reason, and it is the gesture a person would use.
+        swipeDown()
     }
 
     /// Turns a toggle on and proves it took.
