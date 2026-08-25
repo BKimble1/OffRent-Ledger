@@ -11,6 +11,12 @@ import SwiftUI
 ///
 /// `ScanReviewCommitTests` asserts that running the whole pipeline and discarding this object
 /// leaves the store untouched.
+///
+/// **Before deleting anything here as unused, grep the whole repository.** The unit and UI
+/// targets are compiled by Xcode and by nothing on this machine, so a property removed because
+/// `OffRentLedger/` had no callers is a green local run and a failed CI one twenty minutes
+/// later. `intelligenceIsAvailable` below is read only by `ScanIntelligenceTests`, and that is
+/// exactly how it went once.
 @MainActor
 @Observable
 final class ScanReviewViewModel {
@@ -70,8 +76,12 @@ final class ScanReviewViewModel {
         self.intelligence = intelligence
     }
 
-    /// Why this device cannot read tables as well as lines, when it cannot. Shown as one
-    /// sentence on the review screen; `nil` when the model is available.
+    /// Whether this device can read tables as well as lines, and why not when it cannot.
+    ///
+    /// `intelligenceIsAvailable` is read by `ScanIntelligenceTests`, not by a view — which is
+    /// exactly why removing it as "unused" cost a CI round. A grep of `OffRentLedger/` is not a
+    /// grep of the repository.
+    var intelligenceIsAvailable: Bool { intelligence.isAvailable }
     var intelligenceUnavailableReason: String? { intelligence.unavailableReason }
 
     // No `deinit { task?.cancel() }`. `deinit` is nonisolated, this type is `@MainActor`, and
