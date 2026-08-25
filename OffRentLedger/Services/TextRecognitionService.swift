@@ -44,9 +44,10 @@ actor VisionTextRecognizer: DocumentTextRecognizing {
         guard !imageData.isEmpty else { throw TextRecognitionError.noPages }
 
         var lines: [String] = []
+        var linePages: [Int] = []
         var confidences: [Double] = []
 
-        for data in imageData {
+        for (index, data) in imageData.enumerated() {
             try Task.checkCancellation()
             // Decoded here, inside the actor. The bitmap is created and consumed within this
             // isolation domain and never crosses a boundary.
@@ -55,11 +56,16 @@ actor VisionTextRecognizer: DocumentTextRecognizing {
             }
             let page = try recognizeOne(image.downscaled(toMaxDimension: maxDimension))
             lines.append(contentsOf: page.lines)
+            linePages.append(contentsOf: page.lines.map { _ in index })
             confidences.append(contentsOf: page.confidences)
         }
 
         return makeDocument(
-            lines: lines, confidences: confidences, pageCount: imageData.count, source: source
+            lines: lines,
+            linePages: linePages,
+            confidences: confidences,
+            pageCount: imageData.count,
+            source: source
         )
     }
 
@@ -69,6 +75,7 @@ actor VisionTextRecognizer: DocumentTextRecognizing {
         }
 
         var lines: [String] = []
+        var linePages: [Int] = []
         var confidences: [Double] = []
 
         for index in 0..<document.pageCount {
@@ -83,6 +90,7 @@ actor VisionTextRecognizer: DocumentTextRecognizing {
                     .map { $0.trimmingCharacters(in: .whitespaces) }
                     .filter { !$0.isEmpty }
                 lines.append(contentsOf: pageLines)
+                linePages.append(contentsOf: pageLines.map { _ in index })
                 // An embedded text layer is exact, not recognised.
                 confidences.append(contentsOf: pageLines.map { _ in 1.0 })
                 continue
@@ -91,19 +99,28 @@ actor VisionTextRecognizer: DocumentTextRecognizing {
             guard let image = render(page: page) else { continue }
             let recognized = try recognizeOne(image)
             lines.append(contentsOf: recognized.lines)
+            linePages.append(contentsOf: recognized.lines.map { _ in index })
             confidences.append(contentsOf: recognized.confidences)
         }
 
         guard !lines.isEmpty else { throw TextRecognitionError.couldNotRenderPDF }
         return makeDocument(
-            lines: lines, confidences: confidences, pageCount: document.pageCount, source: .pdfImport
+            lines: lines,
+            linePages: linePages,
+            confidences: confidences,
+            pageCount: document.pageCount,
+            source: .pdfImport
         )
     }
 
     // MARK: - Private
 
     private func makeDocument(
-        lines: [String], confidences: [Double], pageCount: Int, source: DocumentSource
+        lines: [String],
+        linePages: [Int],
+        confidences: [Double],
+        pageCount: Int,
+        source: DocumentSource
     ) -> RecognizedDocument {
         let average = confidences.isEmpty
             ? 0
@@ -111,6 +128,7 @@ actor VisionTextRecognizer: DocumentTextRecognizing {
         return RecognizedDocument(
             rawText: lines.joined(separator: "\n"),
             lines: lines,
+            linePages: linePages,
             averageRecognitionConfidence: average,
             pageCount: pageCount,
             source: source
@@ -122,7 +140,9 @@ actor VisionTextRecognizer: DocumentTextRecognizing {
         guard bounds.width > 0, bounds.height > 0 else { return nil }
 
         // Rendered at roughly 200 dpi equivalent, capped, which is where recognition of 8pt
-        // invoice type becomes reliable without producing a 60 MB bitmap.
+        // invoice type becomes reliable without producing a 60 MB bitmap. A page smaller than the
+        // cap is scaled *up* rather than left at its native size: a 612×792 point invoice
+        // rendered 1:1 gives Vision 8pt type at 8 pixels tall, which it cannot read.
         let scale = min(maxDimension / max(bounds.width, bounds.height), 4)
         let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
 
@@ -149,11 +169,22 @@ actor VisionTextRecognizer: DocumentTextRecognizing {
         // US English only in v1; adding languages here without testing them would produce
         // confident nonsense on documents the app has never seen.
         request.recognitionLanguages = ["en-US"]
-        // Rental paperwork is full of "SS-2214" and "CR-44821". Language correction helpfully
-        // turns those into words unless the recogniser is told they are real.
-        request.customWords = ["off-rent", "offrent", "skid", "hrs", "PO", "Qty"]
+        request.customWords = Self.customWords
+        // Rental paperwork is full of short lines — a unit number on its own, a rate in a table
+        // cell. The default minimum height discards text under 1/32 of the frame, which on a
+        // 2400px scan is 75px: taller than most invoice type. Lowering it is the difference
+        // between reading a rate table and reading only the letterhead.
+        request.minimumTextHeight = 0.008
 
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        // The orientation, passed rather than assumed.
+        //
+        // `UIImage.cgImage` is the raw sensor bitmap: a photo taken in portrait carries
+        // `.right` and its `cgImage` is on its side. `downscaled` happens to normalise that,
+        // but only when the image is larger than the cap — so a small photo, or a screenshot,
+        // reached Vision sideways and came back as nothing at all. Nothing said why.
+        let handler = VNImageRequestHandler(
+            cgImage: cgImage, orientation: Self.cgOrientation(image.imageOrientation), options: [:]
+        )
         do {
             try handler.perform([request])
         } catch {
@@ -172,6 +203,36 @@ actor VisionTextRecognizer: DocumentTextRecognizing {
             confidences.append(Double(candidate.confidence))
         }
         return (lines, confidences)
+    }
+
+    /// Words language correction would otherwise "fix" into something else.
+    ///
+    /// Rental paperwork is full of `SS-2214`, `CR-44821` and `28 DAY RATE`, and a corrector that
+    /// has never seen a rental agreement turns half of those into English. Everything here is a
+    /// term that appears on real construction rental documents; nothing here is a value.
+    private static let customWords = [
+        "off-rent", "offrent", "off rent", "skid", "skidsteer", "hrs", "PO", "Qty",
+        "excavator", "telehandler", "manlift", "scissorlift", "compactor", "genset",
+        "attachment", "bucket", "auger", "breaker", "hammer", "trencher",
+        "RPO", "DOT", "CDW", "LDW", "enviro", "surcharge", "prorate", "prorated",
+        "rehandling", "restocking", "refueling", "cycle billing", "min charge",
+        "day rate", "week rate", "4 week rate", "28 day", "monthly rate",
+        "billed thru", "billed through", "contract no", "agreement no", "unit no",
+    ]
+
+    /// UIKit's orientation to Core Graphics', which is what Vision takes.
+    private static func cgOrientation(_ orientation: UIImage.Orientation) -> CGImagePropertyOrientation {
+        switch orientation {
+        case .up: .up
+        case .down: .down
+        case .left: .left
+        case .right: .right
+        case .upMirrored: .upMirrored
+        case .downMirrored: .downMirrored
+        case .leftMirrored: .leftMirrored
+        case .rightMirrored: .rightMirrored
+        @unknown default: .up
+        }
     }
 }
 
@@ -216,6 +277,33 @@ struct StubTextRecognizer: DocumentTextRecognizing {
             DAILY RATE: $285.00
             7 DAY RATE: $985.00
             4 WEEK RATE: $2,450.00
+            """
+    )
+
+    /// A document with nothing about an equipment rental on it.
+    ///
+    /// The negative test: OCR reads it perfectly, and the extractor must find nothing, because
+    /// nothing on it is a rate, a machine or a rental date. This is the document in the
+    /// screenshot that produced a `Use 0 values` button.
+    static let residentialLease = StubTextRecognizer(
+        rawText: """
+            RESIDENTIAL LEASE AGREEMENT
+
+            THIS LEASE is made this 14th day of March, 2026, between
+            HARLAN PROPERTIES, Landlord, and the Tenant named below.
+
+            PREMISES: Apartment 4B, 118 Sycamore Street
+
+            TERM: Twelve (12) months commencing April 1, 2026.
+
+            SECURITY DEPOSIT: The Tenant shall deposit the sum of one
+            month's rent to be held in accordance with state law.
+
+            QUIET ENJOYMENT: The Landlord covenants that the Tenant
+            shall peaceably hold and enjoy the Premises.
+
+            PETS: No animals shall be kept on the Premises without the
+            prior written consent of the Landlord.
             """
     )
 }

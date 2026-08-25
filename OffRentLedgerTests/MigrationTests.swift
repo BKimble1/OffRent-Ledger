@@ -3,11 +3,12 @@ import SwiftData
 import Testing
 @testable import OffRentLedger
 
-/// Schema V2 — job sites that know where they are.
+/// Schema V2 and V3 — job sites that know where they are, companies that know who to ring, and
+/// agreements that carry the contractor's own PO number.
 ///
-/// The check that matters is not that a new store works; it is that the three attributes are
-/// genuinely optional everywhere, so a job site created before this version existed is still a
-/// valid job site afterwards. A migration that requires a value is a migration that loses rows.
+/// The check that matters is not that a new store works; it is that every added attribute is
+/// genuinely optional everywhere, so a record created before this version existed is still a
+/// valid record afterwards. A migration that requires a value is a migration that loses rows.
 @MainActor
 struct MigrationTests {
 
@@ -17,14 +18,80 @@ struct MigrationTests {
 
     @Test func theContainerOpensOnTheCurrentSchema() throws {
         let container = try ModelContainerFactory.make(inMemory: true)
-        #expect(container.schema.version == Schema.Version(2, 0, 0))
+        #expect(container.schema.version == Schema.Version(3, 0, 0))
     }
 
-    @Test func theMigrationPlanStillDescribesTheVersionItIsMigratingFrom() {
+    /// Every shipped version must still be described, and there must be a stage joining each
+    /// consecutive pair. A phone that skipped a build walks V1 → V2 → V3 in order; a missing
+    /// stage is a store that cannot be opened at all.
+    @Test func theMigrationPlanStillDescribesEveryVersionItMightMigrateFrom() {
         let versions = OffRentMigrationPlan.schemas.map { $0.versionIdentifier }
         #expect(versions.contains(Schema.Version(1, 0, 0)), "V1 describes stores already on phones")
-        #expect(versions.contains(Schema.Version(2, 0, 0)))
-        #expect(OffRentMigrationPlan.stages.count == 1)
+        #expect(versions.contains(Schema.Version(2, 0, 0)), "V2 shipped as build 7")
+        #expect(versions.contains(Schema.Version(3, 0, 0)))
+        #expect(OffRentMigrationPlan.stages.count == versions.count - 1)
+    }
+
+    // MARK: - V3
+
+    @Test func aCompanyWithNoContactOrAddressIsStillACompany() throws {
+        let context = try makeContext()
+        let now = Date(timeIntervalSince1970: 1_778_000_000)
+        let vendor = Vendor(name: "Cedar Ridge Equipment", createdAt: now, modifiedAt: now)
+        context.insert(vendor)
+        try context.save()
+
+        #expect(vendor.contactName == nil)
+        #expect(vendor.address == nil)
+        #expect(vendor.name == "Cedar Ridge Equipment")
+    }
+
+    @Test func theNewCompanyFieldsSurviveASave() throws {
+        let context = try makeContext()
+        let now = Date(timeIntervalSince1970: 1_778_000_000)
+        let vendor = Vendor(
+            name: "Cedar Ridge Equipment",
+            branch: "Marlin Falls",
+            contactName: "Dale Whitcomb",
+            address: "4820 Foundry Road, Bay 3, Marlin Falls, TX 76541",
+            createdAt: now,
+            modifiedAt: now
+        )
+        context.insert(vendor)
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<Vendor>()).first
+        #expect(fetched?.contactName == "Dale Whitcomb")
+        #expect(fetched?.address?.hasPrefix("4820 Foundry Road") == true)
+    }
+
+    /// The vendor's number for the paperwork and the contractor's own reference are two
+    /// different strings that both appear on an invoice. Conflating them loses one.
+    @Test func anAgreementKeepsTheVendorNumberAndThePurchaseOrderApart() throws {
+        let context = try makeContext()
+        let now = Date(timeIntervalSince1970: 1_778_000_000)
+        let agreement = RentalAgreement(
+            agreementNumber: "CR-44821",
+            purchaseOrderNumber: "PO-90114",
+            startDate: now,
+            createdAt: now,
+            modifiedAt: now
+        )
+        context.insert(agreement)
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<RentalAgreement>()).first
+        #expect(fetched?.agreementNumber == "CR-44821")
+        #expect(fetched?.purchaseOrderNumber == "PO-90114")
+    }
+
+    @Test func anAgreementWithNoPurchaseOrderIsStillAnAgreement() throws {
+        let context = try makeContext()
+        let now = Date(timeIntervalSince1970: 1_778_000_000)
+        let agreement = RentalAgreement(startDate: now, createdAt: now, modifiedAt: now)
+        context.insert(agreement)
+        try context.save()
+        #expect(agreement.purchaseOrderNumber == nil)
     }
 
     @Test func aJobSiteWithNoPlaceIsStillAJobSite() throws {

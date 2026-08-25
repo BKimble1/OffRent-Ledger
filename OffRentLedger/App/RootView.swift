@@ -10,6 +10,10 @@ struct RootView: View {
     @Environment(OnboardingState.self) private var onboarding
     @AppStorage(AppearanceSetting.storageKey) private var appearance = AppearanceSetting.system
 
+    /// Guards the once-per-launch check below. Without it, every `.task` re-entry would
+    /// re-present a walkthrough the user has just dismissed.
+    @State private var hasCheckedWalkthrough = false
+
     var body: some View {
         @Bindable var router = router
         @Bindable var onboarding = onboarding
@@ -39,9 +43,6 @@ struct RootView: View {
         }
         .tint(Palette.accent)
         .preferredColorScheme(AppearanceSetting.colorScheme(for: appearance))
-        // Above the tab bar, not over the content: the walkthrough is about the real screens and
-        // must not cover the controls it is telling somebody to tap.
-        .safeAreaInset(edge: .bottom) { GuidedTourBar() }
         .sheet(item: $router.presentedSheet) { sheet in
             sheetContent(for: sheet)
         }
@@ -66,13 +67,28 @@ struct RootView: View {
                 }
             )
         }
+        // Finish and Skip do the same thing here: record the version and dismiss. `markTourSeen`
+        // sets `isShowingTour` to false itself, so the cover closes on the same run loop as the
+        // tap — there is nothing else for the user to dismiss, which is what §10 asks for.
         .fullScreenCover(isPresented: $onboarding.isShowingTour) {
-            TourView(
-                onFinish: { onboarding.markTourSeen() },
-                onContinue: { onboarding.startGuidedTour() }
+            WalkthroughView(
+                onFinish: { finishWalkthrough() },
+                onSkip: { finishWalkthrough() }
             )
         }
         .task { await prepare() }
+        // §10: re-present only when the app intentionally advances the walkthrough version.
+        //
+        // A returning user who completed version 1 sees version 2 once, and then never again;
+        // somebody who has not yet been welcomed sees the welcome first and reaches the
+        // walkthrough through it. `markTourSeen` stamps the current version either way, so a
+        // relaunch cannot bring it back.
+        .task {
+            guard !hasCheckedWalkthrough else { return }
+            hasCheckedWalkthrough = true
+            guard !onboarding.shouldShowWelcome, onboarding.shouldPresentTour else { return }
+            onboarding.startTour()
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             // An App Intent is constructed outside the SwiftUI environment, so it parks its
@@ -82,6 +98,12 @@ struct RootView: View {
             // showing yesterday's figure unless this runs.
             Task { await refresh() }
         }
+    }
+
+    /// Ends the walkthrough and puts the user where it said it would: Today.
+    private func finishWalkthrough() {
+        onboarding.markTourSeen()
+        router.selectedTab = .today
     }
 
     @ViewBuilder

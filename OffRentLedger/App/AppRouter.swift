@@ -101,6 +101,7 @@ final class AppRouter {
 
 enum RentalDestination: Hashable {
     case item(id: UUID)
+    case editItem(id: UUID)
     case agreement(id: UUID)
     case timeline(itemID: UUID)
     case vendors

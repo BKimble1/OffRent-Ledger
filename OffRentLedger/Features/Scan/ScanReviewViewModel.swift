@@ -42,7 +42,6 @@ final class ScanReviewViewModel {
     var selection: Set<SuggestedField> = []
     /// Edited values, keyed by field. A value the user typed always wins over the parsed one.
     var edits: [SuggestedField: String] = [:]
-    var showRawText = false
 
     let kind: DocumentKind
     private let recognizer: any DocumentTextRecognizing
@@ -181,6 +180,27 @@ final class ScanReviewViewModel {
     }
 
     var suggestions: [FieldSuggestion] { result?.suggestions ?? [] }
+
+    /// What the scan produced, and therefore what the review screen should offer.
+    ///
+    /// Counted against the fields this *kind* of document can carry, so an "invoice total"
+    /// matched on a rental contract does not make the screen claim it found something useful.
+    var outcome: ScanOutcome {
+        ScanOutcome.evaluate(suggestions: suggestions, kind: kind)
+    }
+
+    var pageCount: Int { document?.pageCount ?? max(pageImageData.count, 1) }
+
+    /// Adds pages to a scan that is already on screen and re-runs the pipeline over all of them.
+    ///
+    /// The user's edits are deliberately cleared: they were made against a different set of
+    /// suggestions, and silently carrying a value the new parse did not produce would put
+    /// something on the review screen that nothing on the document says.
+    func addPages(_ data: [Data], source: DocumentSource) {
+        let combined = pageImageData + data
+        edits = [:]
+        recognise(imageData: combined, source: source)
+    }
 
     var lowConfidenceSuggestions: [FieldSuggestion] {
         suggestions.filter { !$0.isPreselected }

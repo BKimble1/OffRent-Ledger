@@ -3,6 +3,9 @@ import SwiftData
 
 /// Version 2 of the persisted schema: job sites can carry a place.
 ///
+/// Frozen. V3 is what the app opens; this stays because it describes the store on the phone of
+/// anybody who last ran the build before it, and without it there is nothing to migrate *from*.
+///
 /// V2 differs from V1 in three optional attributes on `JobSiteModel` and nothing else, which is
 /// what makes the migration lightweight. V1 stays beside it, unchanged and unused by app code,
 /// because a `VersionedSchema` is a description of a store that exists on somebody's phone and
@@ -676,15 +679,3 @@ enum OffRentSchemaV2: VersionedSchema {
         var status: DiscrepancyStatus { DiscrepancyStatus(rawValue: discrepancyStatusRaw) ?? .open }
     }
 }
-
-// Short names for the rest of the app. When SchemaV2 arrives these aliases point at V2 and the
-// call sites do not change.
-typealias Vendor = OffRentSchemaV2.VendorModel
-typealias JobSite = OffRentSchemaV2.JobSiteModel
-typealias RentalAgreement = OffRentSchemaV2.RentalAgreementModel
-typealias RentalItem = OffRentSchemaV2.RentalItemModel
-typealias RentalEvent = OffRentSchemaV2.RentalEventModel
-typealias EvidenceAsset = OffRentSchemaV2.EvidenceAssetModel
-typealias VendorInvoice = OffRentSchemaV2.VendorInvoiceModel
-typealias InvoiceLine = OffRentSchemaV2.InvoiceLineModel
-typealias Discrepancy = OffRentSchemaV2.DiscrepancyModel

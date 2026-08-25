@@ -11,7 +11,8 @@ extension Vendor {
     var record: VendorRecord {
         VendorRecord(
             id: id, name: name, branch: branch, phone: phone, email: email, link: link,
-            standardNotes: standardNotes, createdAt: createdAt, modifiedAt: modifiedAt
+            standardNotes: standardNotes, contactName: contactName, address: address,
+            createdAt: createdAt, modifiedAt: modifiedAt
         )
     }
 
@@ -19,6 +20,7 @@ extension Vendor {
         self.init(
             id: record.id, name: record.name, branch: record.branch, phone: record.phone,
             email: record.email, link: record.link, standardNotes: record.standardNotes,
+            contactName: record.contactName, address: record.address,
             createdAt: record.createdAt, modifiedAt: record.modifiedAt
         )
     }
@@ -48,6 +50,7 @@ extension RentalAgreement {
         guard let vendorID = vendor?.id else { return nil }
         return AgreementRecord(
             id: id, vendorID: vendorID, jobSiteID: jobSite?.id, agreementNumber: agreementNumber,
+            purchaseOrderNumber: purchaseOrderNumber,
             startDate: startDate, scheduledEndDate: scheduledEndDate,
             disputeWindowDaysOverride: disputeWindowDaysOverride, notes: notes,
             createdAt: createdAt, modifiedAt: modifiedAt

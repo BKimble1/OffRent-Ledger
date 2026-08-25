@@ -16,6 +16,7 @@ struct OffRentNavigationDestinations: ViewModifier {
             .navigationDestination(for: RentalDestination.self) { destination in
                 switch destination {
                 case let .item(id): RentalItemDetailView(itemID: id)
+                case let .editItem(id): EditRentalView(itemID: id)
                 case let .agreement(id): AgreementDetailView(agreementID: id)
                 case let .timeline(itemID): RentalTimelineView(itemID: itemID)
                 case .vendors: VendorListView()

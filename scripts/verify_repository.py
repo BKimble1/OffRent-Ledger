@@ -353,6 +353,7 @@ def check_status_assignment_is_confined() -> None:
         # The property's own declaration and initialiser, in every schema version.
         "OffRentLedger/Persistence/SchemaV1.swift",
         "OffRentLedger/Persistence/SchemaV2.swift",
+        "OffRentLedger/Persistence/SchemaV3.swift",
     }
     # `=` and not `==`: a predicate comparing the column is a read, not an assignment. And the
     # discrepancy model's own status is deliberately named `discrepancyStatusRaw` so that this

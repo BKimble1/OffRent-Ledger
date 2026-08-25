@@ -34,8 +34,8 @@ enum DocumentTextParser {
 
         for (index, line) in document.lines.enumerated() {
             for rule in rules(for: kind) {
-                guard let raw = rule.firstMatch(in: line) else { continue }
-                guard let value = rule.interpret(raw, calendar: calendar) else { continue }
+                guard let match = rule.firstMatch(in: line) else { continue }
+                guard let value = rule.interpret(match.text, calendar: calendar) else { continue }
 
                 let confidence = clamp(rule.confidence * recognitionFactor)
                 let candidate = FieldSuggestion(
@@ -46,7 +46,10 @@ enum DocumentTextParser {
                         sourceLine: line,
                         lineIndex: index,
                         rule: rule.name,
-                        recognitionConfidence: document.averageRecognitionConfidence
+                        recognitionConfidence: document.averageRecognitionConfidence,
+                        page: document.page(ofLineAt: index),
+                        valueStart: match.range?.location,
+                        valueLength: match.range?.length
                     )
                 )
                 matchedLineIndices.insert(index)
@@ -55,6 +58,55 @@ enum DocumentTextParser {
                 // contract is nearer the header and therefore nearer the authoritative figure.
                 if let existing = best[rule.field], existing.confidence >= confidence { continue }
                 best[rule.field] = candidate
+            }
+        }
+
+        // A second pass over label lines that carry no value of their own.
+        //
+        // Some vendors print the label and the value on separate lines:
+        //
+        //     RENTAL AGREEMENT NUMBER
+        //     NG-77304
+        //
+        // Line-by-line matching cannot see that, and the field simply went missing — on a real
+        // agreement, silently. Joining a bare label to the line beneath it and re-running the
+        // rules finds it, and the join is restricted to lines with *no digits at all* so that
+        // two ordinary rows are never fused into a value neither of them carries.
+        for index in document.lines.indices.dropLast() {
+            let label = document.lines[index]
+            guard !label.contains(where: \.isNumber) else { continue }
+            guard label.count <= 48 else { continue }
+            let joined = label + " " + document.lines[index + 1]
+
+            for rule in rules(for: kind) {
+                guard let match = rule.firstMatch(in: joined) else { continue }
+                guard let value = rule.interpret(match.text, calendar: calendar) else { continue }
+
+                // Slightly below an inline match of the same rule, so that when a document
+                // carries both forms the one printed on a single line wins — and so a joined
+                // match of a 0.94 rule still lands above the preselect threshold on a clean scan.
+                let confidence = clamp(rule.confidence * 0.95 * recognitionFactor)
+                if let existing = best[rule.field], existing.confidence >= confidence { continue }
+
+                best[rule.field] = FieldSuggestion(
+                    field: rule.field,
+                    value: value,
+                    confidence: confidence,
+                    provenance: SuggestionProvenance(
+                        // The *joined* text is the source line, because that is what was read —
+                        // showing only the label would leave the user checking a value against a
+                        // line that does not contain it.
+                        sourceLine: joined,
+                        lineIndex: index,
+                        rule: rule.name + "-joined",
+                        recognitionConfidence: document.averageRecognitionConfidence,
+                        page: document.page(ofLineAt: index),
+                        valueStart: match.range?.location,
+                        valueLength: match.range?.length
+                    )
+                )
+                matchedLineIndices.insert(index)
+                matchedLineIndices.insert(index + 1)
             }
         }
 
@@ -98,13 +150,17 @@ enum DocumentTextParser {
         /// A positive pattern cannot express "not that"; this can.
         var excludeIf: String? = nil
 
-        func firstMatch(in line: String) -> String? {
+        /// The captured value, and where in the line it sits.
+        ///
+        /// The range is what lets the review screen point at the figure inside the line it came
+        /// from — "read from: 7 DAY RATE: **$985.00**" — rather than only naming the line.
+        func firstMatch(in line: String) -> (text: String, range: NSRange?)? {
             if let excludeIf, RegexCache.matches(pattern: excludeIf, in: line) { return nil }
             for pattern in patterns {
-                if let captured = RegexCache.firstCapture(pattern: pattern, in: line) {
-                    let trimmed = captured.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty { return trimmed }
-                }
+                guard let captured = RegexCache.firstCaptureWithRange(pattern: pattern, in: line)
+                else { continue }
+                let trimmed = captured.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { return (trimmed, captured.range) }
             }
             return nil
         }
@@ -128,9 +184,35 @@ enum DocumentTextParser {
     }
 
     // Money and date fragments, shared so a change to what counts as an amount applies uniformly.
-    private static let moneyFragment = #"\$?\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)"#
+    //
+    // The trailing lookahead is the whole point of this being written out rather than being the
+    // obvious `[0-9,.]+`. Vision reads `4,18O.00` for `4,180.00` often enough to matter — a
+    // capital O where a zero belongs — and without the lookahead the fragment happily captures
+    // `4,18` and stops, turning a $4,180 rental charge into $418. That is not a near-miss the
+    // user notices; it is a plausible number in the right place.
+    //
+    // So an amount must not be followed by a letter or digit, nor by a separator that is itself
+    // followed by one. Both halves are needed. With only the first, the engine backtracks: on
+    // `4,18O.00` it gives up `4,18`, then `4,1`, then `4,`, and finally matches the bare `4` —
+    // whose next character is a comma, which passed. One dollar, from a four-thousand-dollar
+    // line, reported with high confidence. The second half closes that: a comma or a point with
+    // a digit after it means the number is still going, so the match is not at its end.
+    //
+    // `404.O2` is rejected outright. `$5,292.22.` at the end of a sentence is not, because the
+    // full stop has nothing after it. A rejected amount becomes a field the user fills in, with
+    // the garbled line visible under Recognised text — which is the honest outcome.
+    private static let moneyBoundary = #"(?![0-9A-Za-z]|[.,][0-9A-Za-z])"#
+    private static let moneyFragment =
+        #"\$?\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)"# + moneyBoundary
     private static let dateFragment =
         #"([0-9]{1,2}[/\-][0-9]{1,2}[/\-][0-9]{2,4}|[0-9]{4}-[0-9]{2}-[0-9]{2}|[A-Za-z]{3,9}\.?\s+[0-9]{1,2},?\s+[0-9]{4}|[0-9]{1,2}-[A-Za-z]{3}-[0-9]{2,4})"#
+
+    /// What can sit between a label and its value.
+    ///
+    /// An optional colon or equals, and optionally a run of leader characters — the
+    /// `DAY .................. 465.00` form that rate schedules are printed in. Two or more, so a
+    /// single stray dot cannot join two unrelated things.
+    private static let gap = #"\s*[:=]?\s*(?:[.·•\-–—_]{2,}\s*)?"#
 
     private static let sharedRules: [Rule] = [
         Rule(field: .agreementNumber, name: "labelled-agreement-number", confidence: 0.94, kind: .text,
@@ -154,19 +236,19 @@ enum DocumentTextParser {
 
         Rule(field: .dailyRate, name: "labelled-daily-rate", confidence: 0.94, kind: .money,
              patterns: [
-                #"(?i)\b(?:daily|day)\s*(?:rate|rental)?\s*[:]?\s*"# + moneyFragment,
+                #"(?i)\b(?:daily|day)\s*(?:rate|rental)?"# + gap + moneyFragment,
                 #"(?i)"# + moneyFragment + #"\s*(?:/|per\s+)day\b"#,
              ],
              excludeIf: #"(?i)\b(?:7\s*-?\s*day|28\s*-?\s*day|4\s*-?\s*week|four[\s\-]week|weekly)\b"#),
         Rule(field: .weeklyRate, name: "labelled-weekly-rate", confidence: 0.94, kind: .money,
              patterns: [
-                #"(?i)\b(?:weekly|week|7[\s\-]?day)\s*(?:rate|rental)?\s*[:]?\s*"# + moneyFragment,
+                #"(?i)\b(?:weekly|week|7[\s\-]?day)\s*(?:rate|rental)?"# + gap + moneyFragment,
                 #"(?i)"# + moneyFragment + #"\s*(?:/|per\s+)week\b"#,
              ],
              excludeIf: #"(?i)\b(?:4\s*-?\s*week|four[\s\-]week|28\s*-?\s*day)\b"#),
         Rule(field: .fourWeekRate, name: "labelled-four-week-rate", confidence: 0.94, kind: .money,
              patterns: [
-                #"(?i)\b(?:4[\s\-]?week|four[\s\-]week|28[\s\-]?day)\s*(?:rate|rental)?\s*[:]?\s*"# + moneyFragment,
+                #"(?i)\b(?:4[\s\-]?week|four[\s\-]week|28[\s\-]?day)\s*(?:rate|rental)?"# + gap + moneyFragment,
                 #"(?i)"# + moneyFragment + #"\s*(?:/|per\s+)(?:4\s*weeks?|28\s*days?)\b"#,
              ]),
     ]
@@ -174,11 +256,11 @@ enum DocumentTextParser {
     private static let contractRules: [Rule] = [
         Rule(field: .startDate, name: "labelled-start-date", confidence: 0.92, kind: .date,
              patterns: [
-                #"(?i)\b(?:date\s+out|out\s+date|start\s+date|delivery\s+date|rental\s+start|date\s+delivered)\s*[:]?\s*"# + dateFragment
+                #"(?i)\b(?:date\s+out|out\s+date|start\s+date|delivery\s+date|rental\s+start|date\s+delivered)"# + gap + dateFragment
              ]),
         Rule(field: .scheduledEndDate, name: "labelled-end-date", confidence: 0.9, kind: .date,
              patterns: [
-                #"(?i)\b(?:estimated\s+return|expected\s+return|due\s+(?:back|date)|scheduled\s+end|return\s+date|end\s+date)\s*[:]?\s*"# + dateFragment
+                #"(?i)\b(?:estimated\s+return|expected\s+return|due\s+(?:back|date)|scheduled\s+end|return\s+date|end\s+date)"# + gap + dateFragment
              ]),
     ]
 
@@ -188,32 +270,32 @@ enum DocumentTextParser {
                         #"(?i)\binvoice\s*#\s*([A-Z0-9][A-Z0-9\-/]{2,})"#]),
         Rule(field: .invoiceTotal, name: "labelled-invoice-total", confidence: 0.93, kind: .money,
              patterns: [
-                #"(?i)\b(?:invoice\s+total|total\s+due|amount\s+due|balance\s+due|grand\s+total)\s*[:]?\s*"# + moneyFragment
+                #"(?i)\b(?:invoice\s+total|total\s+due|amount\s+due|balance\s+due|grand\s+total)"# + gap + moneyFragment
              ]),
         Rule(field: .invoiceTotal, name: "bare-total", confidence: 0.7, kind: .money,
-             patterns: [#"(?i)^\s*total\s*[:]?\s*"# + moneyFragment + #"\s*$"#]),
+             patterns: [#"(?i)^\s*total"# + gap + moneyFragment + #"\s*$"#]),
         Rule(field: .billedThroughDate, name: "labelled-billed-through", confidence: 0.9, kind: .date,
              patterns: [
-                #"(?i)\b(?:billed\s+through|billing\s+period\s+end(?:ing)?|through|thru)\s*[:]?\s*"# + dateFragment
+                #"(?i)\b(?:billed\s+through|billing\s+period\s+end(?:ing)?|through|thru)"# + gap + dateFragment
              ]),
         Rule(field: .rentalSubtotal, name: "labelled-rental-subtotal", confidence: 0.9, kind: .money,
              patterns: [
-                #"(?i)\b(?:rental\s+(?:subtotal|charges?|amount)|equipment\s+rental)\s*[:]?\s*"# + moneyFragment
+                #"(?i)\b(?:rental\s+(?:subtotal|charges?|amount)|equipment\s+rental)"# + gap + moneyFragment
              ]),
         Rule(field: .deliveryCharge, name: "labelled-delivery", confidence: 0.9, kind: .money,
-             patterns: [#"(?i)\b(?:delivery|drop[\s\-]?off|freight\s+out)(?:\s+(?:charge|fee))?\s*[:]?\s*"# + moneyFragment]),
+             patterns: [#"(?i)\b(?:delivery|drop[\s\-]?off|freight\s+out)(?:\s+(?:charge|fee|surcharge|recovery))*"# + gap + moneyFragment]),
         Rule(field: .pickupCharge, name: "labelled-pickup", confidence: 0.9, kind: .money,
-             patterns: [#"(?i)\b(?:pick[\s\-]?up|collection|freight\s+in)(?:\s+(?:charge|fee))?\s*[:]?\s*"# + moneyFragment]),
+             patterns: [#"(?i)\b(?:pick[\s\-]?up|collection|freight\s+in)(?:\s+(?:charge|fee|surcharge|recovery))*"# + gap + moneyFragment]),
         Rule(field: .fuelCharge, name: "labelled-fuel", confidence: 0.9, kind: .money,
-             patterns: [#"(?i)\b(?:fuel|refuel(?:ing)?|diesel)(?:\s+(?:charge|fee|surcharge))?\s*[:]?\s*"# + moneyFragment]),
+             patterns: [#"(?i)\b(?:fuel|refuel(?:ing)?|diesel)(?:\s+(?:charge|fee|surcharge|recovery))*"# + gap + moneyFragment]),
         Rule(field: .damageCharge, name: "labelled-damage", confidence: 0.9, kind: .money,
-             patterns: [#"(?i)\b(?:damage|repair)(?:\s+(?:charge|fee|waiver))?\s*[:]?\s*"# + moneyFragment]),
+             patterns: [#"(?i)\b(?:damage|repair)(?:\s+(?:charge|fee|waiver|recovery))*"# + gap + moneyFragment]),
         Rule(field: .cleaningCharge, name: "labelled-cleaning", confidence: 0.9, kind: .money,
-             patterns: [#"(?i)\b(?:cleaning|wash[\s\-]?out)(?:\s+(?:charge|fee))?\s*[:]?\s*"# + moneyFragment]),
+             patterns: [#"(?i)\b(?:cleaning|wash[\s\-]?out)(?:\s+(?:charge|fee|surcharge|recovery))*"# + gap + moneyFragment]),
         Rule(field: .environmentalCharge, name: "labelled-environmental", confidence: 0.88, kind: .money,
-             patterns: [#"(?i)\b(?:environmental|enviro|misc(?:ellaneous)?)(?:\s+(?:charge|fee|recovery))?\s*[:]?\s*"# + moneyFragment]),
+             patterns: [#"(?i)\b(?:environmental|enviro|misc(?:ellaneous)?)(?:\s+(?:charge|fee|recovery|surcharge)){0,3}"# + gap + moneyFragment]),
         Rule(field: .taxAmount, name: "labelled-tax", confidence: 0.92, kind: .money,
-             patterns: [#"(?i)\b(?:sales\s+tax|tax(?:es)?)\s*(?:\([0-9.]+%\))?\s*[:]?\s*"# + moneyFragment]),
+             patterns: [#"(?i)\b(?:sales\s+tax|tax(?:es)?)\s*(?:\([0-9.]+%\))?"# + gap + moneyFragment]),
     ]
 
     private static func rules(for kind: DocumentKind) -> [Rule] {
@@ -286,6 +368,22 @@ enum RegexCache {
         guard let expression = expression(for: pattern) else { return false }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         return expression.firstMatch(in: text, range: range) != nil
+    }
+
+    /// The first capture group, and its range in the line.
+    static func firstCaptureWithRange(
+        pattern: String, in text: String
+    ) -> (text: String, range: NSRange)? {
+        guard let expression = expression(for: pattern) else { return nil }
+        let full = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = expression.firstMatch(in: text, options: [], range: full),
+              match.numberOfRanges > 1
+        else { return nil }
+        let captured = match.range(at: 1)
+        guard captured.location != NSNotFound,
+              let swiftRange = Range(captured, in: text)
+        else { return nil }
+        return (String(text[swiftRange]), captured)
     }
 
     /// The first capture group of the first match, or nil.

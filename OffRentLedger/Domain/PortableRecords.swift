@@ -19,6 +19,11 @@ struct VendorRecord: Codable, Sendable, Equatable, Identifiable {
     var email: String?
     var link: String?
     var standardNotes: String?
+    /// New in schema V3. Optional, so a backup written by build 7 still decodes: Swift's
+    /// synthesised `init(from:)` uses `decodeIfPresent` for an `Optional` property, which is
+    /// exactly the leniency an old file needs.
+    var contactName: String?
+    var address: String?
     var createdAt: Date
     var modifiedAt: Date
 }
@@ -73,6 +78,8 @@ struct AgreementRecord: Codable, Sendable, Equatable, Identifiable {
     var vendorID: UUID
     var jobSiteID: UUID?
     var agreementNumber: String?
+    /// New in schema V3, and optional for the same reason as the company fields above.
+    var purchaseOrderNumber: String?
     var startDate: Date
     var scheduledEndDate: Date?
     var disputeWindowDaysOverride: Int?

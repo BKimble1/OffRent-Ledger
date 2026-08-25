@@ -92,6 +92,7 @@ struct VendorListView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Vendor.name) private var vendors: [Vendor]
     @State private var editing: Vendor?
+    @State private var creating = false
 
     var body: some View {
         List {
@@ -130,16 +131,28 @@ struct VendorListView: View {
         }
         .offRentFormBackground()
         .navigationTitle("Rental companies")
+        .accessibilityIdentifier(A11yID.Company.listRoot)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { creating = true } label: {
+                    Label("Add a rental company", systemImage: "plus")
+                }
+                .accessibilityIdentifier(A11yID.Company.listAdd)
+            }
+        }
         .overlay {
             if vendors.isEmpty {
                 EmptyStateView(
                     symbol: "building.2",
                     title: "No rental companies yet",
-                    message: "They are created as you add rentals."
+                    message: "Add the yard you rent from and it is there for every rental after.",
+                    actionTitle: "Add a rental company",
+                    action: { creating = true }
                 )
             }
         }
-        .sheet(item: $editing) { vendor in VendorEditView(vendor: vendor) }
+        .sheet(item: $editing) { vendor in CompanyEditorView(existing: vendor) }
+        .sheet(isPresented: $creating) { CompanyEditorView(existing: nil) }
     }
 
     /// Branch or phone, plus how many rentals are filed under this company.
@@ -153,75 +166,11 @@ struct VendorListView: View {
     }
 }
 
-struct VendorEditView: View {
-    @Bindable var vendor: Vendor
-    @Environment(AppDependencies.self) private var dependencies
-    @Environment(\.modelContext) private var context
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Details") {
-                    TextField("Name", text: $vendor.name)
-                    TextField("Branch", text: Binding(
-                        get: { vendor.branch ?? "" }, set: { vendor.branch = $0.nilIfBlank }
-                    ))
-                }
-                Section {
-                    TextField("Phone", text: Binding(
-                        get: { vendor.phone ?? "" }, set: { vendor.phone = $0.nilIfBlank }
-                    ))
-                    .keyboardType(.phonePad)
-                    TextField("Email", text: Binding(
-                        get: { vendor.email ?? "" }, set: { vendor.email = $0.nilIfBlank }
-                    ))
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    TextField("Website or app link", text: Binding(
-                        get: { vendor.link ?? "" }, set: { vendor.link = $0.nilIfBlank }
-                    ))
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                } header: {
-                    Text("How you reach them")
-                } footer: {
-                    Text("""
-                        These become the Call, Email and Open-link buttons on the Contact Vendor \
-                        step. \(AppConfiguration.displayName) opens them for you — it never sends \
-                        anything itself.
-                        """)
-                }
-                Section("Notes") {
-                    TextField("Standard notes", text: Binding(
-                        get: { vendor.standardNotes ?? "" },
-                        set: { vendor.standardNotes = $0.nilIfBlank }
-                    ), axis: .vertical)
-                    .lineLimit(2...6)
-                }
-            }
-            .offRentFormBackground()
-            .navigationTitle("Rental company")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        vendor.modifiedAt = dependencies.clock.now
-                        try? context.save()
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
 struct JobSiteListView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \JobSite.name) private var jobSites: [JobSite]
     @State private var editing: JobSite?
+    @State private var creating = false
 
     var body: some View {
         List {
@@ -242,7 +191,7 @@ struct JobSiteListView: View {
                             // The subtitle says whether this site is on the map, because that is
                             // the one thing about a jobsite the user can now change and the one
                             // thing that decides whether it appears on Today.
-                            Text(site.placeName ?? site.address ?? site.projectIdentifier ?? "No place set")
+                            Text(site.locationSummary)
                                 .font(Typography.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
@@ -256,7 +205,7 @@ struct JobSiteListView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier(A11yID.Rentals.jobSiteRow)
+                .accessibilityIdentifier(A11yID.Jobsite.row(site.id))
             }
             .onDelete { offsets in
                 // Nullify, not cascade: deleting a jobsite label must not delete the rentals that
@@ -267,200 +216,30 @@ struct JobSiteListView: View {
         }
         .offRentFormBackground()
         .navigationTitle("Jobsites")
+        .accessibilityIdentifier(A11yID.Jobsite.listRoot)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { creating = true } label: {
+                    Label("Add a jobsite", systemImage: "plus")
+                }
+                .accessibilityIdentifier(A11yID.Jobsite.listAdd)
+            }
+        }
         .overlay {
             if jobSites.isEmpty {
                 EmptyStateView(
                     symbol: "mappin.and.ellipse",
                     title: "No jobsites yet",
-                    message: "They are created as you add rentals."
+                    message: "Put a site on the map once and every rental there shows up on it.",
+                    actionTitle: "Add a jobsite",
+                    action: { creating = true }
                 )
             }
         }
         .sheet(item: $editing) { site in
-            JobSiteEditView(site: site)
+            JobsiteMapEditor(existing: site)
         }
-    }
-}
-
-/// One jobsite: what it is called, and where it is.
-///
-/// This screen exists because of the map. Before it there was nowhere to give an existing
-/// jobsite a place, so every site created before this version would have stayed off the map
-/// forever with no way for anybody to fix it.
-struct JobSiteEditView: View {
-    @Bindable var site: JobSite
-
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
-    @Environment(AppDependencies.self) private var dependencies
-    @State private var showingPlaceSearch = false
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Name") {
-                    TextField("Jobsite name", text: $site.name)
-                        .accessibilityIdentifier(A11yID.Rentals.jobSiteName)
-                    TextField(
-                        "Project number (optional)",
-                        text: Binding(
-                            get: { site.projectIdentifier ?? "" },
-                            set: { site.projectIdentifier = $0.nilIfBlank }
-                        )
-                    )
-                    .autocorrectionDisabled()
-                }
-
-                Section {
-                    if site.coordinate != nil {
-                        LabeledContent("Place") {
-                            Text(site.placeName ?? site.address ?? "Set")
-                                .multilineTextAlignment(.trailing)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        if let address = site.address, site.placeName != nil {
-                            Text(address)
-                                .font(Typography.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Button("Change the place") { showingPlaceSearch = true }
-                            .accessibilityIdentifier(A11yID.Place.choose)
-                        Button("Remove the place", role: .destructive) {
-                            site.placeName = nil
-                            site.latitude = nil
-                            site.longitude = nil
-                        }
-                        .accessibilityIdentifier(A11yID.Place.clear)
-                    } else {
-                        Button {
-                            showingPlaceSearch = true
-                        } label: {
-                            Label("Find this site on a map", systemImage: "mappin.and.ellipse")
-                        }
-                        .accessibilityIdentifier(A11yID.Place.choose)
-                    }
-                } header: {
-                    Text("Where it is")
-                } footer: {
-                    Text("""
-                        Search for the address or the yard rather than typing coordinates. A site \
-                        with a place appears on the Today map; one without still works everywhere \
-                        else.
-                        """)
-                }
-            }
-            .offRentFormBackground()
-            .navigationTitle("Jobsite")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        site.modifiedAt = dependencies.clock.now
-                        try? context.save()
-                        dismiss()
-                    }
-                    .accessibilityIdentifier(A11yID.Rentals.jobSiteSave)
-                }
-            }
-            .sheet(isPresented: $showingPlaceSearch) {
-                PlaceSearchView(initialQuery: site.name) { place in
-                    site.placeName = place.name
-                    site.address = place.address.nilIfBlank ?? site.address
-                    site.latitude = place.latitude
-                    site.longitude = place.longitude
-                    if site.name.trimmingCharacters(in: .whitespaces).isEmpty {
-                        site.name = place.name
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct EditRentalItemView: View {
-    let itemID: UUID
-
-    @Environment(AppDependencies.self) private var dependencies
-    @Environment(\.modelContext) private var context
-    @Environment(\.dismiss) private var dismiss
-    @Query private var items: [RentalItem]
-
-    init(itemID: UUID) {
-        self.itemID = itemID
-        _items = Query(filter: #Predicate<RentalItem> { $0.id == itemID })
-    }
-
-    var body: some View {
-        Form {
-            if let item = items.first {
-                Section("Equipment") {
-                    TextField("Equipment", text: Binding(
-                        get: { item.equipmentName }, set: { item.equipmentName = $0 }
-                    ))
-                    TextField("Class", text: Binding(
-                        get: { item.equipmentClass ?? "" },
-                        set: { item.equipmentClass = $0.nilIfBlank }
-                    ))
-                }
-                Section("Rates") {
-                    CurrencyField(title: "Daily", value: Binding(
-                        get: { item.dailyRate }, set: { item.dailyRate = $0 }
-                    ))
-                    CurrencyField(title: "Weekly", value: Binding(
-                        get: { item.weeklyRate }, set: { item.weeklyRate = $0 }
-                    ))
-                    CurrencyField(title: "4-week", value: Binding(
-                        get: { item.fourWeekRate }, set: { item.fourWeekRate = $0 }
-                    ))
-                    Picker("Currently billing", selection: Binding(
-                        get: { item.terms.billingBasis },
-                        set: { item.billingBasisRaw = $0.rawValue }
-                    )) {
-                        ForEach(BillingBasis.allCases, id: \.self) { Text($0.displayName).tag($0) }
-                    }
-                }
-                Section("Rate changes") {
-                    OptionalDatePicker(title: "Next rate change", date: Binding(
-                        get: { item.nextRolloverDate }, set: { item.nextRolloverDate = $0 }
-                    ))
-                    CurrencyField(title: "Expected to add", value: Binding(
-                        get: { item.expectedNextIncrement },
-                        set: { item.expectedNextIncrement = $0 }
-                    ))
-                }
-                Section("Notes") {
-                    TextField("Included usage", text: Binding(
-                        get: { item.includedUsageNotes ?? "" },
-                        set: { item.includedUsageNotes = $0.nilIfBlank }
-                    ), axis: .vertical)
-                    .lineLimit(2...6)
-                    TextField("Notes", text: Binding(
-                        get: { item.notes ?? "" }, set: { item.notes = $0.nilIfBlank }
-                    ), axis: .vertical)
-                    .lineLimit(2...6)
-                }
-            }
-        }
-        .offRentFormBackground()
-        .navigationTitle("Edit terms")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Done") {
-                    if let item = items.first {
-                        item.modifiedAt = dependencies.clock.now
-                        // Editing a rate changes the estimate and can move the next rate change,
-                        // so both the cache and the reminders are recomputed rather than left to
-                        // drift until the next launch.
-                        RentalWorkflowService(context: context, clock: dependencies.clock)
-                            .refreshEstimate(for: item)
-                    }
-                    try? context.save()
-                    dismiss()
-                }
-            }
-        }
+        .sheet(isPresented: $creating) { JobsiteMapEditor(existing: nil) }
     }
 }
 

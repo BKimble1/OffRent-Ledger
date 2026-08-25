@@ -11,8 +11,8 @@ struct InvoiceReviewView: View {
     let invoiceID: UUID
 
     @Environment(AppDependencies.self) private var dependencies
-    @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
 
     @Query private var invoices: [VendorInvoice]
     @Query private var allItems: [RentalItem]
@@ -20,6 +20,9 @@ struct InvoiceReviewView: View {
     @State private var followUpReason = ""
     @State private var showingFollowUp = false
     @State private var rejection: TransitionRejection?
+    @State private var isAccepting = false
+    @State private var showingEditInvoice = false
+    @State private var justAccepted = false
 
     init(invoiceID: UUID) {
         self.invoiceID = invoiceID
@@ -77,6 +80,9 @@ struct InvoiceReviewView: View {
         .navigationTitle(invoice?.invoiceNumber ?? "Invoice")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingFollowUp) { followUpSheet }
+        .sheet(isPresented: $showingEditInvoice) {
+            if let item { AttachInvoiceSheet(itemID: item.id, editing: invoice?.id) }
+        }
         .onAppear {
             // Opening the review is what moves an invoice out of "not reviewed". It is a state
             // change the user caused, so it is recorded rather than inferred later.
@@ -115,36 +121,70 @@ struct InvoiceReviewView: View {
 
     private func comparisonSection(_ comparison: InvoiceComparison) -> some View {
         section(title: "Side by side", subtitle: comparison.expectationBasis) {
-            DetailRow(
-                label: "Expected rental amount",
-                value: comparison.expectedRentalSubtotal.map(Formatters.currency) ?? "Not available"
+            comparisonRow(
+                "Expected rental amount",
+                comparison.expectedRentalSubtotal.map(Formatters.currency) ?? "Not available"
             )
             RowDivider(inset: Space.comfortable)
-            DetailRow(
-                label: "Invoiced rental amount",
-                value: Formatters.currency(comparison.invoicedRentalSubtotal)
+            comparisonRow(
+                "Invoiced rental amount",
+                Formatters.currency(comparison.invoicedRentalSubtotal)
             )
             RowDivider(inset: Space.comfortable)
-            DetailRow(label: "Invoice total", value: Formatters.currency(comparison.invoiceTotal))
+            comparisonRow("Invoice total", Formatters.currency(comparison.invoiceTotal))
             RowDivider(inset: Space.comfortable)
-            DetailRow(label: "Sum of the lines", value: Formatters.currency(comparison.lineSum))
+            comparisonRow("Sum of the lines", Formatters.currency(comparison.lineSum))
             if let through = comparison.expectedBilledThroughDate {
                 RowDivider(inset: Space.comfortable)
-                DetailRow(label: "Expected billed through", value: Formatters.mediumDate(through))
+                comparisonRow("Expected billed through", Formatters.mediumDate(through))
             }
             if let invoice, let billedThrough = invoice.billedThroughDate {
                 RowDivider(inset: Space.comfortable)
-                DetailRow(
-                    label: "Invoice billed through",
-                    value: Formatters.mediumDate(billedThrough)
-                )
+                comparisonRow("Invoice billed through", Formatters.mediumDate(billedThrough))
             }
         }
-        // `.contain` first: without it this identifier is pushed down onto all five DetailRows
-        // and each one loses its own. The last accessibility dump showed exactly that — five
-        // separate elements all called "audit.comparisonTable".
+        // `.contain` first: without it this identifier is pushed down onto every row and each one
+        // loses its own. The last accessibility dump showed exactly that — five separate
+        // elements all called "audit.comparisonTable".
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11yID.Audit.comparisonTable)
+    }
+
+    /// A label and a figure that share a row until they cannot, and then stack.
+    ///
+    /// `DetailRow` put both on one line with the value trailing, and the screenshot shows what
+    /// that does at larger text sizes: "Expected rental amount" and "Not available" overlapping,
+    /// with the value running off the right edge. `ViewThatFits` keeps the compact form wherever
+    /// it genuinely fits and falls back to a stack everywhere else, so nothing ever clips.
+    private func comparisonRow(_ label: String, _ value: String) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.base) {
+                Text(label)
+                    .font(Typography.rowDetail)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: Space.snug)
+                Text(value)
+                    .font(Typography.rowTitle)
+                    .monospacedDigit()
+                    .multilineTextAlignment(.trailing)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(Typography.rowDetail)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(value)
+                    .font(Typography.rowTitle)
+                    .monospacedDigit()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, Space.comfortable)
+        .padding(.vertical, Space.base)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label), \(value)")
     }
 
     private func reviewFlagsSection(_ comparison: InvoiceComparison) -> some View {
@@ -315,25 +355,66 @@ struct InvoiceReviewView: View {
 
     /// The one decision this screen exists to let somebody make, kept in reach of the thumb.
     ///
-    /// The button alone. The sentence explaining what accepting does and does not do is four
-    /// lines long, and putting it in the bar cost 130pt of a 852pt screen on every scroll; it
-    /// reads better as the last thing in the content, immediately above this.
+    /// The shipped failure was a bright orange `Accept this invoice` that did nothing at all when
+    /// tapped. Three things were wrong at once, and only fixing all three makes the control
+    /// honest:
+    ///
+    /// 1. **The decision lived inside the action.** So "refused" and "accepted" looked identical
+    ///    from outside, and a refusal on the one record in the screenshot — no lines, no total —
+    ///    produced no alert either. Now `InvoiceAcceptance.decide` is asked *before* the button
+    ///    draws itself, and a blocked invoice is a disabled control with its reason printed under
+    ///    it and a route out.
+    /// 2. **Accepting changed nothing visible.** It stamped `reviewStatus` on the invoice and
+    ///    stopped. Nothing on this screen read that property, the rental stayed in Invoice
+    ///    Review, and the Audit counts did not move — so a tap that worked perfectly was
+    ///    indistinguishable from one that did not land. Now it resolves the rental through the
+    ///    workflow service, confirms in place, and pops back to Audit.
+    /// 3. **It could run twice.** Two taps wrote two acceptances. `isAccepting` and the
+    ///    `alreadyAccepted` decision each stop that on their own.
     private var acceptBar: some View {
         StickyActionBar {
-            Button("Accept this invoice") { acceptInvoice() }
-                .buttonStyle(.offRentPrimary)
-                .accessibilityIdentifier(A11yID.Audit.resolveInvoice)
+            VStack(spacing: Space.snug) {
+                if justAccepted {
+                    Label(InvoiceAcceptance.confirmation, systemImage: "checkmark.circle.fill")
+                        .font(Typography.rowTitle)
+                        .foregroundStyle(Palette.settled)
+                        .accessibilityIdentifier(A11yID.Audit.acceptedConfirmation)
+                } else {
+                    Button(action: acceptInvoice) {
+                        // Pressed and loading feedback, rather than a button that looks the same
+                        // whether or not the tap landed.
+                        if isAccepting {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text(InvoiceAcceptance.actionTitle(acceptanceInput))
+                        }
+                    }
+                    .buttonStyle(.offRentPrimary)
+                    .disabled(acceptanceBlock != nil || isAccepting)
+                    .accessibilityIdentifier(A11yID.Audit.resolveInvoice)
+
+                    if let block = acceptanceBlock {
+                        Text(block.explanation)
+                            .font(Typography.micro)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier(A11yID.Audit.resolveBlockedReason)
+
+                        if let route = block.editRouteTitle {
+                            Button(route) { showingEditInvoice = true }
+                                .buttonStyle(.offRentSecondary)
+                                .accessibilityIdentifier(A11yID.Audit.editInvoice)
+                        }
+                    }
+                }
+            }
         }
         // The refusal alert lives on the control that raises it, not on the scroll view.
         //
         // It used to sit beside `.sheet(isPresented:)` on the same view, and the two fought:
         // after the alert had been shown and dismissed once, setting `showingFollowUp` did
-        // nothing at all — the button was tapped, the action ran, and no sheet appeared. Twice in
-        // a row, on a simulator, with two and a half seconds between the two taps.
-        //
-        // Which is worse than a test failure. A user refused an accept, told to record a
-        // follow-up instead, then tapping "Record a follow-up" and getting nothing, is a dead
-        // end in the one workflow this screen exists for.
+        // nothing at all — the button was tapped, the action ran, and no sheet appeared.
         .alert(
             "Cannot resolve yet",
             isPresented: Binding(get: { rejection != nil }, set: { if !$0 { rejection = nil } })
@@ -342,6 +423,23 @@ struct InvoiceReviewView: View {
         } message: {
             Text(rejection?.message ?? "")
         }
+    }
+
+    /// Everything the decision depends on, gathered where it can be read.
+    private var acceptanceInput: InvoiceAcceptanceInput {
+        InvoiceAcceptanceInput(
+            openRecordedDiscrepancies: invoice?.openDiscrepancyCount ?? 0,
+            unaddressedFindings: unaddressedFindingCount,
+            lineCount: invoice?.lines?.count ?? 0,
+            invoiceTotal: invoice?.invoiceTotal ?? .zero,
+            currentStatus: invoice?.reviewStatus ?? .notReviewed
+        )
+    }
+
+    private var acceptanceBlock: InvoiceAcceptanceBlock? {
+        guard invoice != nil else { return nil }
+        if case let .failure(block) = InvoiceAcceptance.decide(acceptanceInput) { return block }
+        return nil
     }
 
     private var acceptExplanation: some View {
@@ -456,21 +554,52 @@ struct InvoiceReviewView: View {
     }
 
     private func acceptInvoice() {
-        guard let invoice else { return }
-        // Two kinds of open, and this used to count only one of them.
-        //
-        // `openDiscrepancyCount` counts *stored* discrepancies, and one only exists after the
-        // user has already accepted a finding or recorded a follow-up against it. So on the one
-        // path this guard exists for — a fresh invoice with a live mismatch on the screen in
-        // front of somebody — the count was zero and Accept went straight through without a
-        // word. The UI suite caught it the first time it ever got this far.
-        let openCount = invoice.openDiscrepancyCount + unaddressedFindingCount
-        guard openCount == 0 else {
-            rejection = .cannotResolveWithOpenDiscrepancies(count: openCount)
-            return
-        }
+        guard !isAccepting, let invoice else { return }
+        // Asked again at the moment of the tap, not only at draw time. A finding can appear
+        // between the two — the comparison is recomputed on every change to the store — and a
+        // disabled-looking button is not a guarantee.
+        guard case .success = InvoiceAcceptance.decide(acceptanceInput) else { return }
+
+        isAccepting = true
         invoice.reviewStatusRaw = InvoiceReviewStatus.accepted.rawValue
         invoice.reviewedAt = dependencies.clock.now
+
+        // The half that was missing. An accepted invoice closes the rental out: that is what
+        // moves it off the Audit tab's "awaiting review" list, off Today's "invoices to review",
+        // and into Resolved. Without it the user's tap changed a column nothing displayed.
+        if let item {
+            let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
+            let resolved = workflow.apply(
+                .resolve(openDiscrepancyCount: invoice.openDiscrepancyCount),
+                to: item,
+                detail: "Invoice \(invoice.invoiceNumber ?? "") accepted."
+                    .trimmingCharacters(in: .whitespaces)
+            )
+            if case let .failure(failure) = resolved {
+                // The state machine refused. Roll the invoice back rather than leaving it
+                // accepted against a rental that is not resolved — two records disagreeing is
+                // worse than one refusal the user can read.
+                invoice.reviewStatusRaw = InvoiceReviewStatus.inReview.rawValue
+                invoice.reviewedAt = nil
+                isAccepting = false
+                rejection = failure
+                return
+            }
+        }
+
         try? context.save()
+        isAccepting = false
+        withAnimation(Motion.quick) { justAccepted = true }
+
+        // Long enough to read the confirmation, short enough not to feel stuck. Going back is
+        // the honest destination: this invoice is finished, and Audit is where the next one is.
+        Task {
+            try? await Task.sleep(for: .seconds(1.2))
+            // `dismiss`, not a pop of the Audit stack. This screen is reached from Today as
+            // often as from Audit — Today's "Invoices to review" section links straight to it —
+            // and the destination is appended to whichever tab's path the link was in. Popping
+            // `auditPath` from a review opened on Today pops something else, or nothing.
+            dismiss()
+        }
     }
 }

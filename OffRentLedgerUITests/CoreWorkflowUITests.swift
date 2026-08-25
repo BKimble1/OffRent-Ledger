@@ -28,21 +28,19 @@ final class CoreWorkflowUITests: XCTestCase {
         app.launch()
 
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.buttons[A11yUI.Rentals.addRental]).tap()
+        app.openNewRental()
 
-        app.expect(app.textFields[A11yUI.AddRental.equipmentName]).tap()
-        app.typeText("Mini Excavator")
+        // The company is a reusable record chosen from a picker, not four text fields inlined
+        // into this form. Creating one here must come back to the draft with the machine name
+        // still in it — which is the §3 requirement, asserted immediately below.
+        app.fillMinimalRental(
+            equipment: "Mini Excavator", company: "Timberline Machinery", dailyRate: "410.00"
+        )
+        XCTAssertEqual(
+            app.textFields[A11yUI.AddRental.equipmentName].value as? String, "Mini Excavator",
+            "creating a company from inside the draft discarded what was already typed"
+        )
 
-        app.textFields[A11yUI.AddRental.newVendorName].tap()
-        app.typeText("Timberline Machinery")
-
-        app.textFields[A11yUI.AddRental.dailyRate].tap()
-        app.typeText("410.00")
-
-        // The decimal pad is still up and Save is pinned at the bottom. This passed three runs
-        // and failed the fourth, which is what a control the keyboard is sometimes over looks
-        // like. Dismissing first is also what a person does.
-        app.dismissKeyboard()
         app.tapWhenHittable(app.buttons[A11yUI.AddRental.save])
 
         XCTAssertTrue(app.staticTexts["Mini Excavator"].waitForExistence(timeout: 8))

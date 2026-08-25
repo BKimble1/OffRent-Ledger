@@ -219,6 +219,7 @@ struct ExportService {
             guard let vendor = vendorsByID[record.vendorID] else { continue }
             let agreement = RentalAgreement(
                 id: record.id, agreementNumber: record.agreementNumber,
+                purchaseOrderNumber: record.purchaseOrderNumber,
                 startDate: record.startDate, scheduledEndDate: record.scheduledEndDate,
                 disputeWindowDaysOverride: record.disputeWindowDaysOverride, notes: record.notes,
                 createdAt: record.createdAt, modifiedAt: record.modifiedAt,

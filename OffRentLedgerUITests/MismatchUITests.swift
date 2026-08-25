@@ -91,7 +91,7 @@ final class MismatchUITests: XCTestCase {
         let app = XCUIApplication.launched(seed: .empty)
 
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.buttons[A11yUI.Rentals.addRental]).tap()
+        app.openNewRental()
 
         let scan = app.buttons[A11yUI.AddRental.scanButton]
         try XCTSkipUnless(

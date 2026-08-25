@@ -50,6 +50,19 @@ struct RentalItemDetailView: View {
         .navigationTitle(item?.equipmentName ?? "Rental")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier(A11yID.ItemDetail.root)
+        // Edit belongs in the navigation bar, where iOS users look for it, as well as beside the
+        // terms it most often corrects. Before this it existed only as a link called "Edit
+        // terms", four sections down, that reached six of a rental's twenty fields.
+        .toolbar {
+            if let item {
+                ToolbarItem(placement: .primaryAction) {
+                    NavigationLink(value: RentalDestination.editItem(id: item.id)) {
+                        Text("Edit")
+                    }
+                    .accessibilityIdentifier(A11yID.ItemDetail.edit)
+                }
+            }
+        }
         .alert(
             "Cannot do that yet",
             isPresented: Binding(get: { rejection != nil }, set: { if !$0 { rejection = nil } })
@@ -304,7 +317,11 @@ struct RentalItemDetailView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            NavigationLink("Edit terms") { EditRentalItemView(itemID: item.id) }
+            NavigationLink(value: RentalDestination.editItem(id: item.id)) {
+                NavigationRow(title: "Edit this rental", symbol: "square.and.pencil")
+            }
+            .buttonStyle(.plain)
+            .minimumTapTarget()
         }
     }
 

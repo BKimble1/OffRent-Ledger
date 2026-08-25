@@ -150,7 +150,8 @@ final class BackupArchiveTests: XCTestCase {
             agreements: [
                 AgreementRecord(
                     id: agreementID, vendorID: vendorID, jobSiteID: siteID,
-                    agreementNumber: "CR-44821", startDate: date(2026, 5, 4, 7),
+                    agreementNumber: "CR-44821", purchaseOrderNumber: "PO-90114",
+                    startDate: date(2026, 5, 4, 7),
                     scheduledEndDate: date(2026, 5, 18, 7), disputeWindowDaysOverride: 15,
                     notes: nil, createdAt: date(2026, 5, 4), modifiedAt: date(2026, 5, 4)
                 )

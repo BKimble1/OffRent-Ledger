@@ -22,26 +22,83 @@ enum A11yUI {
         static let estimatedRentRunning = "today.estimatedRentRunning"
         static let emptyState = "today.emptyState"
         static let addRental = "today.addRental"
+        static let map = "today.map"
+        static let mapEmptyOverlay = "today.map.empty"
     }
 
     enum Rentals {
         static let root = "rentals.root"
+        static let addMenu = "rentals.addMenu"
         static let addRental = "rentals.addRental"
+        static let addCompany = "rentals.addCompany"
+        static let addJobSite = "rentals.addJobSite"
+        static let companiesLink = "rentals.companiesLink"
+        static let jobSitesLink = "rentals.jobSitesLink"
         static let searchField = "rentals.search"
+    }
+
+    enum Company {
+        static let root = "company.editor"
+        static let pickerRoot = "company.picker"
+        static let listRoot = "company.list"
+        static let listAdd = "company.list.add"
+        static let addNew = "company.addNew"
+        static let name = "company.name"
+        static let branch = "company.branch"
+        static let save = "company.save"
+        static let cancel = "company.cancel"
+    }
+
+    enum Jobsite {
+        static let root = "jobsite.editor"
+        static let pickerRoot = "jobsite.picker"
+        static let listRoot = "jobsite.list"
+        static let listAdd = "jobsite.list.add"
+        static let addNew = "jobsite.addNew"
+        static let map = "jobsite.map"
+        static let searchField = "jobsite.search"
+        static let dropPin = "jobsite.dropPin"
+        static let dropPinPanel = "jobsite.dropPinPanel"
+        static let panel = "jobsite.panel"
+        static let name = "jobsite.name"
+        static let confirm = "jobsite.confirm"
+        static let cancel = "jobsite.cancel"
+    }
+
+    enum OperationsMap {
+        static let root = "map.root"
+        static let close = "map.close"
+        static let searchField = "map.search"
+        static let searchResult = "map.searchResult"
+        static let legendToggle = "map.legendToggle"
+        static let legend = "map.legend"
+        static let detailCard = "map.detail"
+        static let openRecord = "map.open"
+        static let editRecord = "map.edit"
+        static let addLocation = "map.addLocation"
     }
 
     enum AddRental {
         static let root = "addRental.root"
         static let equipmentName = "addRental.equipmentName"
-        static let newVendorName = "addRental.newVendorName"
+        static let companyRow = "addRental.companyRow"
+        static let jobSiteRow = "addRental.jobSiteRow"
+        static let moreDetails = "addRental.moreDetails"
+        static let missingRequirement = "addRental.missingRequirement"
         static let dailyRate = "addRental.dailyRate"
         static let save = "addRental.save"
         static let cancel = "addRental.cancel"
         static let scanButton = "addRental.scan"
     }
 
+    enum EditRental {
+        static let root = "editRental.root"
+        static let save = "editRental.save"
+    }
+
     enum ItemDetail {
         static let root = "itemDetail.root"
+        static let edit = "itemDetail.edit"
         static let status = "itemDetail.status"
         static let markDone = "itemDetail.markDone"
         static let recordConfirmation = "itemDetail.recordConfirmation"
@@ -66,6 +123,10 @@ enum A11yUI {
         static let explanation = "scan.review.explanation"
         static let saveButton = "scan.review.save"
         static let cancelButton = "scan.review.cancel"
+        static let nothingFound = "scan.review.nothingFound"
+        static let enterManually = "scan.review.enterManually"
+        static let rescan = "scan.review.rescan"
+        static let rawTextToggle = "scan.review.rawText"
     }
 
     enum Onboarding {
@@ -76,11 +137,9 @@ enum A11yUI {
         static let tourRoot = "onboarding.tour"
         static let tourSkip = "onboarding.tour.skip"
         static let tourNext = "onboarding.tour.next"
-        static let tourDone = "onboarding.tour.done"
-        static let continueTour = "onboarding.tour.continue"
-        static let guideBar = "onboarding.guide"
-        static let guideSkip = "onboarding.guide.skip"
-        static let guideAction = "onboarding.guide.action"
+        static let tourBack = "onboarding.tour.back"
+        static let tourPage = "onboarding.tour.page"
+        static let replayTour = "settings.replayTour"
     }
 
     enum Audit {
@@ -89,8 +148,14 @@ enum A11yUI {
         static let recordFollowUp = "audit.recordFollowUp"
         static let followUpReason = "audit.followUpReason"
         static let resolveInvoice = "audit.resolveInvoice"
+        static let resolveBlockedReason = "audit.resolveBlocked"
+        static let editInvoice = "audit.editInvoice"
+        static let acceptedConfirmation = "audit.accepted"
         static let saveInvoice = "audit.saveInvoice"
         static let lineCategory = "audit.line.category"
+        static let comparisonTable = "audit.comparisonTable"
+        static let awaitingReview = "audit.awaitingReview"
+        static let resolvedHistory = "audit.resolvedHistory"
     }
 
     enum Paywall {

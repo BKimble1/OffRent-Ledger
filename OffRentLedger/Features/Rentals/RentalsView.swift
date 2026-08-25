@@ -21,6 +21,8 @@ struct RentalsView: View {
     @State private var jobSiteFilter: UUID?
     @State private var bucket: Bucket = .all
     @State private var limitAlert: EntitlementBlock?
+    @State private var creatingCompany = false
+    @State private var creatingJobSite = false
 
     var body: some View {
         // A real `List`. The hand-built scroll version reimplemented rows, separators and
@@ -45,10 +47,21 @@ struct RentalsView: View {
             Section {
                 NavigationLink(value: RentalDestination.vendors) {
                     Label("Rental companies", systemImage: "building.2")
+                        .badge(vendors.count)
                 }
+                .accessibilityIdentifier(A11yID.Rentals.companiesLink)
                 NavigationLink(value: RentalDestination.jobSites) {
                     Label("Jobsites", systemImage: "mappin.and.ellipse")
+                        .badge(jobSites.count)
                 }
+                .accessibilityIdentifier(A11yID.Rentals.jobSitesLink)
+            } header: {
+                Text("Reusable records")
+            } footer: {
+                Text("""
+                    A company or a jobsite you add here is available to every rental, and a \
+                    jobsite with a location puts its rentals on the map.
+                    """)
             }
         }
         .listStyle(.insetGrouped)
@@ -58,18 +71,17 @@ struct RentalsView: View {
             if !items.isEmpty { filterBar }
         }
         .navigationTitle("Rentals")
-        .searchable(text: $search, prompt: "Equipment, vendor or jobsite")
+        .searchable(text: $search, prompt: "Equipment, company, jobsite, ID or PO")
         // The identifier goes on the searchable container: `.searchable` builds the field
         // itself, so there is no view for the test to address without this.
         .accessibilityIdentifier(A11yID.Rentals.searchField)
         .offRentNavigationDestinations()
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: addRental) { Label("Add rental", systemImage: "plus") }
-                    .accessibilityIdentifier(A11yID.Rentals.addRental)
-            }
+            ToolbarItem(placement: .primaryAction) { addMenu }
             ToolbarItem(placement: .topBarLeading) { filterMenu }
         }
+        .sheet(isPresented: $creatingCompany) { CompanyEditorView(existing: nil) }
+        .sheet(isPresented: $creatingJobSite) { JobsiteMapEditor(existing: nil) }
         .alert(
             "Free plan limit",
             isPresented: Binding(get: { limitAlert != nil }, set: { if !$0 { limitAlert = nil } })
@@ -292,6 +304,39 @@ struct RentalsView: View {
         return days >= 0 ? days : nil
     }
 
+    /// The plus button, as a menu.
+    ///
+    /// It used to go straight into New Rental, which made a rental the only thing this tab could
+    /// create — so the two records a rental *needs* could only be made as a side effect of making
+    /// one. Adding the yard before the machine is the order people actually work in.
+    private var addMenu: some View {
+        Menu {
+            Button {
+                addRental()
+            } label: {
+                Label("New rental", systemImage: "shippingbox")
+            }
+            .accessibilityIdentifier(A11yID.Rentals.addRental)
+
+            Button {
+                creatingCompany = true
+            } label: {
+                Label("New rental company", systemImage: "building.2")
+            }
+            .accessibilityIdentifier(A11yID.Rentals.addCompany)
+
+            Button {
+                creatingJobSite = true
+            } label: {
+                Label("New jobsite", systemImage: "mappin.and.ellipse")
+            }
+            .accessibilityIdentifier(A11yID.Rentals.addJobSite)
+        } label: {
+            Label("Add", systemImage: "plus")
+        }
+        .accessibilityIdentifier(A11yID.Rentals.addMenu)
+    }
+
     // MARK: - Actions
 
     private func addRental() {
@@ -337,8 +382,10 @@ struct RentalsView: View {
                 item.vendorEquipmentIdentifier,
                 item.serialNumber,
                 item.agreement?.agreementNumber,
+                item.agreement?.purchaseOrderNumber,
                 item.agreement?.vendor?.name,
                 item.agreement?.jobSite?.name,
+                item.agreement?.jobSite?.address,
             ]
             let haystack: String = fields.compactMap { $0 }.joined(separator: " ")
             return haystack.localizedCaseInsensitiveContains(search)

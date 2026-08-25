@@ -13,7 +13,7 @@ final class EntitlementUITests: XCTestCase {
         let app = XCUIApplication.launched(seed: .freeLimit, entitlement: .free)
 
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.buttons[A11yUI.Rentals.addRental]).tap()
+        app.openNewRental()
 
         let alert = app.alerts.element
         XCTAssertTrue(alert.waitForExistence(timeout: 5), "a second open rental must be refused")
@@ -72,7 +72,7 @@ final class EntitlementUITests: XCTestCase {
         let app = XCUIApplication.launched(seed: .freeLimit, entitlement: .pro)
 
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.buttons[A11yUI.Rentals.addRental]).tap()
+        app.openNewRental()
         XCTAssertTrue(
             app.anyElement(A11yUI.AddRental.root).waitForExistence(timeout: 8),
             "Pro must allow a second open rental"

@@ -20,7 +20,25 @@ enum A11yID {
         static let emptyState = "today.emptyState"
         static let addRental = "today.addRental"
         static let map = "today.map"
-        static let mapSelection = "today.map.selection"
+        static let mapEmptyOverlay = "today.map.empty"
+    }
+
+    /// The full-screen map.
+    enum OperationsMap {
+        static let root = "map.root"
+        static let map = "map.canvas"
+        static let close = "map.close"
+        static let searchField = "map.search"
+        static let searchResults = "map.searchResults"
+        static let searchResult = "map.searchResult"
+        static let legendToggle = "map.legendToggle"
+        static let legend = "map.legend"
+        static let detailCard = "map.detail"
+        static let clusterCard = "map.cluster"
+        static let unplacedNotice = "map.unplaced"
+        static let openRecord = "map.open"
+        static let editRecord = "map.edit"
+        static let addLocation = "map.addLocation"
     }
 
     enum Rentals {
@@ -31,18 +49,65 @@ enum A11yID {
         static let searchField = "rentals.search"
         static let filterMenu = "rentals.filterMenu"
         static func row(_ id: UUID) -> String { "rentals.row.\(id.uuidString)" }
-        static let jobSiteRow = "rentals.jobSite.row"
-        static let jobSiteName = "rentals.jobSite.name"
-        static let jobSiteSave = "rentals.jobSite.save"
+        static let addMenu = "rentals.addMenu"
+        static let addCompany = "rentals.addCompany"
+        static let addJobSite = "rentals.addJobSite"
+        static let companiesLink = "rentals.companiesLink"
+        static let jobSitesLink = "rentals.jobSitesLink"
+    }
+
+    /// The reusable rental-company editor and its picker.
+    enum Company {
+        static let root = "company.editor"
+        static let pickerRoot = "company.picker"
+        static let listRoot = "company.list"
+        static let listAdd = "company.list.add"
+        static let addNew = "company.addNew"
+        static let name = "company.name"
+        static let branch = "company.branch"
+        static let contact = "company.contact"
+        static let phone = "company.phone"
+        static let email = "company.email"
+        static let address = "company.address"
+        static let save = "company.save"
+        static let cancel = "company.cancel"
+        static func row(_ id: UUID) -> String { "company.row.\(id.uuidString)" }
+    }
+
+    /// The map-first jobsite editor and its picker.
+    enum Jobsite {
+        static let root = "jobsite.editor"
+        static let pickerRoot = "jobsite.picker"
+        static let listRoot = "jobsite.list"
+        static let listAdd = "jobsite.list.add"
+        static let addNew = "jobsite.addNew"
+        static let none = "jobsite.none"
+        static let map = "jobsite.map"
+        static let searchField = "jobsite.search"
+        static let searchResult = "jobsite.searchResult"
+        static let dropPin = "jobsite.dropPin"
+        static let dropPinPanel = "jobsite.dropPinPanel"
+        static let panel = "jobsite.panel"
+        static let name = "jobsite.name"
+        static let address = "jobsite.address"
+        static let confirm = "jobsite.confirm"
+        static let cancel = "jobsite.cancel"
+        static func row(_ id: UUID) -> String { "jobsite.row.\(id.uuidString)" }
     }
 
     enum AddRental {
         static let root = "addRental.root"
         static let equipmentName = "addRental.equipmentName"
-        static let vendorPicker = "addRental.vendorPicker"
-        static let newVendorName = "addRental.newVendorName"
-        static let jobSitePicker = "addRental.jobSitePicker"
-        static let newJobSiteName = "addRental.newJobSiteName"
+        static let equipmentClass = "addRental.equipmentClass"
+        static let companyRow = "addRental.companyRow"
+        static let jobSiteRow = "addRental.jobSiteRow"
+        static let moreDetails = "addRental.moreDetails"
+        static let equipmentIdentifier = "addRental.equipmentIdentifier"
+        static let serialNumber = "addRental.serialNumber"
+        static let purchaseOrder = "addRental.purchaseOrder"
+        static let notes = "addRental.notes"
+        static let scheduledEnd = "addRental.scheduledEnd"
+        static let missingRequirement = "addRental.missingRequirement"
         static let agreementNumber = "addRental.agreementNumber"
         static let deliveryDate = "addRental.deliveryDate"
         static let dailyRate = "addRental.dailyRate"
@@ -56,8 +121,14 @@ enum A11yID {
         static let scanButton = "addRental.scan"
     }
 
+    enum EditRental {
+        static let root = "editRental.root"
+        static let save = "editRental.save"
+    }
+
     enum ItemDetail {
         static let root = "itemDetail.root"
+        static let edit = "itemDetail.edit"
         static let status = "itemDetail.status"
         static let estimate = "itemDetail.estimate"
         static let markDone = "itemDetail.markDone"
@@ -114,6 +185,10 @@ enum A11yID {
         static let saveButton = "scan.review.save"
         static let cancelButton = "scan.review.cancel"
         static let rawTextToggle = "scan.review.rawText"
+        static let nothingFound = "scan.review.nothingFound"
+        static let rescan = "scan.review.rescan"
+        static let addPages = "scan.review.addPages"
+        static let enterManually = "scan.review.enterManually"
         static let pagePreview = "scan.review.pages"
         static let pageViewer = "scan.review.page"
         static func field(_ field: SuggestedField) -> String { "scan.review.field.\(field.rawValue)" }
@@ -132,6 +207,9 @@ enum A11yID {
         static let recordFollowUp = "audit.recordFollowUp"
         static let followUpReason = "audit.followUpReason"
         static let resolveInvoice = "audit.resolveInvoice"
+        static let resolveBlockedReason = "audit.resolveBlocked"
+        static let editInvoice = "audit.editInvoice"
+        static let acceptedConfirmation = "audit.accepted"
         static let saveInvoice = "audit.saveInvoice"
         static let lineCategory = "audit.line.category"
         static func line(_ id: UUID) -> String { "audit.line.\(id.uuidString)" }
@@ -151,15 +229,6 @@ enum A11yID {
         static let dataReassurance = "paywall.dataReassurance"
     }
 
-    enum Place {
-        static let root = "place.root"
-        static let searchField = "place.search"
-        static let result = "place.result"
-        static let cancel = "place.cancel"
-        static let choose = "place.choose"
-        static let clear = "place.clear"
-    }
-
     enum Onboarding {
         static let welcomeRoot = "onboarding.welcome"
         static let welcomeAddRental = "onboarding.welcome.addRental"
@@ -168,13 +237,9 @@ enum A11yID {
         static let tourRoot = "onboarding.tour"
         static let tourSkip = "onboarding.tour.skip"
         static let tourNext = "onboarding.tour.next"
-        static let tourDone = "onboarding.tour.done"
         static let replayTour = "settings.replayTour"
-        static let continueTour = "onboarding.tour.continue"
-        static let guideBar = "onboarding.guide"
-        static let guideSkip = "onboarding.guide.skip"
-        static let guideAction = "onboarding.guide.action"
-        static let stopGuide = "settings.stopGuide"
+        static let tourBack = "onboarding.tour.back"
+        static let tourPage = "onboarding.tour.page"
     }
 
     enum Settings {

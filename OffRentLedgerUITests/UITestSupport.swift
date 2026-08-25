@@ -270,3 +270,79 @@ extension XCUIApplication {
         launch()
     }
 }
+
+// MARK: - Robots for the flows that changed shape
+
+extension XCUIApplication {
+
+    /// A menu item, addressed however UIKit chose to expose it.
+    ///
+    /// SwiftUI builds a `Menu`'s contents into a `UIMenu` of `UIAction`s, and an accessibility
+    /// identifier set on the `Button` does not reliably survive that translation — the element
+    /// that appears in the tree is usually addressed by its visible title, and it may be a
+    /// `button` or a `menuItem` depending on the presentation. Every form is tried rather than
+    /// one being guessed at, because guessing wrong here is a timeout that names nothing.
+    func menuItem(_ identifier: String, titled title: String) -> XCUIElement {
+        for candidate in [
+            buttons[identifier],
+            menuItems[identifier],
+            buttons[title],
+            menuItems[title],
+            descendants(matching: .any).matching(identifier: identifier).firstMatch,
+        ] where candidate.exists {
+            return candidate
+        }
+        // Nothing exists yet. Return the most likely one so `expect` can wait on it and report
+        // the screen's real contents if it never arrives.
+        return buttons[title]
+    }
+
+    /// Opens New Rental from the Rentals tab.
+    ///
+    /// The plus is a menu now — New Rental, New Rental Company, New Jobsite — so reaching the
+    /// form is two taps rather than one. Wrapped here so that the twelve tests which only want
+    /// to get to the form do not each encode the menu's shape.
+    func openNewRental() {
+        tapWhenHittable(expect(buttons[A11yUI.Rentals.addMenu]))
+        tapWhenHittable(expect(menuItem(A11yUI.Rentals.addRental, titled: "New rental")))
+    }
+
+    /// The same, for the two records the menu can also create.
+    func openNewCompanyFromMenu() {
+        tapWhenHittable(expect(buttons[A11yUI.Rentals.addMenu]))
+        tapWhenHittable(expect(menuItem(A11yUI.Rentals.addCompany, titled: "New rental company")))
+    }
+
+    func openNewJobsiteFromMenu() {
+        tapWhenHittable(expect(buttons[A11yUI.Rentals.addMenu]))
+        tapWhenHittable(expect(menuItem(A11yUI.Rentals.addJobSite, titled: "New jobsite")))
+    }
+
+    /// Creates a rental company from inside a rental draft and returns to the draft with it
+    /// selected.
+    ///
+    /// This is the §3 requirement expressed as a helper: `Add New` inside the picker opens the
+    /// same editor the Rentals plus menu opens, and saving comes back to the draft rather than
+    /// discarding it.
+    func addCompanyFromDraft(named name: String) {
+        tapInContent(expect(anyElement(A11yUI.AddRental.companyRow)))
+        tapWhenHittable(expect(buttons[A11yUI.Company.addNew]))
+        expect(textFields[A11yUI.Company.name]).tap()
+        typeText(name)
+        dismissKeyboard()
+        tapWhenHittable(expect(buttons[A11yUI.Company.save]))
+    }
+
+    /// Fills in the minimum a rental needs: a machine, a company, a daily rate.
+    func fillMinimalRental(equipment: String, company: String, dailyRate: String) {
+        expect(textFields[A11yUI.AddRental.equipmentName]).tap()
+        typeText(equipment)
+        dismissKeyboard()
+
+        addCompanyFromDraft(named: company)
+
+        tapInContent(expect(textFields[A11yUI.AddRental.dailyRate]))
+        typeText(dailyRate)
+        dismissKeyboard()
+    }
+}

@@ -90,6 +90,42 @@ struct SuggestionProvenance: Sendable, Equatable, Codable {
     var rule: String
     /// Vision's own confidence for the text, before the parser's rule confidence is applied.
     var recognitionConfidence: Double
+    /// Which page of the document the line came from, zero-based.
+    ///
+    /// Added because a five-page vendor invoice has a rate table on page 1 and a summary on
+    /// page 4, and "read from: TOTAL DUE $3,214.00" with no page is not enough for a user to
+    /// go and check it. Defaults to 0 so every existing call site and fixture still builds.
+    var page: Int
+    /// Where in `sourceLine` the captured value sits, as UTF-16 offsets, when the rule knows.
+    ///
+    /// Two integers rather than a `Range` so the type stays `Codable` without a custom
+    /// implementation. `nil` when the rule matched the whole line.
+    var valueStart: Int?
+    var valueLength: Int?
+
+    init(
+        sourceLine: String,
+        lineIndex: Int,
+        rule: String,
+        recognitionConfidence: Double,
+        page: Int = 0,
+        valueStart: Int? = nil,
+        valueLength: Int? = nil
+    ) {
+        self.sourceLine = sourceLine
+        self.lineIndex = lineIndex
+        self.rule = rule
+        self.recognitionConfidence = recognitionConfidence
+        self.page = page
+        self.valueStart = valueStart
+        self.valueLength = valueLength
+    }
+
+    /// A page is only worth naming when there is more than one.
+    func pageDescription(of pageCount: Int) -> String? {
+        guard pageCount > 1 else { return nil }
+        return "page \(page + 1)"
+    }
 }
 
 struct FieldSuggestion: Sendable, Equatable, Identifiable {
@@ -165,18 +201,38 @@ enum DocumentKind: String, Codable, Sendable, CaseIterable {
 struct RecognizedDocument: Sendable, Equatable {
     var rawText: String
     var lines: [String]
+    /// Which page each line came from, parallel to `lines`.
+    ///
+    /// Empty when the recogniser did not track it, in which case every line reports page 0.
+    /// Kept as a parallel array rather than folded into a `RecognizedLine` struct so that every
+    /// existing call site — three services, two stubs and forty fixtures — still compiles.
+    var linePages: [Int]
     /// Mean per-line confidence reported by the recogniser, 0…1.
     var averageRecognitionConfidence: Double
     var pageCount: Int
     var source: DocumentSource
 
+    /// The page a line was recognised on, zero-based, or 0 when unknown.
+    func page(ofLineAt index: Int) -> Int {
+        linePages.indices.contains(index) ? linePages[index] : 0
+    }
+
+    /// The lines on one page, with their indices into `lines`.
+    func lines(onPage page: Int) -> [(index: Int, text: String)] {
+        lines.enumerated()
+            .filter { self.page(ofLineAt: $0.offset) == page }
+            .map { (index: $0.offset, text: $0.element) }
+    }
+
     init(
         rawText: String,
         lines: [String]? = nil,
+        linePages: [Int] = [],
         averageRecognitionConfidence: Double = 1.0,
         pageCount: Int = 1,
         source: DocumentSource = .documentCamera
     ) {
+        self.linePages = linePages
         self.rawText = rawText
         self.lines = lines ?? rawText
             .components(separatedBy: .newlines)

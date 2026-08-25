@@ -34,26 +34,18 @@ struct SettingsView: View {
             }
 
             Section {
+                // One entry, and it runs the same walkthrough the app presents on a first
+                // launch. There used to be two — a page tour and a hands-on guide that asked
+                // the user to work through the real workflow — and the second one could not be
+                // finished without creating records to practise on.
                 Button {
                     onboarding.startTour()
                 } label: {
-                    Label("Show the tour again", systemImage: "questionmark.circle")
+                    Label("Replay the walkthrough", systemImage: "questionmark.circle")
                 }
                 .accessibilityIdentifier(A11yID.Onboarding.replayTour)
-
-                if onboarding.isGuidedTourActive {
-                    Button("Stop the walkthrough", role: .destructive) {
-                        onboarding.endGuidedTour()
-                    }
-                    .accessibilityIdentifier(A11yID.Onboarding.stopGuide)
-                } else {
-                    Button {
-                        onboarding.startGuidedTour()
-                    } label: {
-                        Label("Walk me through the workflow", systemImage: "figure.walk")
-                    }
-                    .accessibilityIdentifier(A11yID.Onboarding.continueTour)
-                }
+            } footer: {
+                Text("Seven pages. It explains the workflow without changing anything.")
             }
 
             Section("Legal and support") {

@@ -1,11 +1,18 @@
+import PhotosUI
 import SwiftUI
 import UIKit
 
 /// The review screen every scan passes through.
 ///
-/// There is no path from a scan to a saved record that does not stop here. The Save button is the
-/// only caller of `acceptedValues()`, and dismissing this sheet — by Cancel, by swipe, by
+/// There is no path from a scan to a saved record that does not stop here. The commit button is
+/// the only caller of `acceptedValues()`, and dismissing this sheet — by Cancel, by swipe, by
 /// backgrounding — writes nothing at all.
+///
+/// The screenshot that prompted the rebuild showed a residential lease under the words "Nothing
+/// was recognised on this page" and a large orange button reading `Use 0 values`. The button was
+/// doing the honest thing — committing nothing — while looking like the way forward, and the way
+/// forward was in fact the small grey Cancel above it. A count of zero is not a quantity to
+/// offer; it is a different screen, and this has one.
 struct ScanReviewView: View {
 
     @Bindable var model: ScanReviewViewModel
@@ -13,41 +20,40 @@ struct ScanReviewView: View {
     let onCancel: () -> Void
 
     @State private var enlargedPage: Int?
+    @State private var showsRecognizedText = false
+    @State private var addingPages = false
+    @State private var addedPhotos: [PhotosPickerItem] = []
 
     var body: some View {
         NavigationStack {
             Group {
                 switch model.phase {
                 case .idle, .recognising:
-                    VStack(spacing: 14) {
-                        ProgressView()
-                        Text("Reading the document on this iPhone…")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Text(AppCopy.ocrLocalOnly)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    progressState
 
                 case let .failed(message):
                     EmptyStateView(
                         symbol: "doc.viewfinder",
                         title: "Could not read that",
                         message: message,
-                        actionTitle: "Enter it by hand",
+                        actionTitle: ScanReviewCopy.enterManually,
                         action: { onSave([:]) }
                     )
+                    .accessibilityIdentifier(A11yID.Scan.nothingFound)
 
                 case .reviewing, .reading:
-                    reviewForm
+                    if model.outcome.hasAnything {
+                        reviewForm
+                    } else {
+                        nothingFoundState
+                    }
                 }
             }
             .offRentFormBackground()
             .safeAreaInset(edge: .bottom) {
-                if model.phase == .reviewing || model.phase == .reading { saveBar }
+                if model.outcome.hasAnything, model.phase == .reviewing || model.phase == .reading {
+                    commitBar
+                }
             }
             .navigationTitle("Check what was read")
             .navigationBarTitleDisplayMode(.inline)
@@ -65,25 +71,107 @@ struct ScanReviewView: View {
                     .accessibilityIdentifier(A11yID.Scan.cancelButton)
                 }
             }
+            .photosPicker(
+                isPresented: $addingPages,
+                selection: $addedPhotos,
+                maxSelectionCount: 6,
+                matching: .images
+            )
+            .onChange(of: addedPhotos) { _, items in
+                guard !items.isEmpty else { return }
+                Task { await addPages(items) }
+            }
         }
     }
 
+    // MARK: - States
+
+    private var progressState: some View {
+        VStack(spacing: Space.comfortable) {
+            ProgressView()
+            Text("Reading the document on this iPhone…")
+                .font(Typography.rowDetail)
+                .foregroundStyle(.secondary)
+            Text(AppCopy.ocrLocalOnly)
+                .font(Typography.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Space.section)
+            // Cancellation, offered rather than only supported. A ten-page PDF is minutes of
+            // CPU, and a screen with a spinner and no exit is a screen people force-quit.
+            Button("Stop") {
+                model.cancel()
+                onCancel()
+            }
+            .buttonStyle(.offRentSecondary)
+            .padding(.top, Space.snug)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// The honest empty state. Three ways on, and none of them is a button that commits nothing.
+    private var nothingFoundState: some View {
+        ScrollView {
+            VStack(spacing: Space.comfortable) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 34))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, Space.section)
+
+                Text(ScanReviewCopy.nothingFoundTitle(kind: model.kind))
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+
+                Text(ScanReviewCopy.nothingFoundMessage(kind: model.kind, pageCount: model.pageCount))
+                    .font(Typography.rowDetail)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(spacing: Space.snug) {
+                    Button(ScanReviewCopy.enterManually) { onSave([:]) }
+                        .buttonStyle(.offRentPrimary)
+                        .accessibilityIdentifier(A11yID.Scan.enterManually)
+
+                    HStack(spacing: Space.snug) {
+                        Button(ScanReviewCopy.rescan) {
+                            model.cancel()
+                            onCancel()
+                        }
+                        .buttonStyle(.offRentSecondary)
+                        .accessibilityIdentifier(A11yID.Scan.rescan)
+
+                        Button(ScanReviewCopy.addPages) { addingPages = true }
+                            .buttonStyle(.offRentSecondary)
+                            .accessibilityIdentifier(A11yID.Scan.addPages)
+                    }
+                }
+                .padding(.top, Space.snug)
+
+                if !model.pageImageData.isEmpty { pagePreview }
+                recognizedTextDisclosure
+            }
+            .padding(.horizontal, Space.roomy)
+            .padding(.bottom, Space.screenBottom)
+        }
+        .accessibilityIdentifier(A11yID.Scan.nothingFound)
+    }
+
     /// The commit, and the count of what it will commit.
-    ///
-    /// A scan review is a list of things the user is agreeing to; the button that ends it should
-    /// say how many, because the difference between six and two ticked fields is invisible once
-    /// the list is longer than a screen.
-    private var saveBar: some View {
+    private var commitBar: some View {
         StickyActionBar {
             VStack(spacing: Space.snug) {
-                Button {
-                    onSave(model.acceptedValues())
-                } label: {
-                    Text(selectedCount == 1 ? "Use 1 value" : "Use \(selectedCount) values")
+                if let title = ScanReviewCopy.useValues(selected: model.selection.count) {
+                    Button { onSave(model.acceptedValues()) } label: { Text(title) }
+                        .buttonStyle(.offRentPrimary)
+                        .accessibilityIdentifier(A11yID.Scan.saveButton)
+                } else {
+                    // Everything was unticked. Carrying on by hand is a real outcome and gets its
+                    // own words; `Use 0 values` is not a thing this screen can say.
+                    Button(ScanReviewCopy.enterManually) { onSave([:]) }
+                        .buttonStyle(.offRentPrimary)
+                        .accessibilityIdentifier(A11yID.Scan.enterManually)
                 }
-                .buttonStyle(.offRentPrimary)
-                .accessibilityIdentifier(A11yID.Scan.saveButton)
-                .disabled(model.phase == .recognising || model.phase == .idle)
                 Text("Nothing is saved to a rental until you tap this.")
                     .font(Typography.micro)
                     .foregroundStyle(.secondary)
@@ -91,32 +179,20 @@ struct ScanReviewView: View {
         }
     }
 
-    private var selectedCount: Int { model.selection.count }
+    // MARK: - The form
 
     private var reviewForm: some View {
         Form {
-            if !model.pageImageData.isEmpty {
-                Section {
-                    pagePreview
-                } header: {
-                    Text("What was scanned")
-                } footer: {
-                    Text("Tap a page to look at it closely. Nothing here is saved unless you save the rental.")
-                }
-            }
-
             Section {
                 summaryLine
-                Label(AppCopy.scanReviewExplanation, systemImage: "exclamationmark.circle")
-                    .font(.footnote)
+            } footer: {
+                Text(AppCopy.scanReviewExplanation)
                     .accessibilityIdentifier(A11yID.Scan.explanation)
             }
 
             if !confidentSuggestions.isEmpty {
                 Section {
-                    ForEach(confidentSuggestions) { suggestion in
-                        row(for: suggestion)
-                    }
+                    ForEach(confidentSuggestions) { suggestion in row(for: suggestion) }
                 } header: {
                     Text("Read with high confidence")
                 } footer: {
@@ -126,9 +202,7 @@ struct ScanReviewView: View {
 
             if !model.lowConfidenceSuggestions.isEmpty {
                 Section {
-                    ForEach(model.lowConfidenceSuggestions) { suggestion in
-                        row(for: suggestion)
-                    }
+                    ForEach(model.lowConfidenceSuggestions) { suggestion in row(for: suggestion) }
                 } header: {
                     Text("Less certain")
                 } footer: {
@@ -136,41 +210,44 @@ struct ScanReviewView: View {
                 }
             }
 
-            if model.suggestions.isEmpty {
+            if !model.pageImageData.isEmpty {
                 Section {
-                    Text("""
-                        Nothing recognisable was found on that document. You can still enter \
-                        everything by hand — tap Save to carry on.
-                        """)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    pagePreview
+                    Button(ScanReviewCopy.addPages) { addingPages = true }
+                        .accessibilityIdentifier(A11yID.Scan.addPages)
+                } header: {
+                    Text("What was scanned")
                 }
             }
 
-            Section {
-                Toggle("Show the text that was read", isOn: $model.showRawText)
-                    .accessibilityIdentifier(A11yID.Scan.rawTextToggle)
-                    .minimumTapTarget()
-                if model.showRawText, let document = model.document {
-                    Text(document.rawText)
-                        .font(.caption2.monospaced())
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if model.showRawText, let unmatched = model.result?.unmatchedLines, !unmatched.isEmpty {
-                    DisclosureGroup("Lines that were not interpreted (\(unmatched.count))") {
-                        ForEach(Array(unmatched.enumerated()), id: \.offset) { _, line in
-                            Text(line).font(.caption2.monospaced())
-                        }
-                    }
-                    .font(.footnote)
-                }
-            } header: {
-                Text("What the scanner saw")
-            } footer: {
+            Section { recognizedTextDisclosure } footer: {
                 Text(AppCopy.ocrLocalOnly)
             }
         }
+    }
+
+    /// The raw text, folded away.
+    ///
+    /// It used to be a toggle followed by an inline wall of monospaced OCR, which is why the
+    /// review screen was dominated by empty cards: the sections that held it were sized for text
+    /// that was usually not shown. A `DisclosureGroup` is one row until somebody wants it.
+    private var recognizedTextDisclosure: some View {
+        DisclosureGroup(isExpanded: $showsRecognizedText) {
+            if let document = model.document {
+                Text(document.rawText)
+                    .font(.caption2.monospaced())
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let unmatched = model.result?.unmatchedLines, !unmatched.isEmpty {
+                Text("\(unmatched.count) line\(unmatched.count == 1 ? "" : "s") were not interpreted.")
+                    .font(Typography.micro)
+                    .foregroundStyle(.secondary)
+            }
+        } label: {
+            Label(ScanReviewCopy.recognizedText, systemImage: "text.alignleft")
+        }
+        .accessibilityIdentifier(A11yID.Scan.rawTextToggle)
     }
 
     /// The pages, as a strip. Reading a value off a screen and checking it against the page it
@@ -186,7 +263,7 @@ struct ScanReviewView: View {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(width: 92, height: 120)
+                                .frame(width: 68, height: 88)
                                 .clipShape(RoundedRectangle(cornerRadius: Radius.control))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: Radius.control)
@@ -223,28 +300,23 @@ struct ScanReviewView: View {
     /// matched on a line and which a model proposed from a table.
     @ViewBuilder
     private var summaryLine: some View {
-        let total = model.suggestions.count
-        let fromModel = model.modelSuggestionCount
         VStack(alignment: .leading, spacing: 2) {
-            Text(
-                total == 0
-                    ? "Nothing was recognised on this page."
-                    : "\(total) value\(total == 1 ? "" : "s") found across \(model.document?.pageCount ?? 1) page\(( model.document?.pageCount ?? 1) == 1 ? "" : "s")."
-            )
-            .font(Typography.rowDetail)
+            Text(ScanReviewCopy.summary(outcome: model.outcome, pageCount: model.pageCount))
+                .font(Typography.rowDetail)
+                .fixedSize(horizontal: false, vertical: true)
 
             if model.phase == .reading {
                 Label("Still reading the tables on this iPhone…", systemImage: "sparkles")
                     .font(Typography.caption)
                     .foregroundStyle(.secondary)
-            } else if fromModel > 0 {
+            } else if model.modelSuggestionCount > 0 {
                 Label(
-                    "\(fromModel) of these came from reading the layout rather than a single line, and none of them is ticked.",
+                    "\(model.modelSuggestionCount) came from reading the layout rather than a single line, and none of them is ticked.",
                     systemImage: "sparkles"
                 )
                 .font(Typography.caption)
                 .foregroundStyle(.secondary)
-            } else if let reason = model.intelligenceUnavailableReason, total > 0 {
+            } else if let reason = model.intelligenceUnavailableReason {
                 Text(reason + " Rate tables may not be read.")
                     .font(Typography.caption)
                     .foregroundStyle(.secondary)
@@ -293,26 +365,49 @@ struct ScanReviewView: View {
                 .accessibilityIdentifier(A11yID.Scan.field(suggestion.field))
                 .accessibilityLabel("\(suggestion.field.displayName) value")
 
-            // Provenance, shown rather than hidden. "Read from: 7 DAY RATE: $985.00" is the
-            // difference between a user trusting a value and guessing about it.
-            VStack(alignment: .leading, spacing: 2) {
-                Text(
-                    suggestion.provenance.rule == ModelSuggestionValidator.ruleName
-                        ? "\(suggestion.confidenceDescription) · read from the layout of:"
-                        : "\(suggestion.confidenceDescription) · read from:"
-                )
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                Text(suggestion.provenance.sourceLine)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(
-                "\(suggestion.confidenceDescription). Read from the line: \(suggestion.provenance.sourceLine)"
-            )
+            provenance(suggestion)
         }
         .padding(.vertical, 2)
+    }
+
+    /// Where the value came from: which page, which line, and how sure.
+    ///
+    /// "Read from: 7 DAY RATE: $985.00, page 2" is the difference between a user trusting a
+    /// value and guessing about it — and the page is what makes it checkable on a five-page
+    /// invoice where the rate table and the summary are nowhere near each other.
+    private func provenance(_ suggestion: FieldSuggestion) -> some View {
+        let readFrom = suggestion.provenance.rule == ModelSuggestionValidator.ruleName
+            ? "read from the layout of"
+            : "read from"
+        let page = suggestion.provenance.pageDescription(of: model.pageCount)
+        let heading = [suggestion.confidenceDescription, readFrom + ":"].joined(separator: " · ")
+
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(page.map { "\(heading.dropLast()) on \($0):" } ?? heading)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(suggestion.provenance.sourceLine)
+                .font(.caption2.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(suggestion.confidenceDescription). Read from the line: \(suggestion.provenance.sourceLine)"
+                + (page.map { ", on \($0)." } ?? ".")
+        )
+    }
+
+    // MARK: - Adding pages
+
+    private func addPages(_ items: [PhotosPickerItem]) async {
+        defer { addedPhotos = [] }
+        var data: [Data] = []
+        for item in items {
+            guard let loaded = try? await item.loadTransferable(type: Data.self) else { continue }
+            data.append(loaded)
+        }
+        guard !data.isEmpty else { return }
+        model.addPages(data, source: .photoLibrary)
     }
 }

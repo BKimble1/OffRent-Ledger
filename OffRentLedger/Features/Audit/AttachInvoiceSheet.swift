@@ -10,6 +10,12 @@ import UniformTypeIdentifiers
 struct AttachInvoiceSheet: View {
 
     let itemID: UUID
+    /// The invoice to correct, or nil to attach a new one.
+    ///
+    /// Editing exists because of §8: an invoice that cannot be accepted because nothing was
+    /// entered on it needs a way back to the form, and "delete it and start again" would take
+    /// its attachments with it.
+    var editing: UUID?
 
     @Environment(AppDependencies.self) private var dependencies
     @Environment(AppRouter.self) private var router
@@ -17,6 +23,7 @@ struct AttachInvoiceSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @Query private var items: [RentalItem]
+    @Query private var invoices: [VendorInvoice]
 
     @State private var invoiceNumber = ""
     @State private var receivedDate = Date()
@@ -33,12 +40,22 @@ struct AttachInvoiceSheet: View {
     @State private var scanError: String?
     @State private var isSaving = false
 
-    init(itemID: UUID) {
+    @State private var hasLoaded = false
+
+    init(itemID: UUID, editing: UUID? = nil) {
         self.itemID = itemID
+        self.editing = editing
         _items = Query(filter: #Predicate<RentalItem> { $0.id == itemID })
+        // A predicate that can never match when nothing is being edited, rather than a second
+        // query fetching every invoice in the store to find one that is not wanted. The item's
+        // own identifier is the sentinel: an invoice can never carry it, and it needs no forced
+        // unwrap of a string literal.
+        let target = editing ?? itemID
+        _invoices = Query(filter: #Predicate<VendorInvoice> { $0.id == target })
     }
 
     private var item: RentalItem? { items.first }
+    private var existingInvoice: VendorInvoice? { editing == nil ? nil : invoices.first }
 
     struct DraftLine: Identifiable, Equatable {
         var id = UUID()
@@ -168,12 +185,12 @@ struct AttachInvoiceSheet: View {
                         .disabled(isSaving)
                 }
             }
-            .navigationTitle("Attach invoice")
+            .navigationTitle(editing == nil ? "Attach invoice" : "Edit invoice")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
-            .onAppear { receivedDate = dependencies.clock.now }
+            .onAppear(perform: load)
             .sheet(item: Binding(
                 get: { scanModel.map { ScanSession(model: $0) } },
                 set: { if $0 == nil { scanModel = nil } }
@@ -270,24 +287,66 @@ struct AttachInvoiceSheet: View {
         }
     }
 
+    /// Fills the form from an invoice being corrected, or stamps today's date on a new one.
+    private func load() {
+        guard !hasLoaded else { return }
+        hasLoaded = true
+        guard let existing = existingInvoice else {
+            receivedDate = dependencies.clock.now
+            return
+        }
+        invoiceNumber = existing.invoiceNumber ?? ""
+        receivedDate = existing.receivedDate
+        billedThroughDate = existing.billedThroughDate
+        invoiceTotal = existing.invoiceTotal == .zero ? nil : existing.invoiceTotal
+        expectedOverride = existing.expectedRentalSubtotalOverride
+        notes = existing.notes ?? ""
+        lines = (existing.lines ?? [])
+            .sorted { $0.sortIndex < $1.sortIndex }
+            .map {
+                DraftLine(
+                    category: $0.category,
+                    detail: $0.detail,
+                    amount: $0.amount,
+                    appearedInContract: $0.appearedInContract
+                )
+            }
+    }
+
     private func save() {
         guard !isSaving, let item, let agreement = item.agreement else { return }
         isSaving = true
         defer { isSaving = false }
 
-        let invoice = VendorInvoice(
-            invoiceNumber: invoiceNumber.nilIfBlank,
-            receivedDate: receivedDate,
-            billedThroughDate: billedThroughDate,
-            invoiceTotal: invoiceTotal ?? .zero,
-            reviewStatus: .notReviewed,
-            notes: notes.nilIfBlank,
-            attachedAt: dependencies.clock.now,
-            expectedRentalSubtotalOverride: expectedOverride,
-            agreement: agreement,
-            primaryItemID: item.id
-        )
-        context.insert(invoice)
+        let isNew = existingInvoice == nil
+        let invoice: VendorInvoice
+        if let existing = existingInvoice {
+            invoice = existing
+            invoice.invoiceNumber = invoiceNumber.nilIfBlank
+            invoice.receivedDate = receivedDate
+            invoice.billedThroughDate = billedThroughDate
+            invoice.invoiceTotal = invoiceTotal ?? .zero
+            invoice.notes = notes.nilIfBlank
+            invoice.expectedRentalSubtotalOverride = expectedOverride
+            // The lines are replaced wholesale. Reconciling them by identity would need a stable
+            // key the draft does not carry, and the attachments and discrepancies — the evidence
+            // — hang off the invoice, not off its lines, so they are untouched by this.
+            for line in invoice.lines ?? [] { context.delete(line) }
+        } else {
+            invoice = VendorInvoice(
+                invoiceNumber: invoiceNumber.nilIfBlank,
+                receivedDate: receivedDate,
+                billedThroughDate: billedThroughDate,
+                invoiceTotal: invoiceTotal ?? .zero,
+                reviewStatus: .notReviewed,
+                notes: notes.nilIfBlank,
+                attachedAt: dependencies.clock.now,
+                expectedRentalSubtotalOverride: expectedOverride,
+                agreement: agreement,
+                primaryItemID: item.id
+            )
+            context.insert(invoice)
+        }
 
         for (index, line) in lines.enumerated() {
             guard let amount = line.amount else { continue }
@@ -303,11 +362,17 @@ struct AttachInvoiceSheet: View {
             )
         }
 
-        let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
-        workflow.apply(.attachInvoice, to: item, detail: invoiceNumber.nilIfBlank)
+        if isNew {
+            // Only a new invoice moves the rental. Correcting one already under review must not
+            // try to transition a rental that is already there — the state machine would refuse,
+            // and the refusal would be the user's reward for fixing a typo.
+            let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
+            workflow.apply(.attachInvoice, to: item, detail: invoiceNumber.nilIfBlank)
+        }
         try? context.save()
 
         dismiss()
+        guard isNew else { return }
         router.presentedSheet = nil
         router.handle(.invoiceReview(invoiceID: invoice.id))
     }

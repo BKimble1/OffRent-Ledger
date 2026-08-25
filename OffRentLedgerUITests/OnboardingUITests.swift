@@ -34,68 +34,95 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.tab(A11yUI.Tab.today).waitForExistence(timeout: 5))
     }
 
-    func testTheTourCanBeWalkedToTheEnd() {
+    /// §12.16: the whole walkthrough, using only Next and Finish.
+    ///
+    /// The guide this replaced could not be finished at all without creating a rental, ringing a
+    /// rental company, recording a pickup and accepting an invoice — none of which a person has
+    /// on the day they install the app. So the two properties asserted here are the two that
+    /// were missing: it ends, and it writes nothing.
+    func testTheWalkthroughCompletesOnItsOwnControlsAndCreatesNothing() {
         let app = XCUIApplication.launchedAsNewUser()
 
         app.expect(app.buttons[A11yUI.Onboarding.welcomeTour]).tap()
         app.expect(app.otherElements[A11yUI.Onboarding.tourRoot])
 
-        // Four taps of Next, then the finishing button. If a page is ever added without the
-        // footer following, this fails rather than silently stranding somebody mid-tour.
-        for step in 1...4 {
-            app.expect(app.buttons[A11yUI.Onboarding.tourNext], timeout: 5).tap()
+        // Next until the button says Finish. Driven by the label rather than a hard-coded count,
+        // so adding a page does not silently strand this test halfway.
+        let forward = app.buttons[A11yUI.Onboarding.tourNext]
+        for step in 1...12 {
+            app.expect(forward, timeout: 5)
+            if forward.label == "Finish" { break }
+            forward.tap()
             XCTAssertTrue(
                 app.otherElements[A11yUI.Onboarding.tourRoot].exists,
-                "the tour closed itself on step \(step)"
+                "the walkthrough closed itself on step \(step); only Finish may end it"
             )
         }
-        app.expect(app.buttons[A11yUI.Onboarding.tourDone]).tap()
-        XCTAssertTrue(app.tab(A11yUI.Tab.today).waitForExistence(timeout: 5))
+        XCTAssertEqual(forward.label, "Finish", "the walkthrough never reached a last page")
+        forward.tap()
+
+        // Finish dismisses on its own. Nothing else to tap, nothing to swipe away.
+        XCTAssertTrue(
+            app.anyElement(A11yUI.Today.root).waitForExistence(timeout: 5),
+            "Finish must dismiss the walkthrough and land on Today"
+        )
+        XCTAssertFalse(
+            app.otherElements[A11yUI.Onboarding.tourRoot].exists,
+            "the walkthrough was still on screen after Finish"
+        )
+
+        // And it created nothing. Today's empty state is only drawn when there are no rentals,
+        // and the Rentals tab says so in its own words.
+        XCTAssertTrue(
+            app.anyElement(A11yUI.Today.emptyState).waitForExistence(timeout: 5),
+            "the walkthrough put a rental in the user's store"
+        )
+        app.tab(A11yUI.Tab.rentals).tap()
+        XCTAssertTrue(
+            app.staticTexts["No rentals yet"].waitForExistence(timeout: 5),
+            "the walkthrough created a rental"
+        )
+        app.tapInContent(app.expect(app.buttons[A11yUI.Rentals.companiesLink]))
+        XCTAssertTrue(
+            app.staticTexts["No rental companies yet"].waitForExistence(timeout: 5),
+            "the walkthrough created a rental company"
+        )
+        app.back()
+        app.tapInContent(app.expect(app.buttons[A11yUI.Rentals.jobSitesLink]))
+        XCTAssertTrue(
+            app.staticTexts["No jobsites yet"].waitForExistence(timeout: 5),
+            "the walkthrough created a jobsite"
+        )
     }
 
-    func testWelcomeDoesNotReturnAfterItHasBeenDismissed() {
+    /// Back works, and the walkthrough does not come back once it has been finished.
+    func testTheWalkthroughGoesBackwardsAndIsNotShownTwice() {
         let app = XCUIApplication.launchedAsNewUser()
-        app.expect(app.buttons[A11yUI.Onboarding.welcomeSkip]).tap()
-        app.expect(app.tab(A11yUI.Tab.today))
 
-        // Relaunch without the reset flag: a returning user must not be welcomed again.
+        app.expect(app.buttons[A11yUI.Onboarding.welcomeTour]).tap()
+        app.expect(app.otherElements[A11yUI.Onboarding.tourRoot])
+
+        XCTAssertFalse(
+            app.buttons[A11yUI.Onboarding.tourBack].exists,
+            "Back is absent on the first page rather than present and dead"
+        )
+        app.expect(app.buttons[A11yUI.Onboarding.tourNext]).tap()
+        app.expect(app.buttons[A11yUI.Onboarding.tourBack]).tap()
+        XCTAssertFalse(
+            app.buttons[A11yUI.Onboarding.tourBack].exists,
+            "Back from page two must return to page one"
+        )
+
+        app.expect(app.buttons[A11yUI.Onboarding.tourSkip]).tap()
+        app.expect(app.anyElement(A11yUI.Today.root))
+
         app.terminate()
         app.launchArguments.removeAll { $0 == "-offrent-reset-onboarding" }
         app.launch()
-
         XCTAssertTrue(app.tab(A11yUI.Tab.today).waitForExistence(timeout: 8))
         XCTAssertFalse(
-            app.otherElements[A11yUI.Onboarding.welcomeRoot].exists,
-            "the welcome came back for somebody who had already dismissed it"
-        )
-    }
-
-    /// The hands-on half. The bar has to appear *in* the app — over it would defeat the point,
-    /// since it is telling somebody which control to tap.
-    func testTheTourContinuesIntoAWalkthroughThatCanBeLeft() {
-        let app = XCUIApplication.launchedAsNewUser()
-
-        app.expect(app.buttons[A11yUI.Onboarding.welcomeTour]).tap()
-        app.expect(app.otherElements[A11yUI.Onboarding.tourRoot])
-        for _ in 1...4 {
-            app.expect(app.buttons[A11yUI.Onboarding.tourNext], timeout: 5).tap()
-        }
-        app.expect(app.buttons[A11yUI.Onboarding.continueTour]).tap()
-
-        XCTAssertTrue(
-            app.tab(A11yUI.Tab.today).waitForExistence(timeout: 5),
-            "the walkthrough runs inside the app, not as another full-screen wall"
-        )
-        app.expect(app.otherElements[A11yUI.Onboarding.guideBar])
-        XCTAssertTrue(
-            app.buttons[A11yUI.Onboarding.guideAction].exists,
-            "the first step must offer a way to open Add rental"
-        )
-
-        app.buttons[A11yUI.Onboarding.guideSkip].tap()
-        XCTAssertFalse(
-            app.otherElements[A11yUI.Onboarding.guideBar].exists,
-            "skipping the walkthrough must end it, not hide it until next launch"
+            app.otherElements[A11yUI.Onboarding.tourRoot].exists,
+            "a walkthrough that reappears after being skipped has stopped being optional"
         )
     }
 
