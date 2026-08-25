@@ -6,7 +6,11 @@ import Foundation
 /// Foundation-only on purpose. The MapKit types that produce these live in the Features layer;
 /// the decision about what a jobsite should be *named* is a product decision with a right and a
 /// wrong answer, so it belongs where it can be tested without a map.
-struct PlaceComponents: Equatable, Sendable {
+///
+/// `Hashable` rather than merely `Equatable` because `ChosenPlace` carries one and is itself
+/// `Hashable` — a SwiftUI `ForEach` over search results needs that, and `Equatable` alone
+/// silently breaks the conformance of everything that holds it.
+struct PlaceComponents: Hashable, Sendable {
     /// What the search called it. For a business this is the business; for an address result it
     /// is usually the street line, and occasionally just a postal code.
     var searchResultName: String?
