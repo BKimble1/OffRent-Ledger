@@ -127,6 +127,7 @@ struct EvidenceExportSheet: View {
                 }
             }
             .offRentFormBackground()
+            .accessibilityIdentifier(A11yID.EvidenceExport.root)
             .navigationTitle("Evidence packet")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

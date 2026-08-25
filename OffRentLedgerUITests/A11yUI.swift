@@ -107,7 +107,13 @@ enum A11yUI {
         static let recordConfirmation = "itemDetail.recordConfirmation"
         static let recordPickup = "itemDetail.recordPickup"
         static let attachInvoice = "itemDetail.attachInvoice"
+        static let exportEvidence = "itemDetail.exportEvidence"
+        static let reopen = "itemDetail.reopen"
         static let disclosure = "itemDetail.disclosure"
+    }
+
+    enum EvidenceExport {
+        static let root = "evidenceExport.root"
     }
 
     enum Confirmation {

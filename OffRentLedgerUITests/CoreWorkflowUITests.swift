@@ -106,6 +106,33 @@ final class CoreWorkflowUITests: XCTestCase {
         )
         app.buttons[A11yUI.Audit.resolveInvoice].tap()
     }
+
+    /// 3. The evidence packet sheet opens from a rental.
+    ///
+    /// This screen carried an `.alert` on the same modifier chain as two `.sheet`s. That is the
+    /// arrangement the invoice screen already proved breaks presentation: once the alert has
+    /// shown and been dismissed, setting a sheet's boolean does nothing. Both sheets on this
+    /// screen — the evidence packet and Reopen — were one refusal away from becoming dead taps,
+    /// with nothing on screen to say so. They are now one `.sheet(item:)`, which cannot express
+    /// the ambiguity, and this is the test that says the mechanism still presents.
+    func testTheEvidencePacketSheetOpensFromARental() {
+        let app = XCUIApplication.launched()
+
+        app.tab(A11yUI.Tab.rentals).tap()
+        app.openRental(named: "Skid Steer Loader")
+
+        // Near the bottom of a long list, so it is revealed before it is tapped.
+        app.revealAndTap(app.buttons[A11yUI.ItemDetail.exportEvidence])
+
+        XCTAssertTrue(
+            app.expect(app.anyElement(A11yUI.EvidenceExport.root)).exists,
+            "tapping Export evidence packet must present the packet sheet"
+        )
+
+        // And it closes again, leaving the rental where it was.
+        app.expect(app.buttons["Done"]).tap()
+        XCTAssertTrue(app.expect(app.buttons[A11yUI.ItemDetail.exportEvidence]).exists)
+    }
 }
 
 /// Keeps the tapping out of the assertions.

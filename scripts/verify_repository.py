@@ -377,6 +377,27 @@ def check_domain_is_portable() -> None:
                 )
 
 
+def check_saves_are_not_silent() -> None:
+    check("No screen discards a save failure")
+    # `try? context.save()` in a view is the app telling somebody their record was filed when it
+    # may not have been. `PersistentStore.save` returns a sentence to show them;
+    # `PersistentStore.saveDerived` logs, and is only for caches the app recomputes anyway.
+    # Neither is `try?`, which is why this looks for `try?` and nothing else.
+    pattern = re.compile(r"try\?\s+\w*[cC]ontext\.save\(\)")
+    for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
+        relative = path.relative_to(ROOT).as_posix()
+        if relative == "OffRentLedger/Persistence/PersistentStore.swift":
+            continue
+        source = without_comments(path.read_text())
+        for match in pattern.finditer(source):
+            line = source[: match.start()].count("\n") + 1
+            fail(
+                "silent-save",
+                f"{relative}:{line} discards a save failure; "
+                "use PersistentStore.save or PersistentStore.saveDerived",
+            )
+
+
 def check_status_assignment_is_confined() -> None:
     check("Only RentalWorkflowService assigns rental status")
     allowed = {"OffRentLedger/Persistence/RentalWorkflowService.swift"}
@@ -1779,6 +1800,7 @@ def main() -> int:
         check_sequence_map_on_strings,
         check_app_icon,
         check_ocr_fixtures_exist,
+        check_saves_are_not_silent,
         check_call_sites_resolve,
         check_every_ui_suite_actually_runs,
         check_github_workflows,

@@ -144,6 +144,10 @@ enum A11yID {
         static let disclosure = "itemDetail.disclosure"
     }
 
+    enum EvidenceExport {
+        static let root = "evidenceExport.root"
+    }
+
     enum ContactVendor {
         static let root = "contactVendor.root"
         static let disclosure = "contactVendor.disclosure"

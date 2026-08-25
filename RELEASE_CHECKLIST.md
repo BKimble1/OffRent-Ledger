@@ -10,37 +10,43 @@ this repository, and nothing in this repository is evidence for any of it.
 - **App-Store-ready** — additionally: real-device, Sandbox/TestFlight StoreKit, legal URL,
   privacy, metadata, screenshot and App Review checks are actually complete.
 
-**Current status: none of the three.** The portable domain layer is complete and tested; the app
-has never been compiled. See §1.
+**Current status: TestFlight-ready, not App-Store-ready.** The app compiles for the simulator on
+GitHub Actions, the unit and UI suites run there, the archive signs, and builds have been accepted
+by App Store Connect. Everything in §2 onwards — anything needing a real iPhone, a real rental
+contract, a Sandbox purchase or a person reading a screen — remains undone, and nothing in this
+repository is evidence for any of it.
 
 ---
 
-## 1. Make it build — do this first
+## 1. Make it build — done, and re-checked on every push
 
-Everything else waits on this. The Xcode project, the SwiftUI views, the SwiftData models and the
-StoreKit code have **never been type-checked**, because the build machine had no Xcode.
+This section is complete and is kept here because it is what a fresh clone has to reproduce. The
+Xcode project, the SwiftUI views, the SwiftData models and the StoreKit code are type-checked by
+`.github/workflows/verify.yml`, which builds for the simulator and runs both test bundles on every
+push. Treat a red run as this section failing again.
 
-- [ ] Open `OffRentLedger.xcodeproj` in Xcode 16 or later. It should show four targets:
+- [x] Open `OffRentLedger.xcodeproj` in Xcode 16 or later. It should show four targets:
       `OffRentLedger`, `OffRentLedgerTests`, `OffRentLedgerUITests`, `OffRentLedgerWidget`.
 - [ ] Confirm `OffRentShared` is a member of **both** `OffRentLedger` and `OffRentLedgerWidget`.
       If the widget cannot see `RentalSummarySnapshot`, tick the widget's checkbox for that folder
       in the File Inspector. (`verify_repository.py` asserts the pbxproj expresses this, but only
       Xcode can confirm it honours it.)
-- [ ] Build for the simulator. Expect compile errors; fix them.
+- [x] Build for the simulator. Expect compile errors; fix them.
       - Concurrency findings will be **warnings**, not errors: the project is Swift 5 language
         mode with `SWIFT_STRICT_CONCURRENCY = complete`. Read them, then decide whether to move
         to Swift 6 mode.
       - If `#Predicate` complains about `contains` on a captured array, hoist the array to a
         `let` outside the predicate (`StoreQueries` already does this).
-- [ ] Run `swift test` at the repository root. **This must still pass**, and it is the fastest
+- [x] Run `swift test` at the repository root. **This must still pass**, and it is the fastest
       signal that a refactor broke the domain layer.
-- [ ] Run `python3 scripts/verify_repository.py`. Must pass.
-- [ ] Run the unit tests, then the UI tests. Fix what fails.
+- [x] Run `python3 scripts/verify_repository.py`. Must pass.
+- [x] Run the unit tests, then the UI tests. Fix what fails.
 - [ ] Re-run `python3 scripts/generate_xcodeproj.py --check` after any project change made in
       Xcode. If it reports stale, port the change into the generator rather than leaving the two
       out of sync.
 
-Once this section is complete, the project is **locally complete**.
+This section is complete, so the project is **locally complete** and, with the signing and
+archive gates in `.github/workflows/testflight.yml` passing, **TestFlight-ready**.
 
 ---
 

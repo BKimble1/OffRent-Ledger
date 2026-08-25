@@ -13,6 +13,7 @@ struct InvoiceReviewView: View {
     @Environment(AppDependencies.self) private var dependencies
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @Query private var invoices: [VendorInvoice]
     @Query private var allItems: [RentalItem]
@@ -23,6 +24,7 @@ struct InvoiceReviewView: View {
     @State private var isAccepting = false
     @State private var showingEditInvoice = false
     @State private var justAccepted = false
+    @State private var saveFailure: String?
 
     init(invoiceID: UUID) {
         self.invoiceID = invoiceID
@@ -60,6 +62,12 @@ struct InvoiceReviewView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Space.section) {
+                if let saveFailure {
+                    Label(saveFailure, systemImage: "externaldrive.badge.exclamationmark")
+                        .font(Typography.rowDetail)
+                        .foregroundStyle(Palette.attentionText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if let comparison {
                     varianceSection(comparison)
                     comparisonSection(comparison)
@@ -101,7 +109,7 @@ struct InvoiceReviewView: View {
             // change the user caused, so it is recorded rather than inferred later.
             if let invoice, invoice.reviewStatus == .notReviewed {
                 invoice.reviewStatusRaw = InvoiceReviewStatus.inReview.rawValue
-                try? context.save()
+                PersistentStore.saveDerived(context, describing: "the review status")
             }
         }
     }
@@ -515,7 +523,7 @@ struct InvoiceReviewView: View {
     private func setLineState(_ lineID: UUID, to state: LineReviewState) {
         guard let line = invoice?.lines?.first(where: { $0.id == lineID }) else { return }
         line.reviewStateRaw = state.rawValue
-        try? context.save()
+        saveFailure = PersistentStore.save(context, describing: "That line")
     }
 
     /// Findings on screen that nothing has been recorded against yet.
@@ -536,12 +544,26 @@ struct InvoiceReviewView: View {
             RentalWorkflowService(context: context, clock: dependencies.clock)
                 .append(event: .mismatchAccepted, to: item, detail: finding.type.displayName)
         }
-        try? context.save()
+        saveFailure = PersistentStore.save(context, describing: "That finding")
     }
 
     private func recordFollowUp() {
         guard let invoice, let item, let comparison else { return }
         let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
+
+        // Ask the state machine *before* writing anything.
+        //
+        // This used to insert a Discrepancy for every open finding and stamp the invoice, and
+        // only then ask whether the transition was allowed. On a refusal — recording a second
+        // follow-up on an invoice already in Needs Follow-Up — the user was shown "Cannot do
+        // that yet" and reasonably assumed nothing had happened, while a duplicate set of
+        // discrepancy rows and an overwritten invoice status sat in the context waiting for
+        // SwiftData to autosave them. `acceptInvoice` already rolls back rather than leaving two
+        // records disagreeing; this now avoids needing to.
+        if case let .failure(failure) = workflow.apply(.flagFollowUp(reason: followUpReason), to: item) {
+            rejection = failure
+            return
+        }
 
         // The open findings are written down at the moment the user records the follow-up, so
         // the record survives a later edit to the terms that would change the recomputation.
@@ -553,21 +575,20 @@ struct InvoiceReviewView: View {
         }
         invoice.reviewStatusRaw = InvoiceReviewStatus.followUpRecorded.rawValue
 
-        switch workflow.apply(.flagFollowUp(reason: followUpReason), to: item) {
-        case .success:
-            try? context.save()
-            dependencies.derivedStateNeedsRefresh()
-            followUpReason = ""
-            showingFollowUp = false
-        case let .failure(failure):
-            rejection = failure
+        if let problem = PersistentStore.save(context, describing: "This follow-up") {
+            saveFailure = problem
+            return
         }
+        saveFailure = nil
+        dependencies.derivedStateNeedsRefresh()
+        followUpReason = ""
+        showingFollowUp = false
     }
 
     private func resolve(_ discrepancy: Discrepancy) {
         discrepancy.discrepancyStatusRaw = DiscrepancyStatus.resolved.rawValue
         discrepancy.resolvedAt = dependencies.clock.now
-        try? context.save()
+        saveFailure = PersistentStore.save(context, describing: "That resolution")
     }
 
     private func acceptInvoice() {
@@ -604,13 +625,20 @@ struct InvoiceReviewView: View {
             }
         }
 
-        try? context.save()
+        if let problem = PersistentStore.save(context, describing: "This acceptance") {
+            saveFailure = problem
+            isAccepting = false
+            return
+        }
+        saveFailure = nil
         // The rental has left Invoice review. Today's counts, the widget and the Shortcuts index
         // are all derived from its status, and the reminders it no longer needs are still
         // scheduled until this runs.
         dependencies.derivedStateNeedsRefresh()
         isAccepting = false
-        withAnimation(Motion.quick) { justAccepted = true }
+        withAnimation(Motion.respecting(Motion.quick, reduceMotion: reduceMotion)) {
+            justAccepted = true
+        }
 
         // Long enough to read the confirmation, short enough not to feel stuck. Going back is
         // the honest destination: this invoice is finished, and Audit is where the next one is.

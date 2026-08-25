@@ -55,7 +55,16 @@ struct ReminderSettingsView: View {
             await refreshStatusAsync()
             recomputePlan()
         }
-        .onChange(of: dependencies.reminderSettings) { _, _ in recomputePlan() }
+        .onChange(of: dependencies.reminderSettings) { _, _ in
+            recomputePlan()
+            // The screen used to redraw its "Scheduled now" list from a freshly computed plan
+            // while iOS went on holding the old one — so turning a reminder off left its
+            // notification scheduled, turning one on scheduled nothing, and changing a lead time
+            // or quiet hours moved nothing. The doc comment above `recomputePlan` claims this
+            // "cannot drift from what iOS actually holds"; without this it always did, until the
+            // app next came back from the background. §3.3.
+            dependencies.derivedStateNeedsRefresh()
+        }
         .onChange(of: items.count) { _, _ in recomputePlan() }
         // Somebody who leaves to change the iOS switch has to come back to a screen that agrees
         // with what they just did.
@@ -266,7 +275,7 @@ private struct KindsCard: View {
                     if locked {
                         Label("Pro", systemImage: "lock.fill")
                             .font(Typography.micro)
-                            .foregroundStyle(Palette.accent)
+                            .foregroundStyle(Palette.accentText)
                     }
                 }
                 Text(kind.explanation)
@@ -311,6 +320,9 @@ private struct KindsCard: View {
             dependencies.reminderSettings.enabledKinds.remove(kind)
         }
         onChanged()
+        // The `.onChange` above covers the steppers, which write through a binding. This is the
+        // other write path on the screen and needs the same signal.
+        dependencies.derivedStateNeedsRefresh()
     }
 }
 

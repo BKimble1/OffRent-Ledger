@@ -28,6 +28,7 @@ struct JobsiteMapEditor: View {
     @Environment(AppDependencies.self) private var dependencies
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var camera: MapCameraPosition = .automatic
     @State private var query = ""
@@ -42,6 +43,7 @@ struct JobsiteMapEditor: View {
     @State private var projectIdentifier = ""
     @State private var isDroppingByHand = false
     @State private var hasLoaded = false
+    @State private var saveFailure: String?
     @State private var visibleRegion: MKCoordinateRegion?
 
     @FocusState private var searchIsFocused: Bool
@@ -143,6 +145,10 @@ struct JobsiteMapEditor: View {
                 .autocorrectionDisabled()
                 .submitLabel(.search)
                 .focused($searchIsFocused)
+                // The height comes from the text and its padding rather than from a number, so
+                // the field grows at the accessibility sizes instead of clipping what is in it.
+                // 21pt of body text plus 12 each side is the 48 this used to be nailed to.
+                .padding(.vertical, Space.base)
                 .onChange(of: searchIsFocused) { _, focused in
                     if focused { resultsAreVisible = true }
                 }
@@ -154,13 +160,20 @@ struct JobsiteMapEditor: View {
                     query = ""
                     results = []
                 } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                        // A 20pt glyph with nothing around it is a 20pt target. The glyph is
+                        // unchanged; the area that takes the tap is Apple's 44.
+                        .frame(
+                            width: Layout.minimumTapTarget, height: Layout.minimumTapTarget
+                        )
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Clear the search")
             }
         }
         .padding(.horizontal, Space.base)
-        .frame(height: Layout.controlHeight)
+        .frame(minHeight: Layout.controlHeight)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.control))
         .overlay(
             RoundedRectangle(cornerRadius: Radius.control)
@@ -201,7 +214,7 @@ struct JobsiteMapEditor: View {
                     Spacer(minLength: 0)
                 }
                 .font(Typography.rowDetail)
-                .foregroundStyle(Palette.accent)
+                .foregroundStyle(Palette.accentText)
                 .padding(Space.base)
                 .contentShape(Rectangle())
             }
@@ -249,6 +262,13 @@ struct JobsiteMapEditor: View {
 
     private var detailsPanel: some View {
         VStack(alignment: .leading, spacing: Space.base) {
+            if let saveFailure {
+                Label(saveFailure, systemImage: "externaldrive.badge.exclamationmark")
+                    .font(Typography.caption)
+                    .foregroundStyle(Palette.attentionText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if let pinned {
                 VStack(alignment: .leading, spacing: Space.tight) {
                     // The name, editable, and pre-filled with something a person would say —
@@ -447,8 +467,12 @@ struct JobsiteMapEditor: View {
         }
     }
 
+    /// Reduce Motion means no flight across the map. A gentler curve is still the camera
+    /// travelling, which is the thing the setting was turned on to stop.
     private func centre(on latitude: Double, longitude: Double) {
-        withAnimation(Motion.standard) {
+        withAnimation(
+            Motion.respecting(Motion.standard, reduceMotion: reduceMotion, travelling: true)
+        ) {
             camera = .region(
                 MKCoordinateRegion(
                     center: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
@@ -479,7 +503,13 @@ struct JobsiteMapEditor: View {
             site.longitude = pinned.longitude
         }
         site.modifiedAt = now
-        try? context.save()
+        // Dismissing on a failed write would put the user back on the rental form with a jobsite
+        // selected that is not in the store.
+        if let problem = PersistentStore.save(context, describing: "This jobsite") {
+            saveFailure = problem
+            return
+        }
+        saveFailure = nil
         onSaved(site)
         dismiss()
     }
