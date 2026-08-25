@@ -10,6 +10,7 @@ final class CSVExportTests: XCTestCase {
             vendorBranch: "Marlin Falls",
             jobSiteName: "Ridgeline, Phase 2",
             agreementNumber: "CR-44821",
+            purchaseOrderNumber: "JOB-2291",
             equipmentName: "Skid Steer Loader",
             vendorEquipmentIdentifier: "SS-2214",
             status: .invoiceReview,
@@ -117,6 +118,19 @@ final class CSVExportTests: XCTestCase {
         }
         fields.append(current)
         return fields
+    }
+
+    /// The contractor's own job number reaches the spreadsheet.
+    ///
+    /// It is captured on the agreement, editable on the form, searchable, and shown on the map,
+    /// and it was missing from the CSV — the one output an accounts department actually
+    /// reconciles against their cost codes. The vendor's agreement number is not a substitute:
+    /// it identifies the yard's paperwork, not the job.
+    func testThePurchaseOrderNumberIsAColumn() {
+        let csv = CSVExport.makeCSV(rows: [row()], calendar: calendar())
+        let fields = columns(csv.components(separatedBy: "\r\n")[1])
+        let index = CSVExport.header.firstIndex(of: "PO / Reference")!
+        XCTAssertEqual(fields[index], "JOB-2291")
     }
 }
 

@@ -107,6 +107,7 @@ struct ExportService {
             vendorBranch: agreement?.vendor?.branch,
             jobSiteName: agreement?.jobSite?.name,
             agreementNumber: agreement?.agreementNumber,
+            purchaseOrderNumber: agreement?.purchaseOrderNumber,
             equipmentName: item.equipmentName,
             vendorEquipmentIdentifier: item.vendorEquipmentIdentifier,
             status: item.status,

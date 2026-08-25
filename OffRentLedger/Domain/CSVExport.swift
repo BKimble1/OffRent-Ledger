@@ -6,6 +6,13 @@ struct RentalSummaryRow: Sendable, Equatable {
     var vendorBranch: String?
     var jobSiteName: String?
     var agreementNumber: String?
+    /// The contractor's own purchase-order or job number.
+    ///
+    /// The vendor's agreement number identifies the paperwork; this identifies the *job*, and it
+    /// is the column an accounts department joins this export to their own cost codes on. It was
+    /// captured on the agreement, editable on the form, searchable and on the map — and missing
+    /// from the one output anybody reconciles with.
+    var purchaseOrderNumber: String?
     var equipmentName: String
     var vendorEquipmentIdentifier: String?
     var status: RentalItemStatus
@@ -40,7 +47,8 @@ struct RentalSummaryRow: Sendable, Equatable {
 enum CSVExport {
 
     static let header = [
-        "Vendor", "Branch", "Jobsite", "Agreement #", "Equipment", "Vendor Equipment ID",
+        "Vendor", "Branch", "Jobsite", "Agreement #", "PO / Reference",
+        "Equipment", "Vendor Equipment ID",
         "Status", "Delivery Date", "Billing Basis", "Daily Rate", "Weekly Rate", "4-Week Rate",
         "Next Rate Change", "Estimated Rent (estimate)", "Estimate Complete",
         "Confirmation #", "Confirmation Recorded", "Pickup Recorded",
@@ -55,6 +63,7 @@ enum CSVExport {
                 row.vendorBranch ?? "",
                 row.jobSiteName ?? "",
                 row.agreementNumber ?? "",
+                row.purchaseOrderNumber ?? "",
                 row.equipmentName,
                 row.vendorEquipmentIdentifier ?? "",
                 row.status.displayName,
