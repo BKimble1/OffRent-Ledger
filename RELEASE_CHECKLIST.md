@@ -121,6 +121,9 @@ Once this section is complete, the project is **locally complete**.
 - [ ] Search for somewhere with no street address (a rural site). Check what the name field gets.
 - [ ] Turn off Wi-Fi and cellular. Search must fail gracefully and still let you drop a pin.
 - [ ] Drop a pin by hand and confirm the location. Name it yourself.
+- [ ] Pick a search result, then tap **Move the pin** and put it somewhere else. The address a
+      search returns is often the gate rather than the pour, and "close, but not there" has to be
+      fixable without starting the search again.
 - [ ] Reopen that jobsite for editing. The pin and the name must be where you left them.
 - [ ] Confirm no location permission prompt appears anywhere in this flow.
 
@@ -161,6 +164,21 @@ Once this section is complete, the project is **locally complete**.
       Today map and on the full-screen map — then relaunch and check again.
 - [ ] Edit a rental that is already off rent. Its confirmation, its pickup and its attached
       invoice must be untouched, and the estimate must not start running again.
+
+### Reminders reach the schedule without a relaunch (new, build 8)
+
+The four derived things — the cached estimates, the widget, the Shortcuts index and the reminder
+schedule — used to be rebuilt only on launch and on returning to the foreground. This is the pass
+that proves the new signal works, and it is the one no simulator test can make.
+
+- [ ] Turn reminders on. Create a rental with a scheduled end date a few days out. **Without
+      backgrounding the app**, open Settings → Reminders: the planned reminder for that rental
+      must already be listed.
+- [ ] Edit that rental and move its scheduled end date. The planned reminder must move with it,
+      again without backgrounding the app.
+- [ ] Record the pickup. The reminders that no longer apply must disappear from the list.
+- [ ] Restore a backup onto a phone that has other rentals on it. Every reminder, the widget and
+      the Shortcuts suggestions must describe the restored data, not what was there before.
 
 
 ## 3. Apple accounts and signing — none of this exists yet
