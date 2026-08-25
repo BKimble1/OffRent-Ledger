@@ -93,6 +93,8 @@ struct VendorListView: View {
     @Query(sort: \Vendor.name) private var vendors: [Vendor]
     @State private var editing: Vendor?
     @State private var creating = false
+    /// The companies a swipe has proposed deleting, held until the user confirms.
+    @State private var pendingDeletion: [Vendor] = []
 
     var body: some View {
         List {
@@ -123,11 +125,27 @@ struct VendorListView: View {
                 .minimumTapTarget()
             }
             .onDelete { offsets in
-                // Deleting a vendor cascades to its agreements and everything under them, so the
-                // confirmation says so plainly rather than relying on the user to know.
-                for index in offsets { context.delete(vendors[index]) }
-                try? context.save()
+                // Ask first. The comment that used to sit here said the confirmation "says so
+                // plainly rather than relying on the user to know" — and there was no
+                // confirmation. A vendor cascades to its agreements and through them to every
+                // rental, timeline event, invoice and photograph filed under that yard, so one
+                // careless swipe on this screen could take a contractor's entire record of a
+                // job with it, with no undo and nothing said.
+                pendingDeletion = offsets.map { vendors[$0] }
             }
+        }
+        .confirmationDialog(
+            deletionTitle,
+            isPresented: Binding(
+                get: { !pendingDeletion.isEmpty },
+                set: { if !$0 { pendingDeletion = [] } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) { confirmDeletion() }
+            Button("Keep", role: .cancel) { pendingDeletion = [] }
+        } message: {
+            Text(deletionMessage)
         }
         .offRentFormBackground()
         .navigationTitle("Rental companies")
@@ -156,6 +174,47 @@ struct VendorListView: View {
     }
 
     /// Branch or phone, plus how many rentals are filed under this company.
+    private var deletionTitle: String {
+        guard let first = pendingDeletion.first else { return "Delete this company?" }
+        return pendingDeletion.count == 1
+            ? "Delete \(first.name)?"
+            : "Delete \(pendingDeletion.count) companies?"
+    }
+
+    /// Counts what actually goes, rather than warning in the abstract.
+    ///
+    /// "This cannot be undone" on its own is a sentence people tap through. "This also deletes 4
+    /// rentals, their confirmations, invoices and photos" is a sentence they read.
+    private var deletionMessage: String {
+        var rentals = 0
+        var invoices = 0
+        for vendor in pendingDeletion {
+            for agreement in vendor.agreements ?? [] {
+                rentals += (agreement.items ?? []).count
+                invoices += (agreement.invoices ?? []).count
+            }
+        }
+        if rentals == 0, invoices == 0 {
+            return "Nothing else is filed under it. This cannot be undone."
+        }
+        var parts: [String] = []
+        if rentals > 0 { parts.append("\(rentals) rental\(rentals == 1 ? "" : "s")") }
+        if invoices > 0 { parts.append("\(invoices) invoice\(invoices == 1 ? "" : "s")") }
+        return """
+            This also deletes \(parts.joined(separator: " and ")), with every confirmation, \
+            pickup and photograph filed under them. This cannot be undone.
+            """
+    }
+
+    private func confirmDeletion() {
+        for vendor in pendingDeletion { context.delete(vendor) }
+        pendingDeletion = []
+        try? context.save()
+        // The rentals that just went were on Today, on the map, in the widget and in the
+        // reminder schedule. §3.3.
+        dependencies.derivedStateNeedsRefresh()
+    }
+
     private func vendorDetail(_ vendor: Vendor) -> String? {
         var parts: [String] = []
         if let first = [vendor.branch, vendor.phone].compactMap({ $0 }).first { parts.append(first) }
@@ -167,6 +226,7 @@ struct VendorListView: View {
 }
 
 struct JobSiteListView: View {
+    @Environment(AppDependencies.self) private var dependencies
     @Environment(\.modelContext) private var context
     @Query(sort: \JobSite.name) private var jobSites: [JobSite]
     @State private var editing: JobSite?
@@ -210,8 +270,11 @@ struct JobSiteListView: View {
             .onDelete { offsets in
                 // Nullify, not cascade: deleting a jobsite label must not delete the rentals that
                 // happened there. The relationship's delete rule enforces it; this just triggers.
+                // No confirmation, because nothing is lost that the user cannot re-add — but the
+                // rentals that were pinned there have just come off the map.
                 for index in offsets { context.delete(jobSites[index]) }
                 try? context.save()
+                dependencies.derivedStateNeedsRefresh()
             }
         }
         .offRentFormBackground()

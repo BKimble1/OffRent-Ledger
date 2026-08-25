@@ -56,7 +56,7 @@ struct SupportView: View {
                 .accessibilityIdentifier(A11yID.Settings.supportEmail)
             }
 
-            if let site = AppConfiguration.plannedSupportURL {
+            if AppConfiguration.legalURLsAreLive, let site = AppConfiguration.plannedSupportURL {
                 Button {
                     openURL(site)
                 } label: {
@@ -366,7 +366,7 @@ struct AboutView: View {
 
     private var links: some View {
         ListGroup {
-            if let site = AppConfiguration.plannedWebsiteURL {
+            if AppConfiguration.legalURLsAreLive, let site = AppConfiguration.plannedWebsiteURL {
                 ActionRow(
                     title: "offrent.idlery.com",
                     subtitle: "The product site",

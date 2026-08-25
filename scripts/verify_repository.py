@@ -755,6 +755,39 @@ REQUIRED_REASON_APIS = {
 }
 
 
+def check_planned_urls_are_gated() -> None:
+    check("A URL that is not live yet cannot be opened")
+    # `AppConfiguration.legalURLsAreLive` is false while offrent.idlery.com has not been stood
+    # up. It used to be documentation: three controls opened the planned Privacy Policy, Terms
+    # and Support pages regardless, dropping the reader into Safari on an error page — from
+    # screens App Review opens on purpose.
+    #
+    # The flag is a switch now, and this keeps it one. Flip it to true in AppConfiguration once
+    # RELEASE_CHECKLIST.md records the domain as live and every gate opens at once.
+    for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
+        if path.name == "AppConfiguration.swift":
+            continue
+        lines = path.read_text().splitlines()
+        for index, line in enumerate(lines):
+            if not re.search(r"\bplanned\w*URL\b", line):
+                continue
+            # A line that *declares* the property is not a line that reaches the URL. The gate
+            # for `var plannedURL: URL? { ... }` lives inside its own body, on the next line.
+            if re.match(r"\s*(?:@\w+\s+)*(?:private |static |var |let |func )+\w*[Uu]rl\b", line, re.IGNORECASE):
+                continue
+            if re.search(r"\b(?:var|let|func)\s+planned\w*URL\b", line):
+                continue
+            # Five lines, not one: the gate is allowed to be a `guard` at the top of the
+            # property that returns the URL, which is the better place for it.
+            window = "\n".join(lines[max(0, index - 5): index + 1])
+            if "legalURLsAreLive" not in window:
+                fail(
+                    "planned-url",
+                    f"{path.relative_to(ROOT)}:{index + 1} reaches a planned URL without "
+                    "checking AppConfiguration.legalURLsAreLive first",
+                )
+
+
 def check_privacy_manifests() -> None:
     check("Both privacy manifests exist and describe what the code actually does")
     # Required for App Store submission since May 2024. Its absence is not a warning — the
@@ -1639,6 +1672,7 @@ def main() -> int:
         check_storekit_products_match,
         check_no_hardcoded_prices,
         check_permission_strings,
+        check_planned_urls_are_gated,
         check_privacy_manifests,
         check_privacy_posture,
         check_legal_urls_not_claimed_live,

@@ -201,7 +201,14 @@ enum DocumentTextParser {
     // `404.O2` is rejected outright. `$5,292.22.` at the end of a sentence is not, because the
     // full stop has nothing after it. A rejected amount becomes a field the user fills in, with
     // the garbled line visible under Recognised text — which is the honest outcome.
-    private static let moneyBoundary = #"(?![0-9A-Za-z]|[.,][0-9A-Za-z])"#
+    ///
+    /// `%` is in the rejection set for a reason that cost real money on a real invoice.
+    /// `SALES TAX 8.25%  130.84` is one line with two numbers on it: a rate and an amount. The
+    /// old boundary accepted `8.25` because the character after it was neither a letter nor a
+    /// digit — so the parser reported the tax as $8.25 at 0.90 confidence, above the threshold
+    /// that pre-ticks a suggestion, and the user would have accepted a figure $122.59 short of
+    /// what the vendor billed. A percentage is never an amount of money.
+    private static let moneyBoundary = #"(?![0-9A-Za-z%]|[.,][0-9A-Za-z])"#
     private static let moneyFragment =
         #"\$?\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)"# + moneyBoundary
     private static let dateFragment =
@@ -212,7 +219,12 @@ enum DocumentTextParser {
     /// An optional colon or equals, and optionally a run of leader characters — the
     /// `DAY .................. 465.00` form that rate schedules are printed in. Two or more, so a
     /// single stray dot cannot join two unrelated things.
-    private static let gap = #"\s*[:=]?\s*(?:[.·•\-–—_]{2,}\s*)?"#
+    /// The percentage and the closing bracket are there because rental paperwork prints the rate
+    /// it charged beside the amount it produced: `SALES TAX 8.25%  130.84`,
+    /// `RPP (DAMAGE WAIVER) 12%  136.80`. Without stepping over the rate, the amount is either
+    /// missed entirely or — before the money boundary rejected percentages — read as the rate.
+    private static let gap =
+        #"\s*\)?\s*[:=]?\s*(?:[0-9]+(?:\.[0-9]+)?\s*%\s*)?(?:[.·•\-–—_]{2,}\s*)?"#
 
     private static let sharedRules: [Rule] = [
         Rule(field: .agreementNumber, name: "labelled-agreement-number", confidence: 0.94, kind: .text,
@@ -260,7 +272,9 @@ enum DocumentTextParser {
              ]),
         Rule(field: .scheduledEndDate, name: "labelled-end-date", confidence: 0.9, kind: .date,
              patterns: [
-                #"(?i)\b(?:estimated\s+return|expected\s+return|due\s+(?:back|date)|scheduled\s+end|return\s+date|end\s+date)"# + gap + dateFragment
+                #"(?i)\b(?:est(?:\.|imated)?\s+return|expected\s+return|due\s+(?:back|date|in)"#
+                + #"|scheduled\s+end|return\s+date|end\s+date|off[\s\-]?rent\s+date|date\s+in)"#
+                + gap + dateFragment
              ]),
     ]
 
@@ -282,10 +296,21 @@ enum DocumentTextParser {
              patterns: [
                 #"(?i)\b(?:rental\s+(?:subtotal|charges?|amount)|equipment\s+rental)"# + gap + moneyFragment
              ]),
+        // A bare `SUBTOTAL   1,585.90` line, which is how most invoices actually print it.
+        // Lower confidence than the labelled form: on an invoice with several sections the first
+        // subtotal is not necessarily the rental one, so this is offered and never pre-ticked.
+        Rule(field: .rentalSubtotal, name: "bare-subtotal", confidence: 0.68, kind: .money,
+             patterns: [#"(?i)\bsub[\s\-]?total"# + gap + moneyFragment]),
         Rule(field: .deliveryCharge, name: "labelled-delivery", confidence: 0.9, kind: .money,
              patterns: [#"(?i)\b(?:delivery|drop[\s\-]?off|freight\s+out)(?:\s+(?:charge|fee|surcharge|recovery))*"# + gap + moneyFragment]),
+        // `PICKUP / HAUL OUT` is one line on a real invoice, and the slash used to stop the
+        // match dead. The trailing group steps over a second word joined by a slash or a dash.
         Rule(field: .pickupCharge, name: "labelled-pickup", confidence: 0.9, kind: .money,
-             patterns: [#"(?i)\b(?:pick[\s\-]?up|collection|freight\s+in)(?:\s+(?:charge|fee|surcharge|recovery))*"# + gap + moneyFragment]),
+             patterns: [
+                #"(?i)\b(?:pick[\s\-]?up|collection|haul[\s\-]?(?:out|off|away)?|freight\s+in|return\s+freight)"#
+                + #"(?:\s*[/&\-]?\s*(?:haul|out|off|away|charge|fee|surcharge|recovery)\b)*"#
+                + gap + moneyFragment
+             ]),
         Rule(field: .fuelCharge, name: "labelled-fuel", confidence: 0.9, kind: .money,
              patterns: [#"(?i)\b(?:fuel|refuel(?:ing)?|diesel)(?:\s+(?:charge|fee|surcharge|recovery))*"# + gap + moneyFragment]),
         Rule(field: .damageCharge, name: "labelled-damage", confidence: 0.9, kind: .money,

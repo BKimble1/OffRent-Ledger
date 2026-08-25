@@ -20,8 +20,14 @@ enum LegalDocument: String, Identifiable, CaseIterable {
         }
     }
 
+    /// The web copy of this document — but only once the site is actually serving it.
+    ///
+    /// The guard is inside the property rather than at each call site, so a caller cannot open a
+    /// URL that 404s by forgetting to check. The whole document is bundled and rendered on this
+    /// screen; the web copy is a convenience and never the source.
     var plannedURL: URL? {
-        switch self {
+        guard AppConfiguration.legalURLsAreLive else { return nil }
+        return switch self {
         case .privacy: AppConfiguration.plannedPrivacyURL
         case .terms: AppConfiguration.plannedTermsURL
         }
@@ -201,7 +207,12 @@ struct LegalDocumentView: View {
 
     private var footer: some View {
         VStack(spacing: Space.base) {
-            if let url = document.plannedURL {
+            // Gated on the flag, which until now was documentation rather than a switch.
+            // `legalURLsAreLive` is false because offrent.idlery.com has not been stood up
+            // (§11.4), so this button dropped the reader into Safari on an error page — from the
+            // Privacy Policy screen, which is one App Review reliably opens. The whole document
+            // is already on this screen, bundled; the web copy is a convenience, not the source.
+            if AppConfiguration.legalURLsAreLive, let url = document.plannedURL {
                 Button {
                     openURL(url)
                 } label: {
