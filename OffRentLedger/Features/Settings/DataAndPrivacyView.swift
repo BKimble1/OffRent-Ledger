@@ -19,6 +19,12 @@ struct DataAndPrivacyView: View {
     @State private var showingDeleteConfirmation = false
     @State private var deleteConfirmationText = ""
     @State private var storageBytes: Int64 = 0
+    /// What the delete actually did, read back from the store and the disk afterwards.
+    ///
+    /// A row in the List rather than a second `.alert`: this screen already has one, and it also
+    /// means the sentence stays on screen next to the counts it is talking about.
+    @State private var deleteReport: String?
+    @State private var deleteLeftSomething = false
 
     private var exportService: ExportService {
         ExportService(context: context, clock: dependencies.clock, fileStore: dependencies.fileStore)
@@ -26,6 +32,16 @@ struct DataAndPrivacyView: View {
 
     var body: some View {
         List {
+            if let deleteReport {
+                Section {
+                    InlineAlert(
+                        message: deleteReport,
+                        kind: deleteLeftSomething ? .attention : .positive
+                    )
+                    .accessibilityIdentifier(A11yID.Failure.deleteAllOutcome)
+                }
+            }
+
             Section {
                 Text(AppCopy.localOnlySummary)
                     .font(.footnote)
@@ -103,12 +119,78 @@ struct DataAndPrivacyView: View {
 
     // MARK: - Actions
 
+    /// Deletes everything, then checks whether it did.
+    ///
+    /// This used to be `try? await exportService.deleteAllData()` followed by `storageBytes = 0`
+    /// — the screen reported an empty iPhone whether or not the delete had thrown, and `0` was a
+    /// number assigned rather than a number measured. On the one irreversible action in the app,
+    /// on the screen that promises there is no server copy, that is the wrong way round: the
+    /// only honest report is the one taken from the store and the disk afterwards.
     private func deleteAll() async {
         deleteConfirmationText = ""
-        try? await exportService.deleteAllData()
+        deleteReport = nil
+
+        var failure: String?
+        do {
+            try await exportService.deleteAllData()
+        } catch {
+            failure = error.localizedDescription
+        }
+
         await dependencies.notifications.cancelAll()
         dependencies.snapshotPublisher.clear()
-        storageBytes = 0
+
+        let remaining = try? remainingRecordCount()
+        let remainingBytes = await dependencies.fileStore.totalBytesOnDisk()
+        storageBytes = remainingBytes
+
+        if failure == nil, remaining == 0, remainingBytes == 0 {
+            deleteLeftSomething = false
+            deleteReport = "Everything has been removed from this iPhone."
+        } else {
+            deleteLeftSomething = true
+            deleteReport = Self.incompleteDeletionReport(
+                records: remaining, bytes: remainingBytes, failure: failure
+            )
+        }
+    }
+
+    /// Everything the delete was supposed to take. Throws rather than reporting zero, because
+    /// "nothing is left" and "I could not look" are different answers.
+    private func remainingRecordCount() throws -> Int {
+        var total = try context.fetch(StoreQueries.allItems()).count
+        total += try context.fetch(StoreQueries.allInvoices()).count
+        total += try context.fetch(StoreQueries.allAgreements()).count
+        total += try context.fetch(StoreQueries.allJobSites()).count
+        total += try context.fetch(StoreQueries.allVendors()).count
+        total += try context.fetch(StoreQueries.allAssets()).count
+        return total
+    }
+
+    /// Says what is still here and what to do about it. Specific, and never alarming.
+    private static func incompleteDeletionReport(
+        records: Int?, bytes: Int64, failure: String?
+    ) -> String {
+        var parts: [String] = []
+        if let records, records > 0 {
+            parts.append(records == 1 ? "1 record" : "\(records) records")
+        }
+        if bytes > 0 {
+            let size = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+            parts.append("\(size) of photos and documents")
+        }
+
+        var message = parts.isEmpty
+            ? "The delete did not finish."
+            : "The delete did not finish. \(parts.joined(separator: " and ")) are still on this iPhone."
+        if records == nil {
+            message += " What is left could not be counted."
+        }
+        if let failure {
+            message += " \(failure)"
+        }
+        message += " Tap Delete all data again, and if it keeps failing, restart \(AppConfiguration.displayName)."
+        return message
     }
 }
 
@@ -167,7 +249,7 @@ struct ImportPreviewView: View {
                             does not contain and cannot be imported on their own.
                             """)
                         .font(.footnote)
-                        .foregroundStyle(Palette.attention)
+                        .foregroundStyle(Palette.attentionText)
                     } header: {
                         Text("Cannot be imported")
                     }

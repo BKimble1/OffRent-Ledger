@@ -43,6 +43,13 @@ final class ScanReviewViewModel {
     /// different object entirely.
     private(set) var pageImageData: [Data] = []
 
+    /// The PDF this scan began with, when it began with one.
+    ///
+    /// Held for the same reason and under the same rule as `pageImageData`: in memory, for the
+    /// life of this object, and this type still cannot write a file. `addPages` needs it —
+    /// without it, adding a page to an imported PDF threw the PDF away.
+    private(set) var sourcePDFData: Data?
+
     /// Which suggestions the user has ticked. Seeded from `isPreselected`, then owned entirely by
     /// the user.
     var selection: Set<SuggestedField> = []
@@ -91,11 +98,17 @@ final class ScanReviewViewModel {
     // MARK: - Pipeline
 
     func recognise(imageData: [Data], source: DocumentSource) {
+        sourcePDFData = nil
         pageImageData = imageData
         run { [recognizer] in try await recognizer.recognize(imageData: imageData, source: source) }
     }
 
     func recognise(pdf data: Data) {
+        sourcePDFData = data
+        // A rescan replaces what came before it. Leaving the previous scan's page images here
+        // would show the review screen's page strip a document that is no longer the one being
+        // reviewed.
+        pageImageData = []
         run { [recognizer] in try await recognizer.recognize(pdf: data) }
     }
 
@@ -218,10 +231,34 @@ final class ScanReviewViewModel {
     /// The user's edits are deliberately cleared: they were made against a different set of
     /// suggestions, and silently carrying a value the new parse did not produce would put
     /// something on the review screen that nothing on the document says.
+    ///
+    /// A scan that began as a PDF keeps the PDF. This used to hand the recogniser
+    /// `pageImageData + data` and nothing else — and an imported PDF never fills `pageImageData`,
+    /// because it is read out of its own text layer rather than photographed. So "Add pages" on
+    /// an imported invoice discarded the invoice and reviewed the added photographs on their own:
+    /// a review screen describing half the document, with the total and the charge lines gone and
+    /// nothing on screen to say they had been.
     func addPages(_ data: [Data], source: DocumentSource) {
+        guard !data.isEmpty else { return }
         let combined = pageImageData + data
+        pageImageData = combined
         edits = [:]
-        recognise(imageData: combined, source: source)
+
+        guard let pdf = sourcePDFData else {
+            run { [recognizer] in
+                try await recognizer.recognize(imageData: combined, source: source)
+            }
+            return
+        }
+
+        // Two recognitions joined, because the recogniser has no call that takes both. The PDF
+        // comes first: it is the document the user started from, so its pages keep their numbers
+        // and the added photographs are numbered after them.
+        run { [recognizer] in
+            let fromPDF = try await recognizer.recognize(pdf: pdf)
+            let fromPages = try await recognizer.recognize(imageData: combined, source: source)
+            return fromPDF.appending(fromPages)
+        }
     }
 
     var lowConfidenceSuggestions: [FieldSuggestion] {
@@ -251,10 +288,39 @@ final class ScanReviewViewModel {
 
     var hasAnySelection: Bool { !selection.isEmpty }
 
+    /// The ticked fields `acceptedValues()` is going to drop, and the reason it will drop them:
+    /// the text on screen cannot be read as the kind of value the field holds.
+    ///
+    /// Dropping them is right. A daily rate typed as "twelve hundred" must never reach the store
+    /// as a number, and the store is where a contractor's case against an invoice lives. What was
+    /// wrong was doing it in silence — the row stayed ticked, the button counted it, the sheet
+    /// closed, and nothing on the form had changed. The user had every reason to believe their
+    /// correction was saved.
+    ///
+    /// Whoever presents `acceptedValues()` presents this beside it. Sorted so the list a user
+    /// reads is stable between redraws rather than reshuffling with the set's hash order.
+    var unusableSelections: [SuggestedField] {
+        let accepted = acceptedValues()
+        return selection
+            .filter { accepted[$0] == nil }
+            .sorted { $0.rawValue < $1.rawValue }
+    }
+
+    /// How many ticked values will actually be written. Never more than `selection.count`.
+    ///
+    /// The commit button's count belongs here rather than on `selection.count`, which counts
+    /// rows the commit is about to drop — "Use 5 suggested values" over a commit that writes
+    /// four. A button that overstates what it is about to do is the same defect as a screen that
+    /// overstates what it holds.
+    var acceptedValueCount: Int { acceptedValues().count }
+
     /// The values the user ticked, re-parsed from whatever is on screen now.
     ///
     /// Re-parsing rather than returning the original suggestion is deliberate: if the user
     /// corrected "2565.OO" to "2565.00", the corrected value is what gets saved.
+    ///
+    /// A ticked field whose text will not parse is left out rather than coerced — see
+    /// `unusableSelections`, which is how the caller says so.
     func acceptedValues() -> [SuggestedField: SuggestedValue] {
         var accepted: [SuggestedField: SuggestedValue] = [:]
         for field in selection {

@@ -204,7 +204,10 @@ struct ScanReviewView: View {
     private var commitBar: some View {
         StickyActionBar {
             VStack(spacing: Space.snug) {
-                if let title = ScanReviewCopy.useValues(selected: model.selection.count) {
+                // The count of what will be *written*, not of what is ticked. A ticked field
+                // whose text will not parse is dropped on commit, so `selection.count` promised
+                // five values over a save that wrote four.
+                if let title = ScanReviewCopy.useValues(selected: model.acceptedValueCount) {
                     Button { onSave(model.acceptedValues()) } label: { Text(title) }
                         .buttonStyle(.offRentPrimary)
                         .accessibilityIdentifier(A11yID.Scan.saveButton)
@@ -215,11 +218,32 @@ struct ScanReviewView: View {
                         .buttonStyle(.offRentPrimary)
                         .accessibilityIdentifier(A11yID.Scan.enterManually)
                 }
+                // And the ones that will not be written are named, rather than vanishing
+                // between the tick and the form.
+                if !model.unusableSelections.isEmpty {
+                    Text(unusableExplanation)
+                        .font(Typography.micro)
+                        .foregroundStyle(Palette.attentionText)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier(A11yID.Scan.unusableSelections)
+                }
                 Text("Nothing is saved to a rental until you tap this.")
                     .font(Typography.micro)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// Names the ticked fields the commit will drop, and why.
+    private var unusableExplanation: String {
+        let names = model.unusableSelections.map(\.displayName)
+        let listed = names.count == 1
+            ? names[0]
+            : names.dropLast().joined(separator: ", ") + " and " + (names.last ?? "")
+        let verb = names.count == 1 ? "is not" : "are not"
+        return "\(listed) \(verb) in a form this can save yet. Correct the text or enter "
+            + (names.count == 1 ? "it" : "them") + " by hand on the next screen."
     }
 
     // MARK: - The form

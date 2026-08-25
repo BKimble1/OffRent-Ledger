@@ -27,6 +27,13 @@ struct BackupAndTransferView: View {
     @State private var showingImporter = false
     @State private var pendingImport: (archive: BackupArchive, preview: ImportPreview)?
     @State private var importFailure: String?
+    /// Why the last export did not produce a file.
+    ///
+    /// Shown in the card, not in an alert. There is already an `.alert` on this screen's modifier
+    /// chain alongside a `.sheet`, and a second one there is how the import preview stops
+    /// presenting. It also stays on screen, which an alert does not — a failed backup is worth
+    /// leaving in front of somebody rather than dismissing in a tap.
+    @State private var exportFailure: String?
     @State private var storageBytes: Int64 = 0
     @State private var busy = false
 
@@ -154,7 +161,12 @@ struct BackupAndTransferView: View {
                 ) { Task { await exportBackup() } }
                     .accessibilityIdentifier(A11yID.Settings.exportBackup)
 
-                if let exportedBackup {
+                // Both share rows are gated on the file being *there*. The state is only set
+                // after a write that returned without throwing, and this checks the disk again
+                // at the moment the row is drawn: the temporary directory is the system's to
+                // empty, and a share sheet over a file that is no longer there is how somebody
+                // emails an empty attachment to their accounts department.
+                if let exportedBackup, FileManager.default.fileExists(atPath: exportedBackup.path) {
                     RowDivider()
                     ShareLink(item: exportedBackup) {
                         NavigationRow(
@@ -175,13 +187,18 @@ struct BackupAndTransferView: View {
                 ) { Task { await exportCSV() } }
                     .accessibilityIdentifier(A11yID.Settings.exportCSV)
 
-                if let exportedCSV {
+                if let exportedCSV, FileManager.default.fileExists(atPath: exportedCSV.path) {
                     RowDivider()
                     ShareLink(item: exportedCSV) {
                         NavigationRow(title: "Share the CSV", symbol: "square.and.arrow.up")
                     }
                     .buttonStyle(.plain)
                 }
+            }
+
+            if let exportFailure {
+                InlineAlert(message: exportFailure)
+                    .accessibilityIdentifier(A11yID.Failure.backupExport)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -262,10 +279,40 @@ struct BackupAndTransferView: View {
             return
         }
 
-        guard let csv = try? exportService.makeCSVForAllItems() else { return }
+        // Every failure below used to be a `try?` and a `return`: the row did nothing, said
+        // nothing, and — for the CSV — offered a share sheet over a file the write had just
+        // failed to produce. An export that fails in silence is worse than one that fails,
+        // because the user walks away believing they have a copy of their records.
+        let csv: String
+        do {
+            csv = try exportService.makeCSVForAllItems()
+        } catch {
+            exportedCSV = nil
+            exportFailure = """
+                The CSV could not be built from your records. \(error.localizedDescription) \
+                Try again, or export a backup instead.
+                """
+            return
+        }
+
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("OffRentLedger-rentals.csv")
-        try? csv.write(to: url, atomically: true, encoding: .utf8)
+        do {
+            try csv.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            exportedCSV = nil
+            exportFailure = """
+                The CSV could not be saved to this iPhone. \(error.localizedDescription) \
+                Free up some space and try again.
+                """
+            return
+        }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            exportedCSV = nil
+            exportFailure = "The CSV was not saved to this iPhone. Free up some space and try again."
+            return
+        }
+        exportFailure = nil
         exportedCSV = url
     }
 
@@ -273,14 +320,40 @@ struct BackupAndTransferView: View {
         guard !busy else { return }
         busy = true
         defer { busy = false }
-        guard let data = try? exportService.encodeArchive() else { return }
+
+        let data: Data
+        do {
+            data = try exportService.encodeArchive()
+        } catch {
+            exportedBackup = nil
+            exportFailure = """
+                The backup could not be built from your records. \(error.localizedDescription) \
+                Try again.
+                """
+            return
+        }
+
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("OffRentLedger-backup.json")
         do {
             try data.write(to: url, options: .atomic)
         } catch {
+            exportedBackup = nil
+            exportFailure = """
+                The backup could not be saved to this iPhone. \(error.localizedDescription) \
+                Free up some space and try again.
+                """
             return
         }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            exportedBackup = nil
+            exportFailure = """
+                The backup was not saved to this iPhone. Free up some space and try again.
+                """
+            return
+        }
+
+        exportFailure = nil
         exportedBackup = url
         // Recorded only once the file is actually on disk. A date stamped on the attempt would
         // tell somebody they were covered when they were not.

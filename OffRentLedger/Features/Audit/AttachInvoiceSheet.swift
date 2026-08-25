@@ -33,12 +33,21 @@ struct AttachInvoiceSheet: View {
     @State private var lines: [DraftLine] = []
     @State private var notes = ""
 
+    /// Charge-shaped lines the scan read and no rule understood, kept in front of the user
+    /// instead of dropped. See `unreadSection`.
+    @State private var unreadLines: [UnreadInvoiceLine] = []
+    /// Fields the scan produced that this form had nowhere to put, plus the ones the user ticked
+    /// whose text could not be read as a value.
+    @State private var unreadFieldNames: [String] = []
+
     @State private var scanModel: ScanReviewViewModel?
     @State private var showingCamera = false
     @State private var photoItem: PhotosPickerItem?
     @State private var showingFileImporter = false
     @State private var scanError: String?
     @State private var isSaving = false
+    /// Set when the store refuses the save, and the reason nothing dismisses.
+    @State private var saveFailure: String?
 
     @State private var hasLoaded = false
 
@@ -148,6 +157,81 @@ struct AttachInvoiceSheet: View {
         }
     }
 
+    /// What the scan read and this form could not use.
+    ///
+    /// The parser reports the lines it could not interpret, and until now this screen threw them
+    /// away. On a vendor invoice that is not a cosmetic loss: a charge no rule recognised simply
+    /// never became a line, so the invoice was recorded smaller than the one in the user's hand —
+    /// and the comparison they take back to the yard was built from the smaller one.
+    ///
+    /// Nothing here is added automatically. A line reading `TOTAL DUE $3,214.00` is charge-shaped
+    /// and would double-count, and only the person holding the invoice can tell the difference.
+    /// So each is shown verbatim, with one tap to put it in Lines above, where it can be
+    /// categorised and corrected like any other.
+    @ViewBuilder
+    private var unreadSection: some View {
+        if !unreadLines.isEmpty || !unreadFieldNames.isEmpty {
+            Section {
+                ForEach(unreadLines) { line in
+                    Button {
+                        lines.append(
+                            DraftLine(category: .other, detail: line.text, amount: line.amount)
+                        )
+                        unreadLines.removeAll { $0.id == line.id }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(line.text)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Label("Add this as a line", systemImage: "plus.circle")
+                                .font(Typography.caption)
+                                .foregroundStyle(Palette.accentText)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier(A11yID.Failure.unreadInvoiceLine)
+                    .accessibilityHint("Double tap to add this line to the invoice.")
+                    .minimumTapTarget()
+                }
+
+                if !unreadFieldNames.isEmpty {
+                    InlineAlert(message: unusableFieldMessage)
+                }
+            } header: {
+                Text("Not read from the scan")
+            } footer: {
+                Text(unreadFooter)
+            }
+        }
+    }
+
+    private var unusableFieldMessage: String {
+        let names = unreadFieldNames.joined(separator: ", ")
+        let subject = unreadFieldNames.count == 1 ? "it" : "them"
+        return """
+            Ticked on the scan but not filled in, because what was on screen could not be read as \
+            a value: \(names). Enter \(subject) by hand.
+            """
+    }
+
+    private var unreadFooter: String {
+        guard !unreadLines.isEmpty else {
+            return "Everything else the scan read is in the form above."
+        }
+        let count = unreadLines.count
+        let subject = count == 1 ? "1 line" : "\(count) lines"
+        let pronoun = count == 1 ? "it is" : "they are"
+        return """
+            \(subject) on the document carried an amount that no rule understood, so \(pronoun) \
+            not in the lines above. Add or ignore each one — until you do, the lines add up to \
+            less than the invoice does.
+            """
+    }
+
     private var expectationSection: some View {
         Section {
             CurrencyField(title: "What you expected", value: $expectedOverride)
@@ -173,16 +257,30 @@ struct AttachInvoiceSheet: View {
                 scanSection
                 invoiceSection
                 linesSection
+                unreadSection
                 expectationSection
                 notesSection
             }
             .offRentFormBackground()
             .safeAreaInset(edge: .bottom) {
                 StickyActionBar {
-                    Button("Save invoice", action: save)
-                        .buttonStyle(.offRentPrimary)
-                        .accessibilityIdentifier(A11yID.Audit.saveInvoice)
-                        .disabled(isSaving)
+                    VStack(spacing: Space.snug) {
+                        if let saveFailure {
+                            InlineAlert(message: saveFailure)
+                        }
+                        Button("Save invoice", action: save)
+                            .buttonStyle(.offRentPrimary)
+                            .accessibilityIdentifier(A11yID.Audit.saveInvoice)
+                            .disabled(isSaving || linesMissingAnAmount > 0)
+                        if let missing = missingAmountExplanation {
+                            Text(missing)
+                                .font(Typography.micro)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier(A11yID.Audit.lineNeedsAnAmount)
+                        }
+                    }
                 }
             }
             .navigationTitle(editing == nil ? "Attach invoice" : "Edit invoice")
@@ -198,7 +296,7 @@ struct AttachInvoiceSheet: View {
                 ScanReviewView(
                     model: session.model,
                     onSave: { values in
-                        apply(scanned: values)
+                        apply(scanned: values, from: session.model)
                         scanModel = nil
                     },
                     onCancel: { scanModel = nil },
@@ -278,7 +376,16 @@ struct AttachInvoiceSheet: View {
         configure(model)
     }
 
-    private func apply(scanned values: [SuggestedField: SuggestedValue]) {
+    /// Fills the form from a scan, and keeps whatever it could not use in front of the user.
+    ///
+    /// Three things used to fall off here without a word, and every one of them made the recorded
+    /// invoice smaller than the paper one: a value the user ticked whose text would not parse, a
+    /// value with no home on this form, and every charge line the parser could not interpret.
+    private func apply(
+        scanned values: [SuggestedField: SuggestedValue],
+        from model: ScanReviewViewModel
+    ) {
+        var unused: Set<SuggestedField> = []
         for (field, value) in values {
             switch (field, value) {
             case let (.invoiceNumber, .text(text)): invoiceNumber = text
@@ -290,9 +397,17 @@ struct AttachInvoiceSheet: View {
                     lines.append(
                         DraftLine(category: category, detail: "", amount: amount, appearedInContract: false)
                     )
+                } else {
+                    unused.insert(field)
                 }
             }
         }
+
+        // The fields the review screen dropped for being unparseable are named here too. The
+        // user ticked those rows and has no other way to learn that nothing came of it.
+        unused.formUnion(model.unusableSelections)
+        unreadFieldNames = unused.map(\.displayName).sorted()
+        unreadLines = UnreadInvoiceLines.chargeCandidates(in: model.result?.unmatchedLines ?? [])
     }
 
     /// Fills the form from an invoice being corrected, or stamps today's date on a new one.
@@ -319,6 +434,24 @@ struct AttachInvoiceSheet: View {
                     appearedInContract: $0.appearedInContract
                 )
             }
+    }
+
+    /// Lines the user has given a description but no figure.
+    ///
+    /// `save` skips a line with no amount, so before this the description was typed, the line was
+    /// on screen, Save was pressed, and the line was gone — with the invoice quietly totalling
+    /// less than the paper it was copied from. This is the one screen where that matters most.
+    private var linesMissingAnAmount: Int {
+        lines.filter { $0.amount == nil && !$0.detail.trimmingCharacters(in: .whitespaces).isEmpty }
+            .count
+    }
+
+    private var missingAmountExplanation: String? {
+        let count = linesMissingAnAmount
+        guard count > 0 else { return nil }
+        return count == 1
+            ? "One line still needs an amount. Fill it in, or swipe the line away."
+            : "\(count) lines still need an amount. Fill them in, or swipe them away."
     }
 
     private func save() {
@@ -356,6 +489,9 @@ struct AttachInvoiceSheet: View {
             context.insert(invoice)
         }
 
+        // `linesMissingAnAmount` keeps the Save button disabled while any of these exist, so
+        // this can no longer discard a line somebody typed a description into. It stays a
+        // `continue` rather than a crash because a race between the two is not worth a trap.
         for (index, line) in lines.enumerated() {
             guard let amount = line.amount else { continue }
             context.insert(
@@ -377,7 +513,14 @@ struct AttachInvoiceSheet: View {
             let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
             workflow.apply(.attachInvoice, to: item, detail: invoiceNumber.nilIfBlank)
         }
-        try? context.save()
+        // Nothing closes until the record is on disk. The sheet used to dismiss whether or not
+        // the save landed and then send the user to a review screen for an invoice that might
+        // never have been written — the app reporting a filed invoice it did not have.
+        if let failure = PersistentStore.save(context, describing: "This invoice") {
+            saveFailure = failure
+            return
+        }
+        saveFailure = nil
         dependencies.derivedStateNeedsRefresh()
 
         dismiss()

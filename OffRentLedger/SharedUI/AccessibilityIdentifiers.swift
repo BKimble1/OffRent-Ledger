@@ -148,6 +148,19 @@ enum A11yID {
         static let root = "evidenceExport.root"
     }
 
+    /// The places a failure the user has to know about is drawn.
+    ///
+    /// Each of these existed as a literal string first, which is how it went unnoticed that none
+    /// of them was reachable from a test. Registered so they can be.
+    enum Failure {
+        static let backupExport = "settings.backup.exportFailure"
+        static let deleteAllOutcome = "settings.deleteAllOutcome"
+        static let attachmentSave = "attachments.saveFailure"
+        static let companyDelete = "company.deleteFailure"
+        static let jobsiteDelete = "jobsite.deleteFailure"
+        static let unreadInvoiceLine = "audit.unreadLine"
+    }
+
     enum ContactVendor {
         static let root = "contactVendor.root"
         static let disclosure = "contactVendor.disclosure"
@@ -195,6 +208,7 @@ enum A11yID {
         static let rescan = "scan.review.rescan"
         static let addPages = "scan.review.addPages"
         static let enterManually = "scan.review.enterManually"
+        static let unusableSelections = "scan.review.unusable"
         static let pagePreview = "scan.review.pages"
         static let pageViewer = "scan.review.page"
         static func field(_ field: SuggestedField) -> String { "scan.review.field.\(field.rawValue)" }
@@ -218,6 +232,7 @@ enum A11yID {
         static let acceptedConfirmation = "audit.accepted"
         static let saveInvoice = "audit.saveInvoice"
         static let lineCategory = "audit.line.category"
+        static let lineNeedsAnAmount = "audit.line.needsAnAmount"
         static func line(_ id: UUID) -> String { "audit.line.\(id.uuidString)" }
     }
 

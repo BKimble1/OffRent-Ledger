@@ -95,9 +95,16 @@ struct VendorListView: View {
     @State private var creating = false
     /// The companies a swipe has proposed deleting, held until the user confirms.
     @State private var pendingDeletion: [Vendor] = []
+    /// Set when the store refuses the deletion, so the row that is still on screen is explained
+    /// rather than left looking like a control that did nothing.
+    @State private var deletionFailure: String?
 
     var body: some View {
         List {
+            if let deletionFailure {
+                InlineAlert(message: deletionFailure)
+                    .accessibilityIdentifier(A11yID.Failure.companyDelete)
+            }
             // A `List` rather than the scrolling groups used elsewhere: swipe-to-delete is the
             // reason this screen exists, and it is native here and hand-built anywhere else.
             ForEach(vendors, id: \.id) { vendor in
@@ -209,7 +216,11 @@ struct VendorListView: View {
     private func confirmDeletion() {
         for vendor in pendingDeletion { context.delete(vendor) }
         pendingDeletion = []
-        try? context.save()
+        if let failure = PersistentStore.save(context, describing: "The deletion") {
+            deletionFailure = failure
+            return
+        }
+        deletionFailure = nil
         // The rentals that just went were on Today, on the map, in the widget and in the
         // reminder schedule. §3.3.
         dependencies.derivedStateNeedsRefresh()
@@ -231,9 +242,14 @@ struct JobSiteListView: View {
     @Query(sort: \JobSite.name) private var jobSites: [JobSite]
     @State private var editing: JobSite?
     @State private var creating = false
+    @State private var deletionFailure: String?
 
     var body: some View {
         List {
+            if let deletionFailure {
+                InlineAlert(message: deletionFailure)
+                    .accessibilityIdentifier(A11yID.Failure.jobsiteDelete)
+            }
             ForEach(jobSites, id: \.id) { site in
                 Button {
                     editing = site
@@ -273,7 +289,11 @@ struct JobSiteListView: View {
                 // No confirmation, because nothing is lost that the user cannot re-add — but the
                 // rentals that were pinned there have just come off the map.
                 for index in offsets { context.delete(jobSites[index]) }
-                try? context.save()
+                if let failure = PersistentStore.save(context, describing: "The deletion") {
+                    deletionFailure = failure
+                    return
+                }
+                deletionFailure = nil
                 dependencies.derivedStateNeedsRefresh()
             }
         }
@@ -384,6 +404,13 @@ struct EvidenceManagerView: View {
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var showingCamera = false
     @State private var isImporting = false
+    /// Why the last batch did not all arrive.
+    ///
+    /// A row in the List rather than an alert: there is a `.fullScreenCover` on this screen's
+    /// modifier chain, and it stays on screen next to the attachments it is talking about. A
+    /// photograph of damage that was never filed is exactly the thing a user must not find out
+    /// about weeks later, in front of a rental yard.
+    @State private var attachmentFailure: String?
 
     init(itemID: UUID) {
         self.itemID = itemID
@@ -407,6 +434,10 @@ struct EvidenceManagerView: View {
                     .minimumTapTarget()
                 }
                 if isImporting { ProgressView("Saving…") }
+                if let attachmentFailure {
+                    InlineAlert(message: attachmentFailure)
+                        .accessibilityIdentifier(A11yID.Failure.attachmentSave)
+                }
             } footer: {
                 Text("""
                     Photos are copied into \(AppConfiguration.displayName) and stored on this \
@@ -454,7 +485,16 @@ struct EvidenceManagerView: View {
                     Task { await save(imageData: pages) }
                 },
                 onCancel: { showingCamera = false },
-                onError: { _ in showingCamera = false }
+                onError: { error in
+                    showingCamera = false
+                    // The third silent path off this screen: the scanner itself failing closed
+                    // the sheet and said nothing, which is indistinguishable from the user
+                    // cancelling.
+                    attachmentFailure = """
+                        The scanner stopped before anything was captured. \
+                        \(error.localizedDescription) Try again, or add a photo from your library.
+                        """
+                }
             )
             .ignoresSafeArea()
         }
@@ -464,41 +504,99 @@ struct EvidenceManagerView: View {
         isImporting = true
         defer { isImporting = false; photoItems = [] }
         var pages: [Data] = []
+        // A picked photograph that will not load is counted, not skipped. It is one of the three
+        // ways attaching can fail — this one, the write, and the encode — and all three used to
+        // end in `continue`.
+        var unreadable = 0
         for item in selected {
-            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            guard let data = try? await item.loadTransferable(type: Data.self) else {
+                unreadable += 1
+                continue
+            }
             pages.append(data)
         }
-        await save(imageData: pages)
+        await save(imageData: pages, unreadable: unreadable)
     }
 
     /// Takes encoded data, not bitmaps: `AppFileStore` is an actor and `UIImage` is not
     /// `Sendable`. The picker hands back data anyway, so decoding here only to re-encode inside
     /// the store was wasted work as well as an illegal crossing.
-    private func save(imageData: [Data]) async {
-        guard let item = items.first, !imageData.isEmpty else { return }
+    private func save(imageData: [Data], unreadable: Int = 0) async {
+        guard let item = items.first else { return }
+        guard !imageData.isEmpty || unreadable > 0 else { return }
         isImporting = true
         defer { isImporting = false }
 
-        for (index, data) in imageData.enumerated() {
-            let basename = "\(Int(dependencies.clock.now.timeIntervalSince1970))-\(index)"
-            guard let stored = try? await dependencies.fileStore.writeImage(
-                data, ownerFolder: item.id.uuidString, basename: basename
-            ) else { continue }
+        let alreadyAttached = item.assets?.count ?? 0
+        var storedCount = 0
+        var failedCount = unreadable
 
-            let asset = EvidenceAsset(
-                relativePath: stored.relativePath,
-                mediaType: .image,
-                displayName: "Photo \((item.assets?.count ?? 0) + 1)",
-                capturedAt: dependencies.clock.now,
-                sha256: stored.sha256,
-                thumbnailRelativePath: stored.thumbnailRelativePath,
-                item: item
-            )
-            context.insert(asset)
+        for data in imageData {
+            // A UUID, not a timestamp. `Int(timeIntervalSince1970)` has one-second resolution and
+            // the index only disambiguated within a single batch, so two photographs attached in
+            // the same second wrote to the same filename: the second one overwrote the first on
+            // disk, both records survived, and both then pointed at the surviving image. A user
+            // looking at two thumbnails of the same photograph has lost evidence and been told
+            // nothing.
+            //
+            // Nothing anywhere reads meaning out of this name. `AppFileStore` appends `.jpg` and
+            // `-thumb.jpg` itself, and its reconcile sweep is the only code that inspects a
+            // filename at all — it looks for that `-thumb.jpg` suffix, which is unaffected.
+            let basename = UUID().uuidString
+            do {
+                let stored = try await dependencies.fileStore.writeImage(
+                    data, ownerFolder: item.id.uuidString, basename: basename
+                )
+                let asset = EvidenceAsset(
+                    relativePath: stored.relativePath,
+                    mediaType: .image,
+                    displayName: "Photo \(alreadyAttached + storedCount + 1)",
+                    capturedAt: dependencies.clock.now,
+                    sha256: stored.sha256,
+                    thumbnailRelativePath: stored.thumbnailRelativePath,
+                    item: item
+                )
+                context.insert(asset)
+                storedCount += 1
+            } catch {
+                failedCount += 1
+            }
         }
-        RentalWorkflowService(context: context, clock: dependencies.clock)
-            .append(event: .conditionCaptured, to: item, detail: "\(imageData.count) photo(s) attached.")
-        try? context.save()
+
+        // The timeline says how many photographs were filed, not how many were picked. The count
+        // used to come from the input array, so a batch of six where four failed to write left a
+        // permanent record reading "6 photo(s) attached." over four photographs — the ledger
+        // overstating its own evidence, which is the one thing it must never do.
+        if storedCount > 0 {
+            RentalWorkflowService(context: context, clock: dependencies.clock)
+                .append(
+                    event: .conditionCaptured,
+                    to: item,
+                    detail: storedCount == 1 ? "1 photo attached." : "\(storedCount) photos attached."
+                )
+        }
+
+        if let failure = PersistentStore.save(context, describing: "These photos") {
+            attachmentFailure = failure
+            return
+        }
+
+        attachmentFailure = failedCount == 0
+            ? nil
+            : Self.attachmentFailureMessage(failed: failedCount, stored: storedCount)
+    }
+
+    /// Plain, specific, and it never claims a photograph was filed when it was not.
+    private static func attachmentFailureMessage(failed: Int, stored: Int) -> String {
+        let missing = failed == 1 ? "1 photo" : "\(failed) photos"
+        if stored == 0 {
+            return """
+                \(missing) could not be saved to this iPhone, so nothing was attached. Try again, \
+                or pick a different photo.
+                """
+        }
+        let kept = stored == 1 ? "1 photo is" : "\(stored) photos are"
+        return "\(missing) could not be saved to this iPhone and \(failed == 1 ? "was" : "were") not attached. \(kept) here."
     }
 
     private func delete(_ offsets: IndexSet) {
@@ -506,9 +604,15 @@ struct EvidenceManagerView: View {
         let doomed = offsets.map { assets[$0] }
         let paths = doomed.flatMap { [$0.relativePath, $0.thumbnailRelativePath].compactMap { $0 } }
         for asset in doomed { context.delete(asset) }
-        try? context.save()
         // Files are removed after the record, not before: a failed save would otherwise leave a
-        // record pointing at a file that is already gone.
+        // record pointing at a file that is already gone. Which is why the save's answer is now
+        // read rather than discarded — the whole ordering was pointless while nothing could tell
+        // whether the save had worked.
+        if let failure = PersistentStore.save(context, describing: "That change") {
+            attachmentFailure = failure
+            return
+        }
+        attachmentFailure = nil
         Task { [fileStore = dependencies.fileStore] in
             for path in paths { await fileStore.delete(relativePath: path) }
         }
