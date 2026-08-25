@@ -180,7 +180,7 @@ struct TodayView: View {
                                 Text("+" + Formatters.currency(increment))
                                     .font(Typography.rowTitle)
                                     .monospacedDigit()
-                                    .foregroundStyle(Palette.accent)
+                                    .foregroundStyle(Palette.accentText)
                                 Text("expected")
                                     .font(Typography.micro)
                                     .foregroundStyle(.secondary)

@@ -122,7 +122,7 @@ struct PaywallView: View {
                 HStack(alignment: .top, spacing: Space.base) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: Layout.symbolInline + 3))
-                        .foregroundStyle(Palette.accent)
+                        .foregroundStyle(Palette.accentText)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: Space.hair) {
                         Text(feature.displayName).font(Typography.rowTitle)
@@ -194,7 +194,7 @@ struct PaywallView: View {
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Palette.accent.opacity(0.15), in: Capsule())
-                                .foregroundStyle(Palette.accent)
+                                .foregroundStyle(Palette.accentText)
                         }
                     }
                     Text(product.period.renewalDescription)

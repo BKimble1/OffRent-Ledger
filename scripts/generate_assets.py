@@ -27,6 +27,19 @@ COLOURS = {
     # name: (light r,g,b, dark r,g,b)
     "AccentColor":       ((0.847, 0.400, 0.086), (0.949, 0.541, 0.212)),
     "AttentionColor":    ((0.784, 0.318, 0.055), (0.964, 0.596, 0.278)),
+    # The same two hues, darkened in light mode until they clear 4.5:1 as *text*.
+    #
+    # The fills above are correct where they are fills: WCAG asks 3:1 of a non-text UI component,
+    # and a filled primary button, a status dot or a map pin is one. But the accent is also the
+    # label colour of every secondary button in the app — Accept, Question, Record a follow-up,
+    # Reopen — and there it is body text at 3.14:1 on the page and 3.60:1 on a card. Attention is
+    # 3.94:1 on the page and is how an overdue rental describes itself.
+    #
+    # Solved against the darkest of the three light surfaces (SurfaceSunken), so the same token
+    # clears 4.5 with headroom on all of them: 4.66 sunken, 4.79 page, 5.50 card. Dark mode already ran 6.7-8.5
+    # and is unchanged — darkening there would have made them worse.
+    "AccentTextColor":    ((0.661, 0.312, 0.067), (0.949, 0.541, 0.212)),
+    "AttentionTextColor": ((0.697, 0.283, 0.049), (0.964, 0.596, 0.278)),
     "ReviewColor":       ((0.443, 0.373, 0.671), (0.663, 0.596, 0.882)),
     "SettledColor":      ((0.196, 0.471, 0.318), (0.400, 0.749, 0.541)),
     "WaitingColor":      ((0.310, 0.396, 0.478), (0.573, 0.663, 0.749)),

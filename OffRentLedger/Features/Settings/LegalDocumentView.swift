@@ -65,6 +65,10 @@ struct LegalDocumentView: View {
 
     let document: LegalDocument
     @Environment(\.openURL) private var openURL
+    // The jump to a clause is a journey down a long document, which is exactly the movement
+    // Reduce Motion is switched on to avoid — so it becomes an instant move rather than a
+    // gentler scroll. `withAnimation` is imperative, so this has to be read here.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Read and parsed once, not on every body evaluation. It was a computed property, which
     /// meant opening a twenty-kilobyte file from the bundle and re-parsing it every time SwiftUI
@@ -138,7 +142,11 @@ struct LegalDocumentView: View {
             ForEach(outline.clauses) { clause in
                 if clause.id > 0 { RowDivider(inset: 0) }
                 Button {
-                    withAnimation { proxy.scrollTo(clause.id, anchor: .top) }
+                    withAnimation(
+                        Motion.respecting(.default, reduceMotion: reduceMotion, travelling: true)
+                    ) {
+                        proxy.scrollTo(clause.id, anchor: .top)
+                    }
                 } label: {
                     HStack(spacing: Space.snug) {
                         Text(clause.listLabel)
@@ -150,9 +158,13 @@ struct LegalDocumentView: View {
                         Image(systemName: "arrow.down")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, Space.snug)
+                    // A line of text plus 8pt each side is a 37pt row. The row keeps the size it
+                    // draws; the target around it is Apple's 44.
+                    .frame(minHeight: Layout.minimumTapTarget)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -167,7 +179,7 @@ struct LegalDocumentView: View {
                 if let number = clause.number {
                     Text(number)
                         .font(Typography.caption.monospacedDigit())
-                        .foregroundStyle(Palette.accent)
+                        .foregroundStyle(Palette.accentText)
                         .frame(minWidth: 18, alignment: .leading)
                 }
                 Text(clause.title)
@@ -189,7 +201,7 @@ struct LegalDocumentView: View {
                             HStack(alignment: .top, spacing: Space.snug) {
                                 Text("•")
                                     .font(.callout)
-                                    .foregroundStyle(Palette.accent)
+                                    .foregroundStyle(Palette.accentText)
                                     .accessibilityHidden(true)
                                 inline(item)
                                     .font(.callout)

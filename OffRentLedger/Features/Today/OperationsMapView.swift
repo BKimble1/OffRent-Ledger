@@ -21,6 +21,7 @@ struct OperationsMapView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppRouter.self) private var router
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @Query(sort: \RentalItem.modifiedAt, order: .reverse) private var items: [RentalItem]
     @Query(sort: \JobSite.name) private var jobSites: [JobSite]
@@ -130,7 +131,9 @@ struct OperationsMapView: View {
                 searchField
 
                 Button {
-                    withAnimation(Motion.quick) { showsLegend.toggle() }
+                    withAnimation(Motion.respecting(Motion.quick, reduceMotion: reduceMotion)) {
+                        showsLegend.toggle()
+                    }
                 } label: {
                     Image(systemName: showsLegend ? "info.circle.fill" : "info.circle")
                         .font(.body.weight(.semibold))
@@ -160,18 +163,29 @@ struct OperationsMapView: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .submitLabel(.search)
+                // The height comes from the text and its padding rather than from a number, so
+                // the pill grows at the accessibility sizes instead of clipping what is in it.
+                .padding(.vertical, Space.base - 1)
                 .accessibilityIdentifier(A11yID.OperationsMap.searchField)
             if !query.isEmpty {
                 Button {
                     query = ""
                 } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                        // A bare 20pt glyph is a 20pt target. The glyph is unchanged; what takes
+                        // the tap is Apple's 44, which on a map over a moving truck is the
+                        // difference between clearing the search and panning to the next county.
+                        .frame(
+                            width: Layout.minimumTapTarget, height: Layout.minimumTapTarget
+                        )
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Clear the search")
             }
         }
         .padding(.horizontal, Space.base)
-        .frame(height: Layout.minimumTapTarget)
+        .frame(minHeight: Layout.minimumTapTarget)
         .background(.regularMaterial, in: Capsule())
         // The shape is stated so the whole pill takes the tap, not only the glyphs inside it.
         // Without it a tap between the magnifying glass and the placeholder falls through to the
@@ -188,7 +202,11 @@ struct OperationsMapView: View {
                         count: count(for: candidate),
                         isSelected: filter == candidate
                     ) {
-                        withAnimation(Motion.quick) { filter = candidate }
+                        withAnimation(
+                            Motion.respecting(Motion.quick, reduceMotion: reduceMotion)
+                        ) {
+                            filter = candidate
+                        }
                     }
                     .accessibilityIdentifier("map.filter.\(candidate.rawValue)")
                 }
@@ -341,6 +359,12 @@ struct OperationsMapView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title3)
                         .foregroundStyle(.tertiary)
+                        // As above: the glyph stays 20pt, the target becomes 44.
+                        .frame(
+                            width: Layout.minimumTapTarget, height: Layout.minimumTapTarget,
+                            alignment: .trailing
+                        )
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Close this card")
             }
@@ -362,7 +386,7 @@ struct OperationsMapView: View {
             if !record.hasCoordinate {
                 Text("No location set")
                     .font(Typography.caption.weight(.semibold))
-                    .foregroundStyle(Palette.attention)
+                    .foregroundStyle(Palette.attentionText)
             }
 
             HStack(spacing: Space.snug) {
@@ -454,7 +478,11 @@ struct OperationsMapView: View {
             return
         }
         selectedClusterID = MapClustering.bucketKey(latitude: latitude, longitude: longitude)
-        withAnimation(Motion.standard) {
+        // No flight when Reduce Motion is on. A slower camera is still the camera travelling
+        // the width of a county, which is the movement the setting exists to stop.
+        withAnimation(
+            Motion.respecting(Motion.standard, reduceMotion: reduceMotion, travelling: true)
+        ) {
             camera = .region(
                 MKCoordinateRegion(
                     center: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),

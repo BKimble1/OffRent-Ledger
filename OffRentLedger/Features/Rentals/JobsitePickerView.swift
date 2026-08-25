@@ -31,7 +31,7 @@ struct JobsitePickerView: View {
                         creating = true
                     } label: {
                         Label("Add a new jobsite", systemImage: "plus.circle.fill")
-                            .foregroundStyle(Palette.accent)
+                            .foregroundStyle(Palette.accentText)
                     }
                     .accessibilityIdentifier(A11yID.Jobsite.addNew)
 
@@ -48,7 +48,7 @@ struct JobsitePickerView: View {
                                 if selection == nil {
                                     Image(systemName: "checkmark")
                                         .font(Typography.rowDetail.weight(.semibold))
-                                        .foregroundStyle(Palette.accent)
+                                        .foregroundStyle(Palette.accentText)
                                 }
                             }
                             .contentShape(Rectangle())
@@ -122,7 +122,7 @@ struct JobsitePickerView: View {
             if selection == site.id {
                 Image(systemName: "checkmark")
                     .font(Typography.rowDetail.weight(.semibold))
-                    .foregroundStyle(Palette.accent)
+                    .foregroundStyle(Palette.accentText)
             }
         }
         .contentShape(Rectangle())

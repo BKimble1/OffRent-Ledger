@@ -82,7 +82,7 @@ struct StoreRecoveryView: View {
         VStack(spacing: 18) {
             Image(systemName: "externaldrive.badge.exclamationmark")
                 .font(.system(size: 44, weight: .light))
-                .foregroundStyle(Palette.attention)
+                .foregroundStyle(Palette.attentionText)
                 .accessibilityHidden(true)
 
             Text(didReset ? "Data cleared" : "Your rental data could not be opened")

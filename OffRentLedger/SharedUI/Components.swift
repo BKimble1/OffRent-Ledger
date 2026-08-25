@@ -114,7 +114,7 @@ struct OffRentDisclosureBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.bubble.fill")
-                .foregroundStyle(Palette.attention)
+                .foregroundStyle(Palette.attentionText)
                 .font(style == .prominent ? .body : .footnote)
                 .accessibilityHidden(true)
             Text(AppCopy.offRentDisclosure)
@@ -370,6 +370,12 @@ struct SummaryPanel<Trailing: View>: View {
 ///
 /// Compact: the value, the label, and nothing else. The tinted symbol above each one made a row
 /// of three tiles into a row of three logos.
+///
+/// It used to hold both lines to one line each and shrink them to fit — 0.7 on the figure, 0.85
+/// on the label. At the largest accessibility sizes that is a tile a third of a phone wide
+/// showing "To collec…" over a number set smaller than the caption under it, which is the
+/// opposite of what somebody who has turned those sizes on asked for. Both lines wrap now and
+/// the tile grows to hold them.
 struct MetricTile: View {
     let value: String
     let label: String
@@ -383,15 +389,17 @@ struct MetricTile: View {
                 .font(Typography.metric)
                 .monospacedDigit()
                 .foregroundStyle(.primary)
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
             Text(label)
                 .font(Typography.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // `maxHeight: .infinity` is what keeps a row of these level once one of them wraps onto
+        // a second line: an `HStack` proposes its own height to every child, so each tile fills
+        // the tallest rather than floating at its own size. The padding in `offRentCard` is
+        // applied outside this frame, so the card is exactly the row's height, not more.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .offRentCard(padding: Space.base)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(value) \(label)")
@@ -708,6 +716,8 @@ struct FilterChip: View {
     var tint: Color = Palette.accent
     let action: () -> Void
 
+    @Environment(\.colorSchemeContrast) private var contrast
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: Space.tight + 1) {
@@ -725,10 +735,17 @@ struct FilterChip: View {
             .background(isSelected ? tint : Palette.raised, in: Capsule())
             .overlay(
                 Capsule().strokeBorder(
-                    isSelected ? Color.clear : Palette.hairline, lineWidth: Layout.hairline
+                    isSelected ? Palette.fillEdge(contrast) : Palette.edge(contrast),
+                    lineWidth: Layout.edgeWidth(contrast)
                 )
             )
-            .contentShape(Capsule())
+            // The pill stays the size it draws — about 32pt tall, which is what a row of these
+            // is meant to look like — and the *target* around it is 44pt in both directions.
+            // Apple's minimum is not a visual instruction, and a chip inflated to 44pt of fill
+            // is a chip that has stopped being a chip. Gloves and a moving truck are the reason
+            // this matters here rather than a rule being followed for its own sake.
+            .frame(minWidth: Layout.minimumTapTarget, minHeight: Layout.minimumTapTarget)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(count.map { "\(title), \($0)" } ?? title)
@@ -793,7 +810,7 @@ struct ActionRow: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(Typography.rowTitle)
-                        .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
+                        .foregroundStyle(isEnabled ? Color.primary : Palette.disabledLabel)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     if let subtitle {

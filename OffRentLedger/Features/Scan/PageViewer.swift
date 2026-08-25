@@ -15,6 +15,10 @@ struct PageViewer: View {
     @State private var scale: CGFloat = 1
     @GestureState private var pinch: CGFloat = 1
 
+    // Imperative, so `respectfulAnimation` cannot reach it: the scale is set inside a gesture
+    // handler rather than derived from a value the view can watch.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private static let maximumScale: CGFloat = 6
 
     var body: some View {
@@ -36,7 +40,11 @@ struct PageViewer: View {
                             // Double tap is the shortcut that needs no explaining, and it is the
                             // only way to get back to fit once you are zoomed in.
                             .onTapGesture(count: 2) {
-                                withAnimation(Motion.standard) { scale = scale > 1 ? 1 : 2.5 }
+                                withAnimation(
+                                    Motion.respecting(Motion.standard, reduceMotion: reduceMotion)
+                                ) {
+                                    scale = scale > 1 ? 1 : 2.5
+                                }
                             }
                     }
                 } else {

@@ -57,7 +57,7 @@ struct WalkthroughView: View {
             Spacer()
             Button("Skip", action: onSkip)
                 .font(.body)
-                .foregroundStyle(Palette.accent)
+                .foregroundStyle(Palette.accentText)
                 .minimumTapTarget()
                 .accessibilityIdentifier(A11yID.Onboarding.tourSkip)
         }
@@ -121,7 +121,7 @@ struct WalkthroughView: View {
                 if let tab = tabName(page.focus) {
                     Label("Find it under \(tab)", systemImage: page.symbol)
                         .font(Typography.caption.weight(.semibold))
-                        .foregroundStyle(Palette.accent)
+                        .foregroundStyle(Palette.accentText)
                 }
 
                 Spacer(minLength: 0)

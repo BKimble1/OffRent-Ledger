@@ -88,7 +88,7 @@ struct WelcomeView: View {
         HStack(alignment: .top, spacing: Space.base) {
             Image(systemName: symbol)
                 .font(.system(size: 20))
-                .foregroundStyle(Palette.accent)
+                .foregroundStyle(Palette.accentText)
                 .frame(width: 30, alignment: .leading)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {

@@ -11,6 +11,7 @@ struct RentalsView: View {
     @Environment(AppDependencies.self) private var dependencies
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @Query(sort: \RentalItem.modifiedAt, order: .reverse) private var items: [RentalItem]
     @Query(sort: \Vendor.name) private var vendors: [Vendor]
@@ -147,7 +148,9 @@ struct RentalsView: View {
                         count: count(for: candidate),
                         isSelected: bucket == candidate
                     ) {
-                        withAnimation(Motion.quick) {
+                        withAnimation(
+                            Motion.respecting(Motion.quick, reduceMotion: reduceMotion)
+                        ) {
                             bucket = bucket == candidate ? .all : candidate
                         }
                     }

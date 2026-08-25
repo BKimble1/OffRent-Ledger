@@ -83,18 +83,29 @@ struct SupportView: View {
                 TextField("Search questions", text: $query)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    // The height comes from the text and its padding rather than from a number,
+                    // so the field grows at the accessibility sizes instead of clipping what is
+                    // typed into it. 21pt of body text plus 12 each side is the 48 this used to
+                    // be nailed to, which is where `Layout.controlHeight` came from.
+                    .padding(.vertical, Space.base)
                     .accessibilityIdentifier(A11yID.Settings.supportSearch)
                 if !query.isEmpty {
                     Button {
                         query = ""
                     } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                            // A 20pt glyph with nothing around it is a 20pt target.
+                            .frame(
+                                width: Layout.minimumTapTarget, height: Layout.minimumTapTarget
+                            )
+                            .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Clear the search")
                 }
             }
             .padding(.horizontal, Space.base)
-            .frame(height: Layout.controlHeight)
+            .frame(minHeight: Layout.controlHeight)
             .background(Palette.sunken, in: RoundedRectangle(cornerRadius: Radius.control))
 
             if matches.isEmpty {

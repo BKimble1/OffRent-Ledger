@@ -6,6 +6,7 @@ struct AuditView: View {
 
     @Environment(AppDependencies.self) private var dependencies
     @Environment(AppRouter.self) private var router
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @Query(sort: \VendorInvoice.receivedDate, order: .reverse) private var invoices: [VendorInvoice]
 
@@ -71,39 +72,84 @@ struct AuditView: View {
         }
     }
 
+    /// Two columns until they stop fitting, and then one.
+    ///
+    /// Every line here was held to `lineLimit(1)`, which at the accessibility text sizes clipped
+    /// the invoice number, the company and the total all at once — a row of three ellipses.
+    /// Nothing is clipped now: the row stacks and grows, the way `RentalRow` and `DetailRow`
+    /// already do.
     private func row(_ invoice: VendorInvoice) -> some View {
         let open: Int = invoice.openDiscrepancyCount
         return NavigationLink(value: AuditDestination.invoice(id: invoice.id)) {
-            HStack(alignment: .firstTextBaseline, spacing: Space.base) {
-                VStack(alignment: .leading, spacing: Space.hair) {
-                    Text(invoice.invoiceNumber ?? "Invoice")
-                        .font(Typography.rowTitle)
-                        .lineLimit(1)
-                    Text(invoice.agreement?.vendor?.name ?? "Unknown vendor")
-                        .font(Typography.rowDetail)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    HStack(spacing: Space.tight + 1) {
-                        Text(invoice.reviewStatus.displayName)
-                        if open > 0 {
-                            Text("·").foregroundStyle(.tertiary)
-                            Text(open == 1 ? "1 open" : "\(open) open")
-                                .foregroundStyle(Palette.attention)
-                        }
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: Space.snug) {
+                        rowSummary(invoice, open: open)
+                        rowTotal(invoice)
                     }
-                    .font(Typography.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: Space.base) {
+                        rowSummary(invoice, open: open)
+                        Spacer(minLength: Space.snug)
+                        rowTotal(invoice)
+                    }
                 }
-                Spacer(minLength: Space.snug)
-                Text(Formatters.currency(invoice.invoiceTotal))
-                    .font(Typography.rowTitle)
-                    .monospacedDigit()
-                    .lineLimit(1)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 2)
         }
         .accessibilityHint(invoice.reviewStatus.displayName)
+    }
+
+    /// What the invoice is, whose it is, and where it stands.
+    private func rowSummary(_ invoice: VendorInvoice, open: Int) -> some View {
+        VStack(alignment: .leading, spacing: Space.hair) {
+            Text(invoice.invoiceNumber ?? "Invoice")
+                .font(Typography.rowTitle)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(invoice.agreement?.vendor?.name ?? "Unknown vendor")
+                .font(Typography.rowDetail)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            rowStatus(invoice, open: open)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The status, and the count of lines still open on it. The interpunct between them is a
+    /// width-saving device, so it goes when there is no width to save.
+    @ViewBuilder
+    private func rowStatus(_ invoice: VendorInvoice, open: Int) -> some View {
+        let openText: String? = open == 0 ? nil : (open == 1 ? "1 open" : "\(open) open")
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Space.hair) {
+                Text(invoice.reviewStatus.displayName)
+                    .foregroundStyle(.secondary)
+                if let openText {
+                    Text(openText).foregroundStyle(Palette.attentionText)
+                }
+            }
+            .font(Typography.caption)
+            .fixedSize(horizontal: false, vertical: true)
+        } else {
+            HStack(spacing: Space.tight + 1) {
+                Text(invoice.reviewStatus.displayName)
+                if let openText {
+                    Text("·").foregroundStyle(.tertiary)
+                    Text(openText).foregroundStyle(Palette.attentionText)
+                }
+            }
+            .font(Typography.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+    }
+
+    private func rowTotal(_ invoice: VendorInvoice) -> some View {
+        Text(Formatters.currency(invoice.invoiceTotal))
+            .font(Typography.rowTitle)
+            .monospacedDigit()
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var awaitingReview: [VendorInvoice] {
