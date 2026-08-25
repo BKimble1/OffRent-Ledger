@@ -30,7 +30,12 @@ jobs:
     # account does not have is a job that never starts. Pin one here if you need a specific
     # Xcode that only a newer image carries.
     runs-on: macos-latest
-    timeout-minutes: 45
+    # 75, not 45. A failing UI test gives up after eight seconds; a passing one drives the whole
+    # workflow — mark done, contact vendor, confirmation, pickup, invoice, accept, relaunch — and
+    # takes a minute or more. So the suite got *slower* as it got greener, and 45 minutes was
+    # sized against a run where thirteen tests bailed early. A job killed at the cap reports
+    # nothing at all, which is the most expensive way to learn anything here.
+    timeout-minutes: 75
 
     steps:
       - uses: actions/checkout@v4
