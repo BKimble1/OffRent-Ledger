@@ -375,4 +375,53 @@ final class ExtractionFixtureTests: XCTestCase {
             Decimal(string: "1200.00", locale: Locale(identifier: "en_US_POSIX"))
         )
     }
+
+    func testARateTablePrintedOnOneLineYieldsAllThreeRates() throws {
+        // `RENTAL RATE: DAY 285.00 WEEK 855.00 4WK 2280.00` is the most common way a US yard
+        // prints its rates, and on it the app used to lose the daily rate entirely: the daily
+        // rule excluded any line containing "week", and this line contains two. The one number
+        // the whole running-cost estimate rests on, silently absent, on the commonest layout.
+        //
+        // The exclusion is scoped to the sixteen characters in front of each amount now, which
+        // asks the question that was always meant — is *this* figure qualified by a period that
+        // is not mine — rather than looking anywhere in the line.
+        let result = try parse("contract_single_line_rate_table.txt", kind: .rentalContract)
+        func money(_ field: SuggestedField) throws -> Decimal {
+            try XCTUnwrap(
+                result.suggestions.first { $0.field == field }?.value.moneyValue,
+                "\(field) was not read from the single-line rate table"
+            )
+        }
+        XCTAssertEqual(try money(.dailyRate), Decimal(string: "285.00", locale: Locale(identifier: "en_US_POSIX")))
+        XCTAssertEqual(try money(.weeklyRate), Decimal(string: "855.00", locale: Locale(identifier: "en_US_POSIX")))
+        XCTAssertEqual(try money(.fourWeekRate), Decimal(string: "2280.00", locale: Locale(identifier: "en_US_POSIX")))
+    }
+
+    func testADateAfterAChargeLabelIsNotAnAmount() throws {
+        // `DELIVERY 05/04/26` is a label followed by a date. The fragment read `05` as five
+        // dollars — plausible, in the right place, and above the threshold that pre-ticks it.
+        let result = try parse("contract_single_line_rate_table.txt", kind: .rentalContract)
+        XCTAssertNil(
+            result.suggestions.first { $0.field == .deliveryCharge },
+            "a delivery date is not a delivery charge"
+        )
+        for suggestion in result.suggestions {
+            guard let amount = suggestion.value.moneyValue else { continue }
+            XCTAssertNotEqual(
+                amount, 5,
+                "\(suggestion.field) took the day out of a date as an amount"
+            )
+        }
+    }
+
+    func testASevenDayRateIsStillNotADailyRate() throws {
+        // The reason the exclusion exists at all, and the case the narrower scope must not lose:
+        // a weekly figure labelled in days is a four-fold error on the estimate.
+        let result = try parse("contract_single_line_rate_table.txt", kind: .rentalContract)
+        let daily = try XCTUnwrap(result.suggestions.first { $0.field == .dailyRate }?.value.moneyValue)
+        XCTAssertNotEqual(
+            daily, Decimal(string: "985.00", locale: Locale(identifier: "en_US_POSIX")),
+            "the 7 DAY RATE was read as the daily rate"
+        )
+    }
 }

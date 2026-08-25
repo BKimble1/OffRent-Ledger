@@ -166,6 +166,21 @@ enum DocumentTextParser {
         /// A positive pattern cannot express "not that"; this can.
         var excludeIf: String? = nil
 
+        /// The same idea, scoped to the text immediately before the matched amount.
+        ///
+        /// `excludeIf` is line-scoped, and a rental yard prints its whole rate table on one line:
+        /// `RENTAL RATE: DAY 285.00 WEEK 855.00 4WK 2280.00`. The daily rule's exclusion saw the
+        /// word "WEEK" further along that line and skipped it — losing the daily rate, which is
+        /// the single number the entire running-cost estimate rests on, on the most common layout
+        /// there is. Testing the sixteen characters in front of the amount instead asks the
+        /// question that was always meant: is *this* figure qualified by a period that is not
+        /// mine?
+        var excludeIfPrecededBy: String? = nil
+
+        /// How much of the run-up to inspect. Long enough for `28 DAY RATE: `, short enough that
+        /// the previous column's label cannot reach into it.
+        static let qualifierWindow = 16
+
         /// The captured value, and where in the line it sits.
         ///
         /// The range is what lets the review screen point at the figure inside the line it came
@@ -176,7 +191,15 @@ enum DocumentTextParser {
                 guard let captured = RegexCache.firstCaptureWithRange(pattern: pattern, in: line)
                 else { continue }
                 let trimmed = captured.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty { return (trimmed, captured.range) }
+                guard !trimmed.isEmpty else { continue }
+                if let excludeIfPrecededBy {
+                    let range = captured.range
+                    let text = line as NSString
+                    let start = max(0, range.location - Rule.qualifierWindow)
+                    let runUp = text.substring(with: NSRange(location: start, length: range.location - start))
+                    if RegexCache.matches(pattern: excludeIfPrecededBy, in: runUp) { continue }
+                }
+                return (trimmed, captured.range)
             }
             return nil
         }
@@ -339,7 +362,11 @@ enum DocumentTextParser {
     /// digit — so the parser reported the tax as $8.25 at 0.90 confidence, above the threshold
     /// that pre-ticks a suggestion, and the user would have accepted a figure $122.59 short of
     /// what the vendor billed. A percentage is never an amount of money.
-    private static let moneyBoundary = #"(?![0-9A-Za-z%]|[.,][0-9A-Za-z])"#
+    /// `/` and `-` are here for the same reason `%` is. `DELIVERY 05/04/26` is a charge label
+    /// followed by a *date*, and the fragment happily read `05` as five dollars — a plausible
+    /// number, in the right place, above the threshold that pre-ticks it. A number that is the
+    /// head of a date or a fraction is not an amount of money.
+    private static let moneyBoundary = #"(?![0-9A-Za-z%/]|[.,\-][0-9A-Za-z])"#
     private static let moneyFragment =
         #"\$?\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)"# + moneyBoundary
     private static let dateFragment =
@@ -388,22 +415,28 @@ enum DocumentTextParser {
                 #"(?i)^\s*(?:equipment|description|item|unit\s+description)\s*[:]\s*(.+)$"#
              ]),
 
+        // The three rate rules read a table that is often printed on one line, so each one
+        // excludes on what sits in front of *its* amount rather than on anything anywhere in the
+        // line. `WK`, `4WK` and `MO` are in the alternations because that is how yards abbreviate
+        // them — `4WK` is on the invoice this parser was rebuilt against.
         Rule(field: .dailyRate, name: "labelled-daily-rate", confidence: 0.94, kind: .money,
              patterns: [
                 #"(?i)\b(?:daily|day)\s*(?:rate|rental)?"# + gap + moneyFragment,
                 #"(?i)"# + moneyFragment + #"\s*(?:/|per\s+)day\b"#,
              ],
-             excludeIf: #"(?i)\b(?:7\s*-?\s*day|28\s*-?\s*day|4\s*-?\s*week|four[\s\-]week|weekly)\b"#),
+             excludeIfPrecededBy:
+                #"(?i)\b(?:7|28)\s*-?\s*day|\b(?:4|four)\s*-?\s*(?:week|wk)|\bweekly\b"#),
         Rule(field: .weeklyRate, name: "labelled-weekly-rate", confidence: 0.94, kind: .money,
              patterns: [
-                #"(?i)\b(?:weekly|week|7[\s\-]?day)\s*(?:rate|rental)?"# + gap + moneyFragment,
-                #"(?i)"# + moneyFragment + #"\s*(?:/|per\s+)week\b"#,
+                #"(?i)\b(?:weekly|week|wk|7[\s\-]?day)\s*(?:rate|rental)?"# + gap + moneyFragment,
+                #"(?i)"# + moneyFragment + #"\s*(?:/|per\s+)(?:week|wk)\b"#,
              ],
-             excludeIf: #"(?i)\b(?:4\s*-?\s*week|four[\s\-]week|28\s*-?\s*day)\b"#),
+             excludeIfPrecededBy: #"(?i)\b(?:4|four)\s*-?\s*(?:week|wk)|\b28\s*-?\s*day"#),
         Rule(field: .fourWeekRate, name: "labelled-four-week-rate", confidence: 0.94, kind: .money,
              patterns: [
-                #"(?i)\b(?:4[\s\-]?week|four[\s\-]week|28[\s\-]?day)\s*(?:rate|rental)?"# + gap + moneyFragment,
-                #"(?i)"# + moneyFragment + #"\s*(?:/|per\s+)(?:4\s*weeks?|28\s*days?)\b"#,
+                #"(?i)\b(?:4[\s\-]?(?:week|wk)|four[\s\-](?:week|wk)|28[\s\-]?day|monthly|month|mo)"#
+                + #"\s*(?:rate|rental)?"# + gap + moneyFragment,
+                #"(?i)"# + moneyFragment + #"\s*(?:/|per\s+)(?:4\s*weeks?|28\s*days?|month)\b"#,
              ]),
     ]
 
