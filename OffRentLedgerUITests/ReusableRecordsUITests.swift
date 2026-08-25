@@ -132,7 +132,7 @@ final class ReusableRecordsUITests: XCTestCase {
 
         app.expect(app.anyElement(A11yUI.Jobsite.pickerRoot))
         XCTAssertTrue(
-            app.buttons[A11yUI.Jobsite.none].exists,
+            app.buttons[A11yUI.Jobsite.noJobsite].exists,
             "a rental that never leaves the yard must be able to have no jobsite"
         )
 

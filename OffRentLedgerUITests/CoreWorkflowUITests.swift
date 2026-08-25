@@ -3,7 +3,8 @@ import XCTest
 
 /// Scenario 1 and 2 of the required end-to-end set.
 ///
-/// NOT EXECUTED — no simulator in the build environment. See TEST_MATRIX.md.
+/// Executed in CI on a booted simulator. Green at `b3057d1`, then rewritten for the reusable
+/// company picker; see TEST_MATRIX.md section C.
 final class CoreWorkflowUITests: XCTestCase {
 
     override func setUp() {

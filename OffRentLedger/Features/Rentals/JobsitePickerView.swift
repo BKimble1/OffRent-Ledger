@@ -55,7 +55,7 @@ struct JobsitePickerView: View {
                         }
                         .buttonStyle(.plain)
                         .minimumTapTarget()
-                        .accessibilityIdentifier(A11yID.Jobsite.none)
+                        .accessibilityIdentifier(A11yID.Jobsite.noJobsite)
                     }
                 }
 

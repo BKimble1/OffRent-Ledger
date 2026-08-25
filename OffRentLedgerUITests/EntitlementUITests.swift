@@ -3,7 +3,7 @@ import XCTest
 
 /// Scenarios 4 and 5: the free limit, the Pro unlock, and what survives losing Pro.
 ///
-/// NOT EXECUTED — no simulator in the build environment. See TEST_MATRIX.md.
+/// Executed in CI on a booted simulator. Green at `b3057d1`; see TEST_MATRIX.md section C.
 final class EntitlementUITests: XCTestCase {
 
     override func setUp() { continueAfterFailure = false }

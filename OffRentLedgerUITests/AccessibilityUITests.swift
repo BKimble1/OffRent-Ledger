@@ -4,7 +4,7 @@ import XCTest
 /// A short accessibility smoke pass. Not a substitute for the manual VoiceOver walkthrough in
 /// RELEASE_CHECKLIST.md §2, which is a device gate.
 ///
-/// NOT EXECUTED — no simulator in the build environment.
+/// Executed in CI on a booted simulator. Green at `b3057d1`; see TEST_MATRIX.md section C.
 final class AccessibilityUITests: XCTestCase {
 
     override func setUp() { continueAfterFailure = false }

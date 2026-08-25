@@ -45,15 +45,17 @@ struct RentalsView: View {
             }
 
             Section {
+                // The badge goes on the row, not on the label inside it. A `List` reads it as a
+                // row preference, and one set on a nested view is read inconsistently.
                 NavigationLink(value: RentalDestination.vendors) {
                     Label("Rental companies", systemImage: "building.2")
-                        .badge(vendors.count)
                 }
+                .badge(vendors.count)
                 .accessibilityIdentifier(A11yID.Rentals.companiesLink)
                 NavigationLink(value: RentalDestination.jobSites) {
                     Label("Jobsites", systemImage: "mappin.and.ellipse")
-                        .badge(jobSites.count)
                 }
+                .badge(jobSites.count)
                 .accessibilityIdentifier(A11yID.Rentals.jobSitesLink)
             } header: {
                 Text("Reusable records")

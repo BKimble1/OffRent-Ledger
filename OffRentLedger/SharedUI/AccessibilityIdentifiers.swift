@@ -81,7 +81,7 @@ enum A11yID {
         static let listRoot = "jobsite.list"
         static let listAdd = "jobsite.list.add"
         static let addNew = "jobsite.addNew"
-        static let none = "jobsite.none"
+        static let noJobsite = "jobsite.none"
         static let map = "jobsite.map"
         static let searchField = "jobsite.search"
         static let searchResult = "jobsite.searchResult"

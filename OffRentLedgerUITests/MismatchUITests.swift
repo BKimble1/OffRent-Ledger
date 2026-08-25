@@ -3,7 +3,7 @@ import XCTest
 
 /// Scenario 3: an invoice with an extra day leaves an open follow-up that survives a relaunch.
 ///
-/// NOT EXECUTED — no simulator in the build environment. See TEST_MATRIX.md.
+/// Executed in CI on a booted simulator. Green at `b3057d1`; see TEST_MATRIX.md section C.
 final class MismatchUITests: XCTestCase {
 
     override func setUp() { continueAfterFailure = false }

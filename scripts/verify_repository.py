@@ -787,6 +787,38 @@ def check_accessibility_references_resolve() -> None:
                     f"{path.relative_to(ROOT)} references A11yID.{reference}, which is not declared",
                 )
 
+    # The same, for the UI suite's own copy.
+    #
+    # `check_ui_test_identifiers_match` below compares the two lists of *strings*, which does not
+    # catch a test referencing a member the copy never gained: the string exists on the app side,
+    # so the lists agree, and the only thing wrong is a symbol that does not resolve. That is a
+    # compile error on a Mac and nothing at all here, which cost a CI round for
+    # `A11yUI.Jobsite.none`.
+    ui_source = ROOT / "OffRentLedgerUITests" / "A11yUI.swift"
+    if ui_source.exists():
+        ui_declared: set[str] = set()
+        current = None
+        for line in ui_source.read_text().splitlines():
+            match = re.match(r"\s*enum (\w+) \{", line)
+            if match:
+                current = match.group(1)
+                continue
+            match = re.match(r"\s*static (?:let|func) (\w+)", line)
+            if match and current:
+                ui_declared.add(f"{current}.{match.group(1)}")
+
+        for path in swift_files(ROOT / "OffRentLedgerUITests"):
+            if path.name == "A11yUI.swift":
+                continue
+            for match in re.finditer(r"A11yUI\.(\w+)\.(\w+)", path.read_text()):
+                reference = f"{match.group(1)}.{match.group(2)}"
+                if reference not in ui_declared:
+                    fail(
+                        "a11y-missing",
+                        f"{path.relative_to(ROOT)} references A11yUI.{reference}, "
+                        "which the UI suite's copy does not declare",
+                    )
+
 
 def check_ui_test_identifiers_match() -> None:
     check("The UI suite's identifier copy matches the app's")
