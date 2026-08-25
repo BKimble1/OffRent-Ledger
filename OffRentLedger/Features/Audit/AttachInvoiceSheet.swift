@@ -378,6 +378,7 @@ struct AttachInvoiceSheet: View {
             workflow.apply(.attachInvoice, to: item, detail: invoiceNumber.nilIfBlank)
         }
         try? context.save()
+        dependencies.derivedStateNeedsRefresh()
 
         dismiss()
         guard isNew else { return }

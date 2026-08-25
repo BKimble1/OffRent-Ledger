@@ -114,6 +114,9 @@ struct AddRentalView: View {
         )
 
         try? context.save()
+        // The estimate, the widget, the Shortcuts index and the reminder for this rental's
+        // scheduled end are all derived. Without this they wait for the next foreground.
+        dependencies.derivedStateNeedsRefresh()
         dismiss()
     }
 }

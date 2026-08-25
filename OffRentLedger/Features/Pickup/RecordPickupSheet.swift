@@ -164,6 +164,9 @@ struct RecordPickupSheet: View {
         switch workflow.recordPickup(evidence, for: item, location: capturedLocation) {
         case .success:
             try? context.save()
+            // The status moved, so the widget, the Shortcuts index and this rental's
+            // reminders are all now describing the rental it used to be.
+            dependencies.derivedStateNeedsRefresh()
             dismiss()
         case let .failure(failure):
             rejection = failure

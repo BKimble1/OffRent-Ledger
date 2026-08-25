@@ -29,6 +29,22 @@ final class AppDependencies {
     /// the app crashing on launch and taking a contractor's records with it.
     var storeFailure: String?
 
+    /// Bumped by a screen that has just written something the app's *derived* state depends on:
+    /// the cached estimates, the widget snapshot, the Shortcuts index and the reminder schedule.
+    ///
+    /// Those four were recomputed on launch and on returning to the foreground, and nowhere else.
+    /// So a rental created and then edited in one sitting had no reminder until the next time the
+    /// app came back from the background — which for the one user who adds a rental and puts the
+    /// phone down is the run where the reminder mattered. §9 requires an edit to reach the
+    /// reminders, and this is the signal that carries it.
+    ///
+    /// A counter rather than a closure: `RootView` owns the recomputation and observes this, so
+    /// nothing downstream needs a reference to it, and there is no path by which recomputing can
+    /// trigger another recomputation.
+    private(set) var derivedStateGeneration = 0
+
+    func derivedStateNeedsRefresh() { derivedStateGeneration += 1 }
+
     init(
         clock: any Clock,
         fileStore: any FileStoring,

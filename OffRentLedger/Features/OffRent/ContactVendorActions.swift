@@ -144,6 +144,9 @@ struct ContactVendorActions: View {
             method: method, representative: representative, note: note, for: item
         )
         try? context.save()
+        // A contact attempt is what the "chase the vendor" reminder is waiting for, so the
+        // schedule is wrong from the moment this is written until it is re-planned.
+        dependencies.derivedStateNeedsRefresh()
     }
 
     private func telURL(_ phone: String) -> URL? {

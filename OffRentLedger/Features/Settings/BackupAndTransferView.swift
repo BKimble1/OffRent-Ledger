@@ -303,6 +303,10 @@ struct BackupAndTransferView: View {
     private func applyImport(_ archive: BackupArchive) {
         do {
             try exportService.apply(archive: archive)
+            // The whole store has just been replaced. Every cached estimate, the widget
+            // snapshot, the Shortcuts index and every scheduled reminder describes rentals that
+            // are no longer there — which on a new phone is the first thing the owner sees.
+            dependencies.derivedStateNeedsRefresh()
         } catch {
             importFailure = "The import did not finish. \(error.localizedDescription)"
         }

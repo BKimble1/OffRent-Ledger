@@ -556,6 +556,7 @@ struct InvoiceReviewView: View {
         switch workflow.apply(.flagFollowUp(reason: followUpReason), to: item) {
         case .success:
             try? context.save()
+            dependencies.derivedStateNeedsRefresh()
             followUpReason = ""
             showingFollowUp = false
         case let .failure(failure):
@@ -604,6 +605,10 @@ struct InvoiceReviewView: View {
         }
 
         try? context.save()
+        // The rental has left Invoice review. Today's counts, the widget and the Shortcuts index
+        // are all derived from its status, and the reminders it no longer needs are still
+        // scheduled until this runs.
+        dependencies.derivedStateNeedsRefresh()
         isAccepting = false
         withAnimation(Motion.quick) { justAccepted = true }
 

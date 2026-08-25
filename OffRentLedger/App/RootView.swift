@@ -98,6 +98,13 @@ struct RootView: View {
             // showing yesterday's figure unless this runs.
             Task { await refresh() }
         }
+        .onChange(of: dependencies.derivedStateGeneration) { _, _ in
+            // A screen has just written something the estimates, the widget, the Shortcuts index
+            // or the reminders are derived from. Recomputing here rather than in that screen
+            // keeps one path: the same four things are rebuilt from scratch whether the trigger
+            // was a save, a launch or a return to the foreground.
+            Task { await refresh() }
+        }
     }
 
     /// Ends the walkthrough and puts the user where it said it would: Today.

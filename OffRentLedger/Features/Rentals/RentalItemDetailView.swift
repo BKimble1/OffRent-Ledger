@@ -517,6 +517,7 @@ struct RentalItemDetailView: View {
             return
         }
         try? context.save()
+        dependencies.derivedStateNeedsRefresh()
     }
 
     private func resolve(_ item: RentalItem) {

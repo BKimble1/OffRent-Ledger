@@ -157,6 +157,9 @@ struct EditRentalView: View {
         // map annotations, the search index and the reminders on the next `refresh()`.
         RentalWorkflowService(context: context, clock: dependencies.clock).refreshEstimate(for: item)
         try? context.save()
+        // §9: an edit reaches the reminders. A changed scheduled end date is the case that
+        // matters — the old reminder is for a day that is no longer the day.
+        dependencies.derivedStateNeedsRefresh()
         dismiss()
     }
 }

@@ -176,6 +176,25 @@ for view models, structured cancellation for OCR, no force unwraps on production
 (build-enforced by `verify_repository.py`), `Logger` with `privacy: .private` on anything derived
 from a user document.
 
+### 3.3 Derived state has one owner
+
+Four things are computed from the store rather than stored: each rental's cached estimate, the
+widget snapshot, the Shortcuts/App Intents index, and the reminder schedule. `RootView.refresh()`
+rebuilds all four from scratch. There is no incremental path, because an incremental path is a
+second place for the truth to live.
+
+It runs on launch, on returning to the foreground, and — since build 8 — whenever a screen calls
+`dependencies.derivedStateNeedsRefresh()` after writing something the four depend on. Before that
+last one there was a real gap: a rental created and then edited in one sitting had no reminder
+until the app next came back from the background, which for somebody who adds a rental and puts
+the phone down is exactly the run where the reminder mattered. §9 requires an edit to reach the
+reminders.
+
+**The rule for anything new: if it changes a rental's status, terms or scheduled end date, it
+calls `derivedStateNeedsRefresh()` after `context.save()`.** A counter on `AppDependencies` rather
+than a closure, so nothing needs a reference back to the root view — and `refresh()` never touches
+the counter, so there is no path by which recomputing triggers another recomputation.
+
 ---
 
 ## 4. Domain model
