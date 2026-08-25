@@ -185,6 +185,18 @@ final class ScanReviewViewModel {
 
     // MARK: - Review state
 
+    /// The company the letterhead names, whether or not its row was ticked.
+    ///
+    /// Deliberately outside the tick mechanism, because this is not a value being committed —
+    /// the rental needs a reusable `Vendor` record, not a string, and one is never created from
+    /// OCR. It is a *search hint*, and it was unreachable in the flow that matters: the vendor
+    /// row arrives at 0.54 confidence so it is never pre-ticked, and the ordinary path through
+    /// this screen is to glance at the ticked rows and tap the button. So the name was read off
+    /// the page, shown on screen, and then thrown away every single time.
+    var scannedVendorName: String? {
+        suggestion(for: .vendorName)?.value.textValue
+    }
+
     func suggestion(for field: SuggestedField) -> FieldSuggestion? {
         result?.suggestion(for: field)
     }

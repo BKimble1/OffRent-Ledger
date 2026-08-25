@@ -179,7 +179,9 @@ final class RentalDraft {
     /// app inventing a record nobody chose.
     var scannedCompanyName: String?
 
-    func noteScannedCompany(_ values: [SuggestedField: SuggestedValue]) {
-        if case let .text(name)? = values[.vendorName] { scannedCompanyName = name }
-    }
+    /// True when the company was matched from a scanned letterhead rather than chosen.
+    ///
+    /// The row says so. A field the app filled in on the user's behalf has to be visibly that,
+    /// or the first time it guesses wrong the user will not know to look.
+    var companyCameFromScan = false
 }

@@ -123,4 +123,67 @@ final class EmailValidationTests: XCTestCase {
             XCTAssertFalse(EmailValidation.isPlausible(address), address)
         }
     }
+
+    // MARK: - Matching a scanned letterhead
+
+    private func company(_ name: String, branch: String? = nil) -> CompanyIdentity {
+        CompanyIdentity(id: UUID(), name: name, branch: branch)
+    }
+
+    func testALetterheadFindsTheYardTheUserAlreadySaved() throws {
+        // The failure this replaces: the scan yields the full legal letterhead and the saved
+        // record is what the user typed, so a `contains` in either direction is false and the
+        // contractor is invited to create a second copy of a yard they already have.
+        let saved = [company("Cedar Ridge Equipment"), company("Foundry Tool Supply")]
+        let match = try XCTUnwrap(
+            CompanyMatching.bestMatch(forScannedName: "CEDAR RIDGE EQUIPMENT RENTAL LLC", in: saved)
+        )
+        XCTAssertEqual(match.identity.name, "Cedar Ridge Equipment")
+        XCTAssertEqual(match.score, 1.0, accuracy: 0.0001)
+    }
+
+    func testLegalSuffixesAndNoiseWordsDoNotCountAgainstAMatch() {
+        let saved = [company("Ridgeline Equipment Co")]
+        XCTAssertNotNil(
+            CompanyMatching.bestMatch(forScannedName: "RIDGELINE EQUIPMENT, INC.", in: saved),
+            "a suffix is not an identity"
+        )
+    }
+
+    func testAnUnrelatedLetterheadMatchesNothing() {
+        let saved = [company("Cedar Ridge Equipment"), company("Foundry Tool Supply")]
+        XCTAssertNil(
+            CompanyMatching.bestMatch(forScannedName: "PIEDMONT CIVIL LLC", in: saved),
+            "the contractor's own company is not one of their rental yards"
+        )
+    }
+
+    func testTwoEquallyGoodCandidatesReturnNothingRatherThanAGuess() {
+        // Two branches of one firm, saved separately on purpose. Picking one would put the wrong
+        // phone number on the rental, which is the thing `duplicate(ofName:)` exists to prevent.
+        let saved = [
+            company("Cedar Ridge Equipment", branch: "Marlin Falls"),
+            company("Cedar Ridge Equipment", branch: "Plano"),
+        ]
+        XCTAssertNil(
+            CompanyMatching.bestMatch(forScannedName: "CEDAR RIDGE EQUIPMENT", in: saved),
+            "an ambiguous match is the user's decision, not the app's"
+        )
+    }
+
+    func testAWeakOverlapIsNotAMatch() {
+        // A saved name with four informative words, of which the scan shares one.
+        let saved = [company("Cedar Ridge Equipment and Tool Hire of Texas")]
+        XCTAssertNil(
+            CompanyMatching.bestMatch(forScannedName: "CEDAR SPRINGS DRILLING", in: saved)
+        )
+    }
+
+    func testMatchingIsNotConfusedByPunctuationOrCase() throws {
+        let saved = [company("O'Malley Plant & Tool")]
+        let match = try XCTUnwrap(
+            CompanyMatching.bestMatch(forScannedName: "o'malley plant and tool, llc", in: saved)
+        )
+        XCTAssertEqual(match.identity.name, "O'Malley Plant & Tool")
+    }
 }

@@ -27,6 +27,9 @@ struct ScanReviewView: View {
     var onRescan: (() -> Void)?
 
     @State private var enlargedPage: Int?
+    @Environment(AppDependencies.self) private var dependencies
+    /// Guards the auto-fill against firing twice if the phase settles more than once.
+    @State private var hasAutoFilled = false
     @State private var showsRecognizedText = false
     @State private var addingPages = false
     @State private var addedPhotos: [PhotosPickerItem] = []
@@ -69,6 +72,17 @@ struct ScanReviewView: View {
                     commitBar
                 }
             }
+            // "Auto scan and fill if you allow it", and only if.
+            //
+            // The rule is in `ScanSettings.shouldFillAutomatically` rather than here, so it is
+            // one sentence in one place and a test can reach it without a view: the setting has
+            // to be on, the scan has to have produced at least three high-confidence fields, and
+            // nothing may have been read at medium confidence. That last condition is the one
+            // that matters — a scan that is part confident and part uncertain is precisely the
+            // one worth looking at, so the shortcut stands down rather than quietly dropping the
+            // uncertain half.
+            .onChange(of: model.phase) { _, _ in autoFillIfAllowed() }
+            .onAppear { autoFillIfAllowed() }
             .navigationTitle("Check what was read")
             .navigationBarTitleDisplayMode(.inline)
             // Replaces what used to be the view model's `deinit`. This is the better hook anyway:
@@ -96,6 +110,17 @@ struct ScanReviewView: View {
                 Task { await addPages(items) }
             }
         }
+    }
+
+    private func autoFillIfAllowed() {
+        guard !hasAutoFilled, model.phase == .reviewing else { return }
+        let unticked = model.suggestions.contains { !$0.isPreselected }
+        guard dependencies.scanSettings.shouldFillAutomatically(
+            preselectedCount: model.selection.count,
+            hasAnythingUnticked: unticked
+        ) else { return }
+        hasAutoFilled = true
+        onSave(model.acceptedValues())
     }
 
     // MARK: - States

@@ -54,7 +54,10 @@ struct RentalFormView: View {
         .sheet(isPresented: $choosingCompany) {
             CompanyPickerView(
                 selection: $draft.companyID,
-                initialSearch: draft.companyID == nil ? (draft.scannedCompanyName ?? "") : ""
+                initialSearch: draft.companyID == nil ? (draft.scannedCompanyName ?? "") : "",
+                // Picking by hand is the user overruling the match, so the row stops claiming
+                // the scan chose it.
+                onPicked: { _ in draft.companyCameFromScan = false }
             )
         }
         .sheet(isPresented: $choosingJobSite) {
@@ -68,7 +71,7 @@ struct RentalFormView: View {
                 model: session.model,
                 onSave: { values in
                     draft.apply(scanned: values)
-                    draft.noteScannedCompany(values)
+                    adoptScannedCompany(named: session.model.scannedVendorName)
                     scanModel = nil
                 },
                 onCancel: { scanModel = nil },
@@ -186,7 +189,10 @@ struct RentalFormView: View {
             SelectorRow(
                 title: "Rental company",
                 value: selectedCompany?.name,
-                detail: selectedCompany?.branch,
+                // The row says where the value came from. A field the app filled in on the
+                // user's behalf has to be visibly that, or the first time it matches the wrong
+                // yard nobody will know to look.
+                detail: companyDetail,
                 placeholder: "Choose company",
                 symbol: "building.2",
                 identifier: A11yID.AddRental.companyRow
@@ -208,13 +214,25 @@ struct RentalFormView: View {
             Text("Who and where")
         } footer: {
             if let scanned = draft.scannedCompanyName, draft.companyID == nil {
-                // The document named a company. It is offered, never applied: a name read off a
-                // letterhead is a string, and the rental needs a record the user chose.
-                Text("The document said “\(scanned)”. Tap Rental company to find or add it.")
+                // The document named a company the user does not have yet. A name read off a
+                // letterhead is a string and the rental needs a record, so it is offered rather
+                // than created — but the picker opens with it already typed in, so saying yes is
+                // one tap and no typing.
+                Text("The document said “\(scanned)”. Tap Rental company to add it.")
+            } else if draft.companyCameFromScan {
+                Text("Matched from the document you scanned. Tap it if that is the wrong yard.")
             } else {
                 Text("Both are reusable. Pick them once and they are there for the next rental.")
             }
         }
+    }
+
+    private var companyDetail: String? {
+        guard let selectedCompany else { return nil }
+        if draft.companyCameFromScan {
+            return selectedCompany.branch.map { "\($0) · from the scan" } ?? "From the scan"
+        }
+        return selectedCompany.branch
     }
 
     private var datesSection: some View {
@@ -348,6 +366,28 @@ struct RentalFormView: View {
     private var selectedCompany: Vendor? {
         guard let id = draft.companyID else { return nil }
         return companies.first { $0.id == id }
+    }
+
+    /// Fills the company in from the letterhead, the only way it honestly can.
+    ///
+    /// A rental references a reusable `Vendor`; a scan yields a string. So the name is matched
+    /// against the yards the user already has, and on a clear single match the row is filled in
+    /// for them — which is what "if it finds a company name it should fill that in" means when
+    /// the app is not allowed to invent records from OCR.
+    ///
+    /// With no match, the name is kept as a hint: the row's footer names it, and opening the
+    /// picker starts with it typed into the search box, so creating it is one tap and no typing.
+    private func adoptScannedCompany(named scanned: String?) {
+        guard let scanned, !scanned.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        draft.scannedCompanyName = scanned
+        guard draft.companyID == nil else { return }
+        let identities = companies.map {
+            CompanyIdentity(id: $0.id, name: $0.name, branch: $0.branch)
+        }
+        if let match = CompanyMatching.bestMatch(forScannedName: scanned, in: identities) {
+            draft.companyID = match.identity.id
+            draft.companyCameFromScan = true
+        }
     }
 
     private var selectedJobSite: JobSite? {

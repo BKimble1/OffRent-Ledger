@@ -246,6 +246,7 @@ enum A11yID {
         static let root = "settings.root"
         static let subscription = "settings.subscription"
         static let reminders = "settings.reminders"
+        static let autoFillScans = "settings.autoFillScans"
         static let remindersRoot = "settings.reminders.root"
         static let remindersPermission = "settings.reminders.permission"
         static let remindersEnable = "settings.reminders.enable"

@@ -25,6 +25,11 @@ final class AppDependencies {
         didSet { ReminderSettingsStore.save(reminderSettings) }
     }
 
+    /// What the scanner may do without asking. Off by default; see `ScanSettings`.
+    var scanSettings: ScanSettings {
+        didSet { ScanSettingsStore.save(scanSettings) }
+    }
+
     /// Set when the store could not be opened. The root view shows a recovery screen rather than
     /// the app crashing on launch and taking a contractor's records with it.
     var storeFailure: String?
@@ -55,8 +60,10 @@ final class AppDependencies {
         evidenceRenderer: any EvidenceRendering,
         snapshotPublisher: any SnapshotPublishing,
         subscriptions: any SubscriptionProviding,
-        reminderSettings: ReminderSettings = ReminderSettingsStore.load()
+        reminderSettings: ReminderSettings = ReminderSettingsStore.load(),
+        scanSettings: ScanSettings = ScanSettingsStore.load()
     ) {
+        self.scanSettings = scanSettings
         self.clock = clock
         self.fileStore = fileStore
         self.textRecognizer = textRecognizer

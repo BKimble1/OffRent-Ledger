@@ -34,6 +34,21 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle(
+                    "Fill the form automatically",
+                    isOn: Binding(
+                        get: { dependencies.scanSettings.autoFillConfidentScans },
+                        set: { dependencies.scanSettings.autoFillConfidentScans = $0 }
+                    )
+                )
+                .accessibilityIdentifier(A11yID.Settings.autoFillScans)
+            } header: {
+                Text("Scanning")
+            } footer: {
+                Text(AppCopy.autoFillScansExplanation)
+            }
+
+            Section {
                 // One entry, and it runs the same walkthrough the app presents on a first
                 // launch. There used to be two — a page tour and a hands-on guide that asked
                 // the user to work through the real workflow — and the second one could not be

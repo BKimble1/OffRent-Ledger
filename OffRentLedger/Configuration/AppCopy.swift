@@ -116,4 +116,17 @@ enum AppCopy {
         your rental. You are responsible for reviewing anything you generate here before relying \
         on it or sending it to anyone.
         """
+
+    /// The Settings footer under the auto-fill toggle.
+    ///
+    /// Says what "automatically" does *not* mean, because that is the part worth knowing: a scan
+    /// the app was unsure about still stops, and nothing reaches the store until the user saves
+    /// the rental themselves. §7 spends its length on not applying a value nobody looked at, and
+    /// an opt-in that quietly relaxed that would undo it.
+    static let autoFillScansExplanation = """
+        Off, every scan opens a review screen first. On, a scan that reads at least three fields \
+        clearly and leaves nothing uncertain goes straight into the form. Anything the app was \
+        unsure about still stops for you to check, and nothing is saved until you tap Save on \
+        the rental.
+        """
 }
