@@ -408,8 +408,23 @@ enum DocumentTextParser {
              patterns: [
                 #"(?i)\b(?:unit|equip(?:ment)?|asset|machine)\s*(?:no\.?|number|id|#)\s*[:#]?\s*([A-Z0-9][A-Z0-9\-]{2,})"#
              ]),
+        // `SERIAL NO`, and the three abbreviations a yard writes instead of the word.
+        //
+        // A rental ticket almost never spells "serial" out. It prints `S/N 4TNV88-1234`,
+        // `S/N: 4TNV88` or `SN 4TNV88`, and none of those reached the spelled-out rule — so the
+        // one field that identifies *which* machine came off the truck went missing on most real
+        // paperwork, and the user typed a seventeen-character string off a plate by hand.
+        //
+        // The slash form is written as `s / n` with optional space either side because the
+        // recogniser sometimes puts one there. Both abbreviations end on a word boundary so
+        // `S/NABCDE` and the middle of a longer word cannot pose as a label, and the label itself
+        // is outside the capture group, so nothing files "S/N" as the serial number.
         Rule(field: .serialNumber, name: "labelled-serial", confidence: 0.9, kind: .text,
-             patterns: [#"(?i)\bserial\s*(?:no\.?|number|#)?\s*[:#]?\s*([A-Z0-9][A-Z0-9\-]{4,})"#]),
+             patterns: [
+                #"(?i)\bserial\s*(?:no\.?|number|#)?\s*[:#]?\s*([A-Z0-9][A-Z0-9\-]{4,})"#,
+                #"(?i)\bs\s*/\s*n\b\s*[:#.]?\s*([A-Z0-9][A-Z0-9\-]{4,})"#,
+                #"(?i)\bsn\b\s*[:#.]?\s*([A-Z0-9][A-Z0-9\-]{4,})"#,
+             ]),
         Rule(field: .equipmentName, name: "labelled-equipment", confidence: 0.85, kind: .text,
              patterns: [
                 #"(?i)^\s*(?:equipment|description|item|unit\s+description)\s*[:]\s*(.+)$"#
@@ -456,7 +471,21 @@ enum DocumentTextParser {
     private static let invoiceRules: [Rule] = [
         Rule(field: .invoiceNumber, name: "labelled-invoice-number", confidence: 0.95, kind: .text,
              patterns: [#"(?i)\binvoice\s*(?:no\.?|number|#)?\s*[:#]\s*([A-Z0-9][A-Z0-9\-/]{2,})"#,
-                        #"(?i)\binvoice\s*#\s*([A-Z0-9][A-Z0-9\-/]{2,})"#]),
+                        #"(?i)\binvoice\s*#\s*([A-Z0-9][A-Z0-9\-/]{2,})"#,
+                        // `INVOICE NO 44821` and `INVOICE NO. 44821` — the separator word is
+                        // printed but the colon is not, which is how a plain-text invoice header
+                        // usually reads. Both forms fell through the two patterns above, because
+                        // each of those insists on a colon or a hash, so the one number the
+                        // contractor files the document under was missing from the review screen.
+                        //
+                        // The colon is optional here and the separator word is not, so this
+                        // cannot fire on `INVOICE DATE 05/12/26`. The lookahead additionally
+                        // insists the value carries a digit, so a header that reads
+                        // `INVOICE NUMBER SHOWN BELOW` does not file "SHOWN" as an invoice
+                        // number — a wrong value above the preselect threshold being worse than
+                        // no value at all.
+                        #"(?i)\binvoice\s*(?:no\.?|number|#)\s*[:#]?\s*"#
+                        + #"(?=[A-Z0-9\-/]*[0-9])([A-Z0-9][A-Z0-9\-/]{2,})"#]),
         Rule(field: .invoiceTotal, name: "labelled-invoice-total", confidence: 0.93, kind: .money,
              patterns: [
                 #"(?i)\b(?:invoice\s+total|total\s+due|amount\s+due|balance\s+due|grand\s+total)"# + gap + moneyFragment
@@ -490,6 +519,29 @@ enum DocumentTextParser {
              patterns: [#"(?i)\b(?:fuel|refuel(?:ing)?|diesel)(?:\s+(?:charge|fee|surcharge|recovery))*"# + gap + moneyFragment]),
         Rule(field: .damageCharge, name: "labelled-damage", confidence: 0.9, kind: .money,
              patterns: [#"(?i)\b(?:damage|repair)(?:\s+(?:charge|fee|waiver|recovery))*"# + gap + moneyFragment]),
+        // The same charge, billed the way most US yards actually print it: an abbreviation.
+        //
+        // `RPP` (rental protection plan), `DW` (damage waiver), `LDW` (loss damage waiver) and
+        // `CDW` (collision damage waiver) are one line item with an amount —
+        // `RPP (14%) .......... 63.00`, `LDW  87.50` — and the spelled-out rule saw none of them.
+        // It is an optional charge worth ten to fifteen per cent of the rental, so missing it
+        // left the largest line on the invoice out of the comparison entirely.
+        //
+        // Two guards, both needed, and `DW` is why. It is two letters, so it is matched only as
+        // a standalone token — never inside `MIDWAY`, `SIDEWALK` or a unit number — and only
+        // where a money amount follows it directly. Either guard alone lets something through:
+        // the boundary alone would read the `DW` of a drywall-lift description, and the amount
+        // alone would read the tail of a longer word that happens to sit before a figure.
+        //
+        // The bracket group steps over the rate the waiver was worked out from, which is printed
+        // beside the abbreviation as often as not.
+        Rule(field: .damageCharge, name: "labelled-damage-waiver-abbreviation", confidence: 0.9,
+             kind: .money,
+             patterns: [
+                #"(?i)\b(?:rpp|ldw|cdw|dw)\b(?:\s*\([^)]{0,24}\))?"#
+                + #"(?:\s+(?:charge|fee|waiver|protection|plan))*"#
+                + gap + moneyFragment
+             ]),
         Rule(field: .cleaningCharge, name: "labelled-cleaning", confidence: 0.9, kind: .money,
              patterns: [#"(?i)\b(?:cleaning|wash[\s\-]?out)(?:\s+(?:charge|fee|surcharge|recovery))*"# + gap + moneyFragment]),
         Rule(field: .environmentalCharge, name: "labelled-environmental", confidence: 0.88, kind: .money,

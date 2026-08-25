@@ -172,4 +172,231 @@ final class ModelSuggestionValidatorTests: XCTestCase {
         )
         XCTAssertEqual(accepted.count, 1)
     }
+
+    // MARK: - A quotation is not the page stating something
+
+    /// A rental agreement whose conditions paragraph quotes figures that are not the deal.
+    private var documentWithQuotedConditions: RecognizedDocument {
+        RecognizedDocument(
+            rawText: """
+                CEDAR RIDGE EQUIPMENT RENTAL
+                AGREEMENT 44-118392
+                SKID STEER LOADER 75HP CLOSED CAB
+                DAILY        WEEKLY       4-WEEK
+                285.00       1,140.00     3,420.00
+                DELIVERED 05/04/2026
+                CONDITIONS: THE "MINIMUM RENTAL" IS ONE DAY. A RATE SHOWN AS "450.00" IN
+                SCHEDULE B APPLIES TO ATTACHMENTS ORDERED SEPARATELY AND IS NOT CHARGED HERE.
+                """,
+            averageRecognitionConfidence: 0.92
+        )
+    }
+
+    func testAFigureThatAppearsOnlyInsideQuotationMarksIsDropped() {
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "dailyRate",
+                value: "450.00",
+                sourceLine: #"CONDITIONS: THE "MINIMUM RENTAL" IS ONE DAY. A RATE SHOWN AS "450.00" IN"#
+            )],
+            against: documentWithQuotedConditions, existing: [], calendar: calendar
+        )
+        XCTAssertTrue(
+            accepted.isEmpty,
+            "a rate the conditions merely quote is not a rate the document charges"
+        )
+    }
+
+    /// And the same document's real rate is still read, so this is a boundary rather than a
+    /// refusal to validate anything on a page that contains a quotation mark.
+    func testTheRealRateOnAPageThatQuotesAnotherOneIsStillAccepted() {
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "dailyRate", value: "285.00",
+                sourceLine: "285.00       1,140.00     3,420.00"
+            )],
+            against: documentWithQuotedConditions, existing: [], calendar: calendar
+        )
+        XCTAssertEqual(accepted.first?.value, .money(money("285.00")))
+    }
+
+    /// An unpaired mark is an inches sign, not the start of a quotation.
+    ///
+    /// Treating it as one would blank the rest of the document, and every value below it would
+    /// be dropped as "not on the page" — a scan that silently found nothing on paperwork that
+    /// mentions a 48" fork.
+    func testAStrayInchesMarkDoesNotBlankTheRestOfThePage() {
+        let document = RecognizedDocument(
+            rawText: """
+                CANYON STATE EQUIPMENT CO.
+                FORK EXTENSIONS 48" PAIR
+                DELIVERY                          120.00
+                """,
+            averageRecognitionConfidence: 0.95
+        )
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "deliveryCharge", value: "120.00",
+                sourceLine: "DELIVERY                          120.00"
+            )],
+            against: document, existing: [], calendar: calendar
+        )
+        XCTAssertEqual(accepted.first?.value, .money(money("120.00")))
+    }
+
+    // MARK: - A value has to start and end where a value does
+
+    private var chargeDocument: RecognizedDocument {
+        RecognizedDocument(
+            rawText: """
+                CANYON STATE EQUIPMENT CO.
+                INVOICE 44821
+                ENVIRONMENTAL FEE                   9.90
+                DELIVERY                          120.00
+                TOTAL DUE                         129.90
+                """,
+            averageRecognitionConfidence: 0.95
+        )
+    }
+
+    /// The substring hole. "12" is inside "120.00", so the old check said the page had stated it.
+    func testANumberIsNotValidatedByALongerNumberThatMerelyContainsIt() {
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "deliveryCharge", value: "12",
+                sourceLine: "DELIVERY                          120.00"
+            )],
+            against: chargeDocument, existing: [], calendar: calendar
+        )
+        XCTAssertTrue(
+            accepted.isEmpty,
+            "a $12 charge was validated by a line that reads $120.00 — a tenth of the figure, "
+            + "carrying the page's authority"
+        )
+    }
+
+    /// The head of a number is no better than its tail.
+    func testTheTailOfALongerNumberIsNotAValueEither() {
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "environmentalCharge", value: "9",
+                sourceLine: "ENVIRONMENTAL FEE                   9.90"
+            )],
+            against: chargeDocument, existing: [], calendar: calendar
+        )
+        XCTAssertTrue(accepted.isEmpty)
+    }
+
+    /// The whole figure from the very same line is still accepted.
+    func testTheWholeFigureOnThatLineIsStillAccepted() {
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "deliveryCharge", value: "120.00",
+                sourceLine: "DELIVERY                          120.00"
+            )],
+            against: chargeDocument, existing: [], calendar: calendar
+        )
+        XCTAssertEqual(accepted.first?.value, .money(money("120.00")))
+    }
+
+    /// Identifiers have the same failure mode as amounts.
+    func testAFragmentOfAnAgreementNumberIsNotValidatedByTheWholeOne() {
+        let accepted = validate([
+            ProposedField(field: "agreementNumber", value: "118392", sourceLine: "AGREEMENT 44-118392"),
+        ])
+        XCTAssertTrue(
+            accepted.isEmpty,
+            "half an agreement number is a different agreement number"
+        )
+    }
+
+    /// And a hyphen inside a value the page really prints does not stop it being found.
+    func testAHyphenatedIdentifierIsStillFoundWhole() {
+        let accepted = validate([
+            ProposedField(field: "agreementNumber", value: "44-118392", sourceLine: "AGREEMENT 44-118392"),
+        ])
+        XCTAssertEqual(accepted.first?.value, .text("44-118392"))
+    }
+
+    /// Punctuation after a value is punctuation, not more value. A full stop that ends a sentence
+    /// must not make the figure in front of it unfindable.
+    func testAFigureFollowedByAFullStopIsStillOnThePage() {
+        let document = RecognizedDocument(
+            rawText: "AMOUNT DUE ON RECEIPT IS 129.90. NO RETAINAGE APPLIES.",
+            averageRecognitionConfidence: 0.95
+        )
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "invoiceTotal", value: "129.90",
+                sourceLine: "AMOUNT DUE ON RECEIPT IS 129.90. NO RETAINAGE APPLIES."
+            )],
+            against: document, existing: [], calendar: calendar
+        )
+        XCTAssertEqual(accepted.first?.value, .money(money("129.90")))
+    }
+
+    // MARK: - Rates are not amounts
+
+    private var waiverDocument: RecognizedDocument {
+        RecognizedDocument(
+            rawText: """
+                CANYON STATE EQUIPMENT CO.
+                INVOICE 44822
+                RENTAL SUBTOTAL                   990.00
+                RPP (12%)                         118.80
+                TOTAL DUE                       1,108.80
+                """,
+            averageRecognitionConfidence: 0.95
+        )
+    }
+
+    /// A percentage is a rate the vendor quoted, not a figure it billed.
+    ///
+    /// No field this validator accepts is a percentage, so a number printed with a percent sign
+    /// after it can never be the value. Before the guard, `%` looked like a clean right-hand
+    /// boundary — it is neither alphanumeric nor one of the separators — so `12` read straight out
+    /// of `RPP (12%)` was accepted as a damage charge of twelve dollars.
+    func testAPercentageIsNotValidatedAsAnAmount() {
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "damageCharge", value: "12",
+                sourceLine: "RPP (12%)                         118.80"
+            )],
+            against: waiverDocument, existing: [], calendar: calendar
+        )
+        XCTAssertTrue(
+            accepted.isEmpty,
+            "a $12 damage charge was validated by the 12% rate the waiver is calculated at"
+        )
+    }
+
+    /// A space between the figure and the sign changes nothing.
+    func testAPercentageWithASpaceBeforeTheSignIsStillARate() {
+        let spaced = RecognizedDocument(
+            rawText: """
+                RENTAL PROTECTION PLAN AT 14 %    138.60
+                """,
+            averageRecognitionConfidence: 0.95
+        )
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "damageCharge", value: "14",
+                sourceLine: "RENTAL PROTECTION PLAN AT 14 %    138.60"
+            )],
+            against: spaced, existing: [], calendar: calendar
+        )
+        XCTAssertTrue(accepted.isEmpty)
+    }
+
+    /// The amount on the same line is still the amount.
+    func testTheWaiverAmountOnThatLineIsStillAccepted() {
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "damageCharge", value: "118.80",
+                sourceLine: "RPP (12%)                         118.80"
+            )],
+            against: waiverDocument, existing: [], calendar: calendar
+        )
+        XCTAssertEqual(accepted.first?.value, .money(money("118.80")))
+    }
 }

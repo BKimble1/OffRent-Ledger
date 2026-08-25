@@ -22,7 +22,18 @@ final class ExtractionFixtureTests: XCTestCase {
     private func parse(
         _ name: String, kind: DocumentKind, confidence: Double = 1.0, pages: Int = 1
     ) throws -> ParseResult {
-        let text = try fixture(name)
+        parseRecognisedText(try fixture(name), kind: kind, confidence: confidence, pages: pages)
+    }
+
+    /// The same parse, from text rather than from a file.
+    ///
+    /// Used where a test needs the *same* document with one line printed the way a different
+    /// yard prints it. Retyping the whole invoice per spelling would leave five near-identical
+    /// fixtures whose differences nobody could see; swapping the one line that differs keeps the
+    /// document real and the difference legible.
+    private func parseRecognisedText(
+        _ text: String, kind: DocumentKind, confidence: Double = 1.0, pages: Int = 1
+    ) -> ParseResult {
         let lines = text.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
@@ -423,5 +434,174 @@ final class ExtractionFixtureTests: XCTestCase {
             daily, Decimal(string: "985.00", locale: Locale(identifier: "en_US_POSIX")),
             "the 7 DAY RATE was read as the daily rate"
         )
+    }
+
+    // MARK: - The abbreviations rental paperwork actually prints
+
+    // Three defects, all of the same shape: the parser knew the word and the paperwork prints
+    // the abbreviation. Each one was a field that simply went missing on a real document, which
+    // on a scanning app is indistinguishable from the scan having failed.
+
+    /// `S/N` is how a serial number is written on every plate and nearly every ticket.
+    func testASerialWrittenAsSlashNIsRead() throws {
+        let result = try parse("contract_abbreviated_serial.txt", kind: .rentalContract)
+        XCTAssertEqual(
+            result.suggestion(for: .serialNumber)?.value, .text("4TNV88-1234"),
+            "the serial is printed as `S/N 4TNV88-1234` and was not read at all"
+        )
+    }
+
+    /// And the label is never swallowed into the value.
+    func testTheSerialLabelIsNotCapturedAsPartOfTheSerial() throws {
+        let result = try parse("contract_abbreviated_serial.txt", kind: .rentalContract)
+        let serial = try XCTUnwrap(result.suggestion(for: .serialNumber)?.value.textValue)
+        XCTAssertFalse(serial.uppercased().contains("S/N"), "the label became part of the value")
+        XCTAssertFalse(serial.uppercased().hasPrefix("SN"), "the label became part of the value")
+    }
+
+    /// The same contract, with that one line printed the three ways yards print it.
+    func testEveryWayAYardAbbreviatesASerialNumberIsRead() throws {
+        let template = try fixture("contract_abbreviated_serial.txt")
+        let printed: [(line: String, expected: String)] = [
+            ("S/N 4TNV88-1234", "4TNV88-1234"),
+            ("S/N: 4TNV88", "4TNV88"),
+            ("SN 4TNV88", "4TNV88"),
+        ]
+        for (line, expected) in printed {
+            let document = template.replacingOccurrences(of: "S/N 4TNV88-1234", with: line)
+            XCTAssertTrue(document.contains(line), "the fixture no longer carries the serial line")
+            let result = parseRecognisedText(document, kind: .rentalContract)
+            XCTAssertEqual(
+                result.suggestion(for: .serialNumber)?.value, .text(expected),
+                "a serial printed as `\(line)` was not read"
+            )
+        }
+    }
+
+    /// The rest of the same contract, so the fixture is a document and not a serial-number
+    /// delivery mechanism: if the parser stops reading any of this, that is a regression too.
+    func testTheAbbreviatedSerialContractStillFillsTheRestOfTheForm() throws {
+        let result = try parse("contract_abbreviated_serial.txt", kind: .rentalContract)
+        XCTAssertEqual(result.suggestion(for: .agreementNumber)?.value, .text("BV-31408"))
+        XCTAssertEqual(result.suggestion(for: .purchaseOrderNumber)?.value, .text("WO-55712"))
+        XCTAssertEqual(result.suggestion(for: .equipmentIdentifier)?.value, .text("TB-0417"))
+        XCTAssertEqual(
+            result.suggestion(for: .equipmentName)?.value,
+            .text("TAKEUCHI TB260 COMPACT EXCAVATOR")
+        )
+        XCTAssertEqual(result.suggestion(for: .dailyRate)?.value, .money(money("340.00")))
+        XCTAssertEqual(result.suggestion(for: .weeklyRate)?.value, .money(money("1020.00")))
+        XCTAssertEqual(result.suggestion(for: .fourWeekRate)?.value, .money(money("2720.00")))
+        XCTAssertNotNil(result.suggestion(for: .startDate)?.value.dateValue)
+        XCTAssertNotNil(result.suggestion(for: .scheduledEndDate)?.value.dateValue)
+    }
+
+    /// The damage waiver, billed as `RPP (14%) ....... 63.00`, which is a tenth of this invoice.
+    func testTheWaiverAbbreviationIsReadAsTheDamageCharge() throws {
+        let result = try parse("invoice_waiver_abbreviation.txt", kind: .vendorInvoice)
+        XCTAssertEqual(
+            result.suggestion(for: .damageCharge)?.value, .money(money("63.00")),
+            "an `RPP` line item is the damage waiver and was not read as a charge at all"
+        )
+    }
+
+    /// `RPP`, `DW`, `LDW`, `CDW` — four ways to bill one thing, all of them the same field.
+    func testEveryWaiverAbbreviationMapsToTheDamageCharge() throws {
+        let template = try fixture("invoice_waiver_abbreviation.txt")
+        let printed: [(line: String, expected: String)] = [
+            ("RPP (14%) ............................... 63.00", "63.00"),
+            ("LDW ..................................... 63.00", "63.00"),
+            ("CDW (14%) ............................... 63.00", "63.00"),
+            ("DAMAGE WAIVER (DW) ...................... 63.00", "63.00"),
+            ("LDW  87.50", "87.50"),
+            ("DW  87.50", "87.50"),
+        ]
+        for (line, expected) in printed {
+            let document = template.replacingOccurrences(
+                of: "RPP (14%) ............................... 63.00", with: line
+            )
+            XCTAssertTrue(document.contains(line), "the fixture no longer carries the waiver line")
+            let result = parseRecognisedText(document, kind: .vendorInvoice)
+            XCTAssertEqual(
+                result.suggestion(for: .damageCharge)?.value, .money(money(expected)),
+                "a waiver billed as `\(line)` was not read as the damage charge"
+            )
+        }
+    }
+
+    /// The reason `DW` is matched as a token and not as a substring.
+    ///
+    /// This invoice bills `MIDWAY YARD RESTOCK ...... 18.00`, which contains the letters of
+    /// `DW` in the middle of a word and is not a waiver. Taking the waiver line away must leave
+    /// no damage charge at all — an $18 charge invented out of a restocking fee would arrive
+    /// above the threshold that pre-ticks it, and the comparison would then flag a mismatch of
+    /// the app's own making.
+    func testATwoLetterWaiverCodeIsNotReadOutOfTheMiddleOfAWord() throws {
+        let template = try fixture("invoice_waiver_abbreviation.txt")
+        let withoutWaiver = template.replacingOccurrences(
+            of: "RPP (14%) ............................... 63.00", with: ""
+        )
+        XCTAssertTrue(
+            withoutWaiver.contains("MIDWAY YARD RESTOCK"),
+            "the word carrying the letters of DW must still be on the page"
+        )
+        let result = parseRecognisedText(withoutWaiver, kind: .vendorInvoice)
+        XCTAssertNil(
+            result.suggestion(for: .damageCharge),
+            "a restocking fee became a damage waiver because `DW` matched inside `MIDWAY`"
+        )
+    }
+
+    /// `INVOICE NO 44821` — the separator word without the colon, which is how most of them
+    /// print. The number the contractor files the document under used to be missing entirely.
+    func testAnInvoiceNumberWithoutAColonIsRead() throws {
+        let result = try parse("invoice_waiver_abbreviation.txt", kind: .vendorInvoice)
+        XCTAssertEqual(result.suggestion(for: .invoiceNumber)?.value, .text("44821"))
+    }
+
+    func testTheThreeUncolonedInvoiceNumberFormsAllParse() throws {
+        let template = try fixture("invoice_waiver_abbreviation.txt")
+        for line in ["INVOICE NO 44821", "INVOICE NO. 44821", "INVOICE # 44821"] {
+            let document = template.replacingOccurrences(of: "INVOICE NO 44821", with: line)
+            XCTAssertTrue(document.contains(line), "the fixture no longer carries the header line")
+            let result = parseRecognisedText(document, kind: .vendorInvoice)
+            XCTAssertEqual(
+                result.suggestion(for: .invoiceNumber)?.value, .text("44821"),
+                "an invoice numbered `\(line)` was not read"
+            )
+        }
+    }
+
+    /// A date is not a number. `INVOICE DATE 07/06/26` sits two lines below the header on this
+    /// fixture, and the looser header rule must not read the day out of it.
+    func testTheInvoiceDateLineIsNotReadAsTheInvoiceNumber() throws {
+        let result = try parse("invoice_waiver_abbreviation.txt", kind: .vendorInvoice)
+        let number = try XCTUnwrap(result.suggestion(for: .invoiceNumber)?.value.textValue)
+        XCTAssertFalse(number.contains("/"), "the invoice date was filed as the invoice number")
+    }
+
+    /// And the rest of that invoice, for the same reason as the contract above.
+    func testTheWaiverInvoiceStillReadsItsOtherCharges() throws {
+        let result = try parse("invoice_waiver_abbreviation.txt", kind: .vendorInvoice)
+        XCTAssertEqual(result.suggestion(for: .deliveryCharge)?.value, .money(money("110.00")))
+        XCTAssertEqual(result.suggestion(for: .pickupCharge)?.value, .money(money("110.00")))
+        XCTAssertEqual(result.suggestion(for: .environmentalCharge)?.value, .money(money("9.90")))
+        XCTAssertEqual(result.suggestion(for: .rentalSubtotal)?.value, .money(money("760.90")))
+        XCTAssertEqual(result.suggestion(for: .taxAmount)?.value, .money(money("65.44")))
+        XCTAssertEqual(result.suggestion(for: .invoiceTotal)?.value, .money(money("826.34")))
+        XCTAssertEqual(result.suggestion(for: .agreementNumber)?.value, .text("CS-20714"))
+        XCTAssertEqual(result.suggestion(for: .purchaseOrderNumber)?.value, .text("PO-8830"))
+    }
+
+    /// The waiver rate is not the waiver charge — the same trap the tax line set.
+    func testTheWaiverRateIsNeverReadAsTheWaiverAmount() throws {
+        let result = try parse("invoice_waiver_abbreviation.txt", kind: .vendorInvoice)
+        for suggestion in result.suggestions {
+            guard let amount = suggestion.value.moneyValue else { continue }
+            XCTAssertNotEqual(
+                amount, Decimal(string: "14", locale: Locale(identifier: "en_US_POSIX")),
+                "\(suggestion.field) took the waiver rate as an amount"
+            )
+        }
     }
 }
