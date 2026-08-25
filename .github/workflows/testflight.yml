@@ -93,8 +93,9 @@ jobs:
         # `--break-system-packages` is needed on a PEP 668 Python and rejected by older pips, so
         # try it only if the plain install refuses.
         run: |
-          python3 -m pip install --quiet pillow pyyaml \
-            || python3 -m pip install --quiet --break-system-packages pillow pyyaml
+          python3 -m pip install --quiet pillow pyyaml pyjwt cryptography requests \
+            || python3 -m pip install --quiet --break-system-packages \
+                 pillow pyyaml pyjwt cryptography requests
 
       - name: Repository invariants
         run: python3 scripts/verify_repository.py
@@ -113,15 +114,91 @@ jobs:
           printf '%s\n' "$PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
           chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
 
-      # Every upload needs a build number App Store Connect has not seen for this version. The run
-      # number is monotonic per repository, which is exactly the property required.
+      # Every upload needs a build number App Store Connect has not seen for this version — and,
+      # less obviously, one *higher* than every number it already has.
+      #
+      # `github.run_number` was doing the first job and not the second. It is monotonic per
+      # workflow, not per app, and this app's builds did not all come from this workflow: an
+      # earlier Codemagic pipeline had already uploaded build 16 before GitHub Actions started
+      # counting at 1. Apple accepted builds 4 through 10 because they were unique, and TestFlight
+      # then sorted 16 to the top and left every tester looking at four-day-old code as though it
+      # were the latest. A build nobody installs is the same as a build that never uploaded.
+      #
+      # So the number comes from App Store Connect itself: the highest it holds for this bundle,
+      # plus one. Self-correcting, no magic offset, and it cannot be wrong-footed again by a build
+      # from some other pipeline.
       - name: Set the build number
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          REQUESTED: ${{ inputs.build_number }}
         run: |
           set -e
-          BUILD_NUMBER="${{ inputs.build_number }}"
-          [ -n "$BUILD_NUMBER" ] || BUILD_NUMBER="${{ github.run_number }}"
-          echo "Building $BUILD_NUMBER"
-          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          if [ -n "$REQUESTED" ]; then
+            echo "Building $REQUESTED (asked for explicitly)"
+            echo "BUILD_NUMBER=$REQUESTED" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import os, sys, time
+          import jwt, requests
+
+          key_id = os.environ["KEY_ID"].strip()
+          issuer = os.environ["ISSUER_ID"].strip()
+          bundle = os.environ["BUNDLE_ID"].strip()
+          fallback = int(os.environ["GITHUB_RUN_NUMBER"])
+
+          with open(os.path.expanduser(f"~/.appstoreconnect/private_keys/AuthKey_{key_id}.p8")) as f:
+              private_key = f.read()
+
+          token = jwt.encode(
+              {"iss": issuer, "iat": int(time.time()), "exp": int(time.time()) + 1200,
+               "aud": "appstoreconnect-v1"},
+              private_key, algorithm="ES256", headers={"kid": key_id, "typ": "JWT"},
+          )
+          session = requests.Session()
+          session.headers["Authorization"] = f"Bearer {token}"
+          base = "https://api.appstoreconnect.apple.com/v1"
+
+          def highest():
+              apps = session.get(f"{base}/apps", params={"filter[bundleId]": bundle},
+                                 timeout=30).json().get("data", [])
+              if not apps:
+                  return None
+              builds = session.get(
+                  f"{base}/builds",
+                  params={"filter[app]": apps[0]["id"], "sort": "-version", "limit": "200"},
+                  timeout=30,
+              ).json().get("data", [])
+              numbers = []
+              for build in builds:
+                  raw = (build.get("attributes") or {}).get("version")
+                  try:
+                      numbers.append(int(str(raw).strip()))
+                  except (TypeError, ValueError):
+                      # A build numbered like "1.0.3" is not ours to reason about; skip it rather
+                      # than crash the release on somebody else's numbering scheme.
+                      continue
+              return max(numbers) if numbers else None
+
+          try:
+              top = highest()
+          except Exception as error:
+              print(f"# App Store Connect lookup failed: {error}", file=sys.stderr)
+              top = None
+
+          if top is None:
+              # Never block the release on this. The run number is still unique-per-workflow, and a
+              # collision fails loudly at upload rather than silently shipping the wrong thing.
+              print(f"# Falling back to the run number", file=sys.stderr)
+              chosen = fallback
+          else:
+              chosen = max(top + 1, fallback)
+              print(f"# App Store Connect's highest is {top}", file=sys.stderr)
+
+          print(f"# Building {chosen}", file=sys.stderr)
+          print(f"BUILD_NUMBER={chosen}")
+          PY
 
       # Archive unsigned; sign at export.
       #

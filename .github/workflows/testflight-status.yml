@@ -157,12 +157,38 @@ jobs:
                     f"{external:<22} {uploaded}{flag}")
 
           print()
-          newest = rows[0]["attributes"]
-          state = newest.get("processingState")
-          print(f"Newest build {newest.get('version')}: processingState = {state}")
+
+          # "Newest" is two different builds when a number is out of order, and the difference is
+          # the whole point of this report. TestFlight ranks by build number, so the highest number
+          # is what a tester is offered; the latest upload is what the code actually is. When they
+          # disagree, testers are installing something older than the last thing that shipped.
+          def number_of(build):
+              try:
+                  return int(str(build["attributes"].get("version")).strip())
+              except (TypeError, ValueError):
+                  return -1
+
+          highest = max(rows, key=number_of)
+          latest = max(rows, key=lambda b: b["attributes"].get("uploadedDate") or "")
+
+          state = highest["attributes"].get("processingState")
+          print(f"Highest build number: {highest['attributes'].get('version')} "
+                f"(uploaded {(highest['attributes'].get('uploadedDate') or '')[:19].replace('T', ' ')})")
+          print(f"Most recent upload:   {latest['attributes'].get('version')} "
+                f"(uploaded {(latest['attributes'].get('uploadedDate') or '')[:19].replace('T', ' ')})")
+          print()
+
+          if highest["id"] != latest["id"]:
+              print("MISMATCH — the build at the top of TestFlight is not the last one uploaded.")
+              print("TestFlight ranks by build number, so testers are being offered the older code.")
+              print("Upload again: testflight.yml now takes its number from the highest here, plus one.")
+              sys.exit(1)
+
+          print(f"processingState = {state}")
           if state == "VALID":
-              print("Processed. It is installable by any tester in a group it has been assigned to.")
-              print("Assigning it to a group is done in App Store Connect; no workflow here does it.")
+              print("Processed, and it is both the newest upload and the highest number, so a tester")
+              print("in an assigned group gets this build. Assigning a group is done in App Store")
+              print("Connect; no workflow here does it.")
           elif state == "PROCESSING":
               print("Still processing. Re-run this workflow in a few minutes.")
           else:
