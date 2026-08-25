@@ -160,15 +160,24 @@ final class MapAndEditingUITests: XCTestCase {
 
         app.tapWhenHittable(app.expect(app.buttons[A11yUI.EditRental.save]))
 
+        // The navigation bar, not a `staticTexts` lookup. The rental's name appears on its own
+        // screen only as the navigation title, and CI dumps show a `NavigationBar` carrying its
+        // title as the element's identifier — which is a fact about the tree rather than a guess
+        // about which type SwiftUI chose for the label inside it.
         XCTAssertTrue(
-            app.staticTexts["Skid Steer Loader 75HP"].waitForExistence(timeout: 8),
+            app.navigationBars["Skid Steer Loader 75HP"].waitForExistence(timeout: 8),
             "the edit did not reach the screen it came from"
         )
 
         app.relaunchKeepingStore()
         app.tab(A11yUI.Tab.rentals).tap()
+
+        // A rentals row is one combined accessibility element whose label is the whole row —
+        // equipment, reference, company, status and estimate — so there is no `StaticText`
+        // equal to the machine's name to look for. The label *begins* with it.
+        let renamed = NSPredicate(format: "label BEGINSWITH %@", "Skid Steer Loader 75HP")
         XCTAssertTrue(
-            app.staticTexts["Skid Steer Loader 75HP"].waitForExistence(timeout: 10),
+            app.buttons.matching(renamed).firstMatch.waitForExistence(timeout: 10),
             "the edit did not survive a relaunch"
         )
     }
@@ -182,12 +191,16 @@ final class MapAndEditingUITests: XCTestCase {
         app.tapWhenHittable(app.expect(app.buttons[A11yUI.ItemDetail.edit]))
 
         app.expect(app.anyElement(A11yUI.EditRental.root))
+
+        // Revealed rather than waited for. A `Form` row below the fold has not been built, so
+        // it is absent from the accessibility tree rather than merely off screen — waiting for
+        // it can only time out.
         XCTAssertTrue(
-            app.anyElement(A11yUI.AddRental.companyRow).waitForExistence(timeout: 8),
+            app.reveal(app.anyElement(A11yUI.AddRental.companyRow)).exists,
             "a rental filed under the wrong company must be correctable"
         )
         XCTAssertTrue(
-            app.anyElement(A11yUI.AddRental.jobSiteRow).exists,
+            app.reveal(app.anyElement(A11yUI.AddRental.jobSiteRow)).exists,
             "a rental with no jobsite must be able to gain one"
         )
     }

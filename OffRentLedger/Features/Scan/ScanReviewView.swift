@@ -48,6 +48,13 @@ struct ScanReviewView: View {
                     )
                     .accessibilityIdentifier(A11yID.Scan.nothingFound)
 
+                case .reading where !model.outcome.hasAnything:
+                    // The rules found nothing and the on-device model is still reading. Saying
+                    // "No rental details found" now would be a verdict delivered before the work
+                    // finished — and on a rate table, which is the case the model exists for, it
+                    // would be wrong about half a second later.
+                    progressState
+
                 case .reviewing, .reading:
                     if model.outcome.hasAnything {
                         reviewForm
@@ -96,9 +103,13 @@ struct ScanReviewView: View {
     private var progressState: some View {
         VStack(spacing: Space.comfortable) {
             ProgressView()
-            Text("Reading the document on this iPhone…")
-                .font(Typography.rowDetail)
-                .foregroundStyle(.secondary)
+            Text(
+                model.phase == .reading
+                    ? "Reading the layout on this iPhone…"
+                    : "Reading the document on this iPhone…"
+            )
+            .font(Typography.rowDetail)
+            .foregroundStyle(.secondary)
             Text(AppCopy.ocrLocalOnly)
                 .font(Typography.caption)
                 .foregroundStyle(.secondary)

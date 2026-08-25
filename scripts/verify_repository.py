@@ -820,6 +820,150 @@ def check_accessibility_references_resolve() -> None:
                     )
 
 
+def check_one_identifier_per_modifier_chain() -> None:
+    check("No view carries two accessibility identifiers")
+    # `.accessibilityIdentifier` sets one property on one element, so a second call on the same
+    # modifier chain silently *replaces* the first. Nothing warns, the file compiles, and the
+    # identifier that lost appears nowhere in the accessibility tree.
+    #
+    # `RentalsView` had `rentals.root` on its List and then `rentals.search` on the `.searchable`
+    # below it. `rentals.root` was gone, and eleven UI tests failed eight seconds apart saying
+    # only "the rentals list never appeared".
+    #
+    # A chain is found by delimiter depth rather than by indentation: a modifier's trailing
+    # closure sits one level deeper, and the first version of this check treated the body of
+    # `.safeAreaInset { … }` as the end of the chain — which is precisely how it missed the bug
+    # it was written for.
+    for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
+        lines = path.read_text().splitlines()
+        depth = 0
+        in_multiline_string = False
+        chain: list[int] = []
+        base: int | None = None
+
+        def report() -> None:
+            marked = [i for i in chain if ".accessibilityIdentifier(" in lines[i]]
+            if len(marked) > 1:
+                where = ", ".join(str(i + 1) for i in marked)
+                fail(
+                    "a11y-overwritten",
+                    f"{path.relative_to(ROOT)} sets two accessibility identifiers on one view "
+                    f"(lines {where}); only the last one survives",
+                )
+
+        for index, raw in enumerate(lines):
+            stripped = raw.strip()
+            fences = stripped.count('"""')
+            if in_multiline_string:
+                if fences:
+                    in_multiline_string = False
+                continue
+            if fences % 2 == 1:
+                in_multiline_string = True
+                continue
+
+            depth_before = depth
+            code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', raw)
+            code = code.split("//", 1)[0]
+            depth += sum(code.count(c) for c in "{([") - sum(code.count(c) for c in ")]}")
+
+            if not stripped or stripped.startswith("//"):
+                continue
+            if base is not None and depth_before > base:
+                continue  # inside a modifier's trailing closure — still the same chain
+            if stripped.startswith("."):
+                if base is None or depth_before != base:
+                    report()
+                    chain, base = [], depth_before
+                chain.append(index)
+            else:
+                report()
+                chain, base = [], None
+        report()
+
+
+def check_container_identifiers_do_not_shadow_children() -> None:
+    check("A stack that names itself does not rename its children")
+    # An accessibility modifier applied to a *plain layout container* — VStack, HStack, ZStack,
+    # Group — is pushed down onto every element inside it. So an identifier meant to name the
+    # container instead overwrites the identifier of everything it contains, and the container
+    # itself gets no element of its own.
+    #
+    # This is not theoretical. The operations map's result list carried `map.searchResults`, and
+    # the row inside it lost `map.searchResult`: the search ran, the row was on screen with the
+    # right label, and two tests waited eight seconds for an element their own parent had
+    # renamed. The welcome screen had already hit this once and been fixed; nothing stopped the
+    # next one.
+    #
+    # `.accessibilityElement(children: .contain)` before the identifier is the fix — it makes the
+    # view a real container that owns the identifier while its children keep theirs.
+    #
+    # Deliberately limited to plain stacks. `List`, `Form` and `ScrollView` are backed by UIKit
+    # containers that already own an element, and CI dumps show their rows keeping their own
+    # identifiers; requiring `.contain` on those would be noise.
+    #
+    # `Group` is exempt for the same reason rather than by assumption. It is transparent: the
+    # modifier is applied to each child, and where those children are scroll containers the
+    # identifier lands on them. `RentalItemDetailView` has had exactly that shape since b3057d1,
+    # a commit whose UI suite was green while asserting `itemDetail.markDone`,
+    # `itemDetail.status` and `itemDetail.disclosure` as separate elements.
+    stacks = ("VStack", "HStack", "ZStack")
+    declaration = re.compile(
+        r"^\s*(?:@\w+\s+)*(?:private |internal |public |fileprivate )?(?:static )?(?:var|func)\s+(\w+)"
+    )
+
+    for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
+        lines = path.read_text().splitlines()
+        depth = 0
+        in_multiline_string = False
+        open_declarations: list[list] = []
+
+        for index, raw in enumerate(lines):
+            stripped = raw.strip()
+            if in_multiline_string:
+                if '"""' in stripped:
+                    in_multiline_string = False
+                continue
+            if stripped.count('"""') % 2 == 1:
+                in_multiline_string = True
+                continue
+
+            code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', raw).split("//", 1)[0]
+            opens = code.count("{")
+            closes = code.count("}")
+            before = depth
+
+            match = declaration.match(raw)
+            if match and "some View" in raw and opens:
+                # name, base depth, root expression, identifier hits, has `.contain`
+                open_declarations.append([match.group(1), before, None, [], False])
+
+            if open_declarations:
+                current = open_declarations[-1]
+                if current[2] is None and before == current[1] + 1 and stripped and not stripped.startswith("//"):
+                    current[2] = stripped
+                if ".accessibilityIdentifier(" in raw:
+                    current[3].append((before - current[1], index + 1))
+                if ".accessibilityElement(children: .contain)" in raw and before == current[1] + 1:
+                    current[4] = True
+
+            depth += opens - closes
+            while open_declarations and depth <= open_declarations[-1][1]:
+                name, base, root, hits, contained = open_declarations.pop()
+                if contained or not root or not root.startswith(stacks):
+                    continue
+                outer = [line for relative, line in hits if relative == 1]
+                inner = [line for relative, line in hits if relative > 1]
+                if outer and inner:
+                    fail(
+                        "a11y-shadowed",
+                        f"{path.relative_to(ROOT)} «{name}» names a plain stack at line "
+                        f"{outer[0]}, which overwrites the identifiers set inside it "
+                        f"(lines {', '.join(str(line) for line in inner[:4])}). "
+                        "Add .accessibilityElement(children: .contain) before it.",
+                    )
+
+
 def check_ui_test_identifiers_match() -> None:
     check("The UI suite's identifier copy matches the app's")
     # The UI test target drives the app as a black box and cannot @testable import it, so it
@@ -1300,6 +1444,8 @@ def main() -> int:
         check_accessibility_identifiers_are_used,
         check_accessibility_references_resolve,
         check_ui_test_identifiers_match,
+        check_one_identifier_per_modifier_chain,
+        check_container_identifiers_do_not_shadow_children,
         check_no_colour_only_status,
         check_generated_project_is_current,
         check_website_is_generated,

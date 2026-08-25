@@ -46,7 +46,6 @@ enum A11yID {
         /// than a `root` and a `list` addressing the same view.
         static let root = "rentals.root"
         static let addRental = "rentals.addRental"
-        static let searchField = "rentals.search"
         static let filterMenu = "rentals.filterMenu"
         static func row(_ id: UUID) -> String { "rentals.row.\(id.uuidString)" }
         static let addMenu = "rentals.addMenu"
@@ -87,6 +86,7 @@ enum A11yID {
         static let searchResult = "jobsite.searchResult"
         static let dropPin = "jobsite.dropPin"
         static let dropPinPanel = "jobsite.dropPinPanel"
+        static let dropPinEmpty = "jobsite.dropPinEmpty"
         static let panel = "jobsite.panel"
         static let name = "jobsite.name"
         static let address = "jobsite.address"

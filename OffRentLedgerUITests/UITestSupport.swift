@@ -212,6 +212,53 @@ extension XCUIApplication {
         )
     }
 
+    /// Scrolls until an element that has not been rendered yet exists, then returns it.
+    ///
+    /// A `Form` builds its rows lazily. A row below the fold is not merely off-screen — it is
+    /// **not in the accessibility tree at all**, so `expect` fails on existence eight seconds
+    /// before `tapInContent` ever gets the chance to scroll to it. That is what the daily-rate
+    /// field did: the dump showed equipment name, company, jobsite and the delivery date, and
+    /// nothing at all for `addRental.dailyRate`, because the row had never been built.
+    ///
+    /// `tapInContent` scrolls an element that already exists into a clear part of the screen.
+    /// This scrolls until it exists in the first place. The two compose: reveal, then tap.
+    @discardableResult
+    func reveal(
+        _ element: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        if element.exists { return element }
+        for _ in 0..<8 {
+            swipeUp()
+            if element.exists { return element }
+        }
+        // Back the other way, in case the form was already scrolled past it.
+        for _ in 0..<8 {
+            swipeDown()
+            if element.exists { return element }
+        }
+        XCTFail(
+            """
+            element never appeared, even after scrolling the screen end to end.
+            Identified elements on screen:
+            \(identifiedElements())
+            """,
+            file: file, line: line
+        )
+        return element
+    }
+
+    /// Reveals a lazily built row and taps it.
+    func revealAndTap(
+        _ element: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        reveal(element, file: file, line: line)
+        tapInContent(element, file: file, line: line)
+    }
+
     /// Dismisses the keyboard through the app's own Done affordance, if one is up.
     ///
     /// A decimal pad has no return key, which is why `CurrencyField` puts Done in the keyboard
@@ -332,12 +379,19 @@ extension XCUIApplication {
     /// screen and says which if it cannot find it.
     func openRental(named name: String, file: StaticString = #filePath, line: UInt = #line) {
         let list = anyElement(A11yUI.Rentals.root)
-        guard list.waitForExistence(timeout: 8) else {
-            XCTFail("the rentals list never appeared.\n\(identifiedElements())", file: file, line: line)
-            return
-        }
+        // Not a `guard` that fails. The absence of the list's own identifier is worth knowing
+        // about but is not on its own a reason to give up: the row lookup below can still find
+        // the row unscoped, and reporting "the rentals list never appeared" while the rentals
+        // list was plainly on screen is how eleven tests once named the wrong defect.
+        let scoped = list.waitForExistence(timeout: 8)
         let prefix = NSPredicate(format: "label BEGINSWITH %@", name)
-        for query in [list.buttons, list.staticTexts, list.cells] {
+        // The scoped queries first, then the unscoped one this replaced. Scoping is what
+        // keeps it off Today's upcoming-rate-change row, which carries the same equipment
+        // name — but if the scope itself is ever wrong, falling back to the lookup that was
+        // green at b3057d1 turns a silent eight-second timeout into a passing test.
+        var queries = [buttons, staticTexts]
+        if scoped { queries = [list.buttons, list.staticTexts, list.cells] + queries }
+        for query in queries {
             let row = query.matching(prefix).firstMatch
             if row.waitForExistence(timeout: 4) {
                 tapInContent(row, file: file, line: line)
@@ -350,6 +404,23 @@ extension XCUIApplication {
         )
     }
 
+    /// Whether a rental with this name is on screen — as a list row, or as the title of its own
+    /// screen.
+    ///
+    /// A rentals row is one combined accessibility element whose label is the entire row:
+    /// equipment, reference, company, status and running estimate. So `staticTexts["Mini
+    /// Excavator"]` is not what a row looks like, and a test that asserts it is asserting
+    /// something about a screen it is not on. Matched on a label prefix across both types
+    /// instead, which holds for the row and for the navigation title alike.
+    func rentalIsListed(_ name: String, timeout: TimeInterval = 10) -> Bool {
+        let prefix = NSPredicate(format: "label BEGINSWITH %@", name)
+        let row = buttons.matching(prefix).firstMatch
+        let title = staticTexts.matching(prefix).firstMatch
+        if row.exists || title.exists { return true }
+        if row.waitForExistence(timeout: timeout) { return true }
+        return title.exists
+    }
+
     /// Opens an invoice from the Audit list, addressed by the company on its row.
     ///
     /// Scoped to the Audit list for the same reason `openRental` is scoped to the rentals one:
@@ -357,12 +428,11 @@ extension XCUIApplication {
     /// tree happens to order first.
     func openInvoice(from company: String, file: StaticString = #filePath, line: UInt = #line) {
         let list = anyElement(A11yUI.Audit.root)
-        guard list.waitForExistence(timeout: 10) else {
-            XCTFail("the audit list never appeared.\n\(identifiedElements())", file: file, line: line)
-            return
-        }
+        let scoped = list.waitForExistence(timeout: 10)
         let prefix = NSPredicate(format: "label CONTAINS %@", company)
-        for query in [list.buttons, list.cells, list.staticTexts] {
+        var queries = [buttons, staticTexts]
+        if scoped { queries = [list.buttons, list.cells, list.staticTexts] + queries }
+        for query in queries {
             let row = query.matching(prefix).firstMatch
             if row.waitForExistence(timeout: 4) {
                 tapInContent(row, file: file, line: line)
@@ -403,7 +473,7 @@ extension XCUIApplication {
     /// same editor the Rentals plus menu opens, and saving comes back to the draft rather than
     /// discarding it.
     func addCompanyFromDraft(named name: String) {
-        tapInContent(expect(anyElement(A11yUI.AddRental.companyRow)))
+        revealAndTap(anyElement(A11yUI.AddRental.companyRow))
         tapWhenHittable(expect(buttons[A11yUI.Company.addNew]))
         expect(textFields[A11yUI.Company.name]).tap()
         typeText(name)
@@ -419,7 +489,9 @@ extension XCUIApplication {
 
         addCompanyFromDraft(named: company)
 
-        tapInContent(expect(textFields[A11yUI.AddRental.dailyRate]))
+        // Revealed, not merely waited for: the rate lives below the fold on this form and the
+        // row does not exist until the form scrolls to it.
+        revealAndTap(textFields[A11yUI.AddRental.dailyRate])
         typeText(dailyRate)
         dismissKeyboard()
     }

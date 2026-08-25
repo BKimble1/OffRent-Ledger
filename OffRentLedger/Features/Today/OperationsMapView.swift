@@ -260,6 +260,12 @@ struct OperationsMapView: View {
             }
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.card))
+        // `children: .contain` before the identifier. An accessibility modifier on a plain
+        // layout container is pushed down onto everything inside it, so the bare identifier put
+        // `map.searchResults` on the result row itself and the row's own `map.searchResult`
+        // was gone — the search worked, the row was on screen, and the test waited eight
+        // seconds for an element that had been renamed by its own parent.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11yID.OperationsMap.searchResults)
     }
 
@@ -393,6 +399,9 @@ struct OperationsMapView: View {
         .padding(Space.comfortable)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial)
+        // As above: without `.contain` this card's identifier lands on Open, Edit and
+        // Add a location too, and none of the three can be addressed by name.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11yID.OperationsMap.detailCard)
     }
 
@@ -411,6 +420,7 @@ struct OperationsMapView: View {
         .padding(Space.comfortable)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11yID.OperationsMap.clusterCard)
     }
 

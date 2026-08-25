@@ -44,12 +44,15 @@ final class CoreWorkflowUITests: XCTestCase {
 
         app.tapWhenHittable(app.buttons[A11yUI.AddRental.save])
 
-        XCTAssertTrue(app.staticTexts["Mini Excavator"].waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            app.rentalIsListed("Mini Excavator", timeout: 8),
+            "saving did not put the rental where the user could see it"
+        )
 
         app.relaunchKeepingStore()
         app.tab(A11yUI.Tab.rentals).tap()
         XCTAssertTrue(
-            app.staticTexts["Mini Excavator"].waitForExistence(timeout: 10),
+            app.rentalIsListed("Mini Excavator"),
             "the rental did not survive a relaunch"
         )
     }

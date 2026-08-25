@@ -52,7 +52,10 @@ struct RentalFormView: View {
         .scrollDismissesKeyboard(.interactively)
         .offRentFormBackground()
         .sheet(isPresented: $choosingCompany) {
-            CompanyPickerView(selection: $draft.companyID)
+            CompanyPickerView(
+                selection: $draft.companyID,
+                initialSearch: draft.companyID == nil ? (draft.scannedCompanyName ?? "") : ""
+            )
         }
         .sheet(isPresented: $choosingJobSite) {
             JobsitePickerView(selection: $draft.jobSiteID)

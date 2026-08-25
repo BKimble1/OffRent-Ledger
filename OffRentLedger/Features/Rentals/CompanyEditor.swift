@@ -202,6 +202,9 @@ struct CompanyEditorView: View {
 struct CompanyPickerView: View {
 
     @Binding var selection: UUID?
+    /// Seeds the search field. Set when a scan read a company name off a letterhead: the app
+    /// will not create that record on the user's behalf, but it can save them typing it.
+    var initialSearch: String = ""
     /// Called after a pick or a creation, so a rental draft can close the sheet itself.
     var onPicked: (Vendor) -> Void = { _ in }
 
@@ -260,6 +263,9 @@ struct CompanyPickerView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
+            }
+            .onAppear {
+                if search.isEmpty { search = initialSearch }
             }
             .sheet(isPresented: $creating) {
                 // Saving from here selects the new company and closes *both* sheets, so somebody

@@ -166,6 +166,10 @@ struct JobsiteMapEditor: View {
             RoundedRectangle(cornerRadius: Radius.control)
                 .strokeBorder(Palette.hairline, lineWidth: Layout.hairline)
         )
+        // The whole field takes the tap, not only the glyphs in it. Without the shape, a tap in
+        // the gap between the magnifying glass and the placeholder falls through to the map
+        // underneath, which pans instead of focusing the field.
+        .contentShape(RoundedRectangle(cornerRadius: Radius.control))
     }
 
     @ViewBuilder
@@ -273,6 +277,16 @@ struct JobsiteMapEditor: View {
                         .autocorrectionDisabled()
                 }
 
+                // §4.4 in full: a pin that arrived from a search result can still be moved.
+                // Search puts the marker on the address, and on a jobsite the address is often
+                // the gate rather than the pour — so "close, but not there" has to be fixable
+                // without starting again.
+                Button(isDroppingByHand ? "Tap the map to move the pin" : "Move the pin") {
+                    beginManualPin()
+                }
+                .buttonStyle(.offRentSecondary)
+                .accessibilityIdentifier(A11yID.Jobsite.dropPinPanel)
+
                 Button("Confirm location", action: save)
                     .buttonStyle(.offRentPrimary)
                     .disabled(!canSave)
@@ -297,7 +311,7 @@ struct JobsiteMapEditor: View {
                     beginManualPin()
                 }
                 .buttonStyle(.offRentSecondary)
-                .accessibilityIdentifier(A11yID.Jobsite.dropPinPanel)
+                .accessibilityIdentifier(A11yID.Jobsite.dropPinEmpty)
             }
         }
         .padding(.horizontal, Space.comfortable)
@@ -305,6 +319,10 @@ struct JobsiteMapEditor: View {
         .padding(.bottom, Space.snug)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial)
+        // A plain stack pushes an accessibility modifier down onto everything inside it,
+        // so without `.contain` this identifier would replace the name field's, the
+        // address field's and Confirm location's.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11yID.Jobsite.panel)
     }
 

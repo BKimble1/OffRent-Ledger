@@ -34,7 +34,6 @@ enum A11yUI {
         static let addJobSite = "rentals.addJobSite"
         static let companiesLink = "rentals.companiesLink"
         static let jobSitesLink = "rentals.jobSitesLink"
-        static let searchField = "rentals.search"
     }
 
     enum Company {
@@ -60,6 +59,7 @@ enum A11yUI {
         static let searchField = "jobsite.search"
         static let dropPin = "jobsite.dropPin"
         static let dropPinPanel = "jobsite.dropPinPanel"
+        static let dropPinEmpty = "jobsite.dropPinEmpty"
         static let panel = "jobsite.panel"
         static let name = "jobsite.name"
         static let confirm = "jobsite.confirm"

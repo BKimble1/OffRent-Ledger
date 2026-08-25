@@ -145,7 +145,12 @@ final class RentalDraft {
     func apply(scanned values: [SuggestedField: SuggestedValue]) {
         for (field, value) in values {
             switch (field, value) {
-            case let (.agreementNumber, .text(text)): agreementNumber = text
+            case let (.agreementNumber, .text(text)):
+                agreementNumber = text
+                // Opened, like the other two identifiers. A value applied into a collapsed
+                // section is a value the user cannot check, and checking is the entire point
+                // of the review screen it just came through.
+                showsMoreDetails = true
             case let (.equipmentName, .text(text)): equipmentName = text
             case let (.equipmentIdentifier, .text(text)):
                 vendorEquipmentIdentifier = text

@@ -196,6 +196,7 @@ private struct PermissionCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .offRentCard()
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11yID.Settings.remindersPermission)
     }
 

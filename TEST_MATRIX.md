@@ -71,7 +71,7 @@ could not have: that the walkthrough ends.
 
 | Check | Result |
 |---|---|
-| `python3 scripts/verify_repository.py` | ✅ 45 invariant checks, 0 problems |
+| `python3 scripts/verify_repository.py` | ✅ 47 invariant checks, 0 problems |
 | `python3 scripts/check_swift_call_sites.py` | ✅ 115 types with initialisers and 168 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
@@ -206,19 +206,59 @@ is a menu, a company that is a record rather than four text fields, a walkthroug
 | `EntitlementUITests` | 3 | ✅ green at `b3057d1`, rewritten | Free limit, Pro unlock, entitlement loss |
 | `AccessibilityUITests` | 4 | ✅ green at `b3057d1` | Tabs labelled, estimate spoken as an estimate, disclosure readable, status spoken |
 | `OnboardingUITests` | 5 | ✅ **5 passed** at `78a8a39` | **§12.16.** The whole walkthrough on Next and Finish alone; it dismisses itself; Back is absent on page one rather than dead; it is not shown twice; **and it created no rental, no company and no jobsite** |
-| `ReusableRecordsUITests` | 5 | ⛔ not yet executed | **§12.1–3.** The plus offers all three; a company made from Rentals is selectable in a draft; one made *inside* a draft returns to it selected with the draft intact; a disabled Save names the missing field; the jobsite editor is a map |
-| `MapAndEditingUITests` | 6 | ⛔ not yet executed | **§12.6–9, §12.15.** Today keeps the map with no rentals and with unplaced ones; the card opens full screen and X closes it; the legend opens; search finds the user's own machine; a rental with no coordinate says `No location set`; an edit survives a relaunch; the editor reaches company and jobsite |
-| `LayoutObstructionUITests` | 3 | ⛔ not yet executed | **§12.17.** The save bar stays above the keyboard on the longest form; Today scrolls clear of the tab bar; the map's close button and search field clear the status bar and the home indicator |
-| `InvoiceAcceptanceUITests` | 3 | ⛔ not yet executed | **§12.13–14.** A valid invoice is accepted from Audit, the counts move, and it is still accepted after a relaunch; an empty one is disabled with a specific reason and an `Edit invoice` route that opens the form; no comparison row runs past the right edge |
+| `ReusableRecordsUITests` | 5 | ✅ **5 passed** at `b671f4f` | **§12.1–3.** The plus offers all three; a company made from Rentals is selectable in a draft; one made *inside* a draft returns to it selected with the draft intact; a disabled Save names the missing field; the jobsite editor is a map |
+| `MapAndEditingUITests` | 7 | ⚠️ 3 passed, 4 failed at `b671f4f`; all four traced to the three defects below | **§12.6–9, §12.15.** Today keeps the map with no rentals and with unplaced ones; the card opens full screen and X closes it; the legend opens; search finds the user's own machine; a rental with no coordinate says `No location set`; an edit survives a relaunch; the editor reaches company and jobsite |
+| `LayoutObstructionUITests` | 3 | ✅ **3 passed** at `b671f4f` | **§12.17.** The save bar stays above the keyboard on the longest form; Today scrolls clear of the tab bar; the map's close button and search field clear the status bar and the home indicator |
+| `InvoiceAcceptanceUITests` | 3 | ⚠️ 3 failed at `b671f4f`, all on defect 1 below | **§12.13–14.** A valid invoice is accepted from Audit, the counts move, and it is still accepted after a relaunch; an empty one is disabled with a specific reason and an `Edit invoice` route that opens the form; no comparison row runs past the right edge |
 
-**33 UI test methods.** 16 have been executed and passed; the 17 in the four suites added for
-this change had never run at all until `cec8638` — the workflow names its UI suites explicitly
-with `-only-testing:`, and the new ones were not on the list. CI reported "Executed 17 tests" and
-looked exactly like a pass.
+**35 UI test methods.** The four suites added for this change had never run at all until
+`cec8638` — the workflow names its UI suites explicitly with `-only-testing:`, and the new ones
+were not on the list. CI reported "Executed 17 tests" and looked exactly like a pass.
 
 `verify_repository.py` now fails if a `XCTestCase` subclass in the UI target is not named in
 that step, and if the step names one that does not exist. Both directions were proved by breaking
 them.
+
+### What run 32810021653 (`b671f4f`) actually found
+
+35 executed, 1 skipped, **13 failures — and every one of the thirteen came from three defects**,
+none of which was in the feature the failing test was named after. The accessibility-tree dump
+each failure prints is what made them separable; without it the same thirteen read as thirteen
+unrelated timeouts.
+
+1. **`rentals.root` was not in the tree at all.** `RentalsView` put it on its `List` and then put
+   `rentals.search` on the `.searchable` below it. `.accessibilityIdentifier` sets one property
+   on one element, so the second call replaced the first: the dump shows
+   `CollectionView, identifier: 'rentals.search'` and no `rentals.root` anywhere. Eleven tests
+   waited eight seconds for it and reported "the rentals list never appeared" while the rentals
+   list was plainly on screen. The `.searchable` field needs no identifier — XCUITest addresses
+   it as `app.searchFields` — so the duplicate is gone, and
+   `check_one_identifier_per_modifier_chain` now fails the build on a second identifier in one
+   modifier chain.
+
+2. **A stack that names itself renames its children.** An accessibility modifier on a plain
+   `VStack`/`HStack`/`ZStack` is pushed down onto everything inside it. The operations map's
+   result list carried `map.searchResults`, so the row inside it lost `map.searchResult` — the
+   dump shows the row present, correct and renamed:
+   `Button, identifier: 'map.searchResults', label: 'Rental, Skid Steer Loader, Active, at
+   Ridgeline Phase 2, No location set'`. The detail card was about to do the same to `Open`,
+   `Edit` and `Add a location`. `.accessibilityElement(children: .contain)` before the identifier
+   is the fix — the same one the welcome screen had already needed — and
+   `check_container_identifiers_do_not_shadow_children` now requires it. `List`, `Form`,
+   `ScrollView` and `Group` are exempt on evidence, not assumption: CI dumps show their children
+   keeping their own identifiers.
+
+3. **A `Form` row below the fold is not in the accessibility tree at all.** Not off screen —
+   absent, because the row has never been built. `expect` on `addRental.dailyRate` therefore
+   failed on existence eight seconds before `tapInContent` could have scrolled to it. The dump
+   proves the rest of the form was there and Save was enabled. `reveal(_:)` scrolls until the
+   element exists; `revealAndTap` then hands off to `tapInContent`.
+
+Two test-side defects came out of the same reading. A rentals row is one combined accessibility
+element whose label is the whole row, so `staticTexts["Mini Excavator"]` is not what a row looks
+like — and `XCTAssertFalse(app.staticTexts["Skid Steer Loader 75HP Closed Cab"].exists)` in
+`MismatchUITests` was therefore passing whether or not the scan had written a rental. Both now go
+through `rentalIsListed(_:)`, which matches a label prefix across buttons and static texts.
 
 **What the UI suite still cannot cover, and why:**
 

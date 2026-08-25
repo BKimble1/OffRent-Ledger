@@ -73,10 +73,14 @@ struct RentalsView: View {
             if !items.isEmpty { filterBar }
         }
         .navigationTitle("Rentals")
+        // No identifier on this chain. `.accessibilityIdentifier` sets one property on one
+        // element, so a second call on the same view *replaces* the first — and this List
+        // already carries `rentals.root` four lines up. The search identifier was silently
+        // taking the root's place, `rentals.root` was absent from the tree entirely, and every
+        // test that waits for the rentals list failed eight seconds later naming nothing.
+        // `.searchable` builds a real UISearchField, which XCUITest addresses as
+        // `app.searchFields` without help.
         .searchable(text: $search, prompt: "Equipment, company, jobsite, ID or PO")
-        // The identifier goes on the searchable container: `.searchable` builds the field
-        // itself, so there is no view for the test to address without this.
-        .accessibilityIdentifier(A11yID.Rentals.searchField)
         .offRentNavigationDestinations()
         .toolbar {
             ToolbarItem(placement: .primaryAction) { addMenu }

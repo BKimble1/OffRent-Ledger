@@ -120,8 +120,11 @@ final class MismatchUITests: XCTestCase {
         app.buttons[A11yUI.AddRental.cancel].tap()
 
         app.tab(A11yUI.Tab.rentals).tap()
+        // Matched the way a row actually reads. `staticTexts[...]` for a machine name can never
+        // be true on this list — a row is one combined element — so the old assertion passed
+        // whether the scan had written a rental or not, which is no assertion at all.
         XCTAssertFalse(
-            app.staticTexts["Skid Steer Loader 75HP Closed Cab"].exists,
+            app.rentalIsListed("Skid Steer Loader 75HP Closed Cab", timeout: 3),
             "cancelling a scan review must write nothing"
         )
     }
