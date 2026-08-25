@@ -969,6 +969,87 @@ def check_container_identifiers_do_not_shadow_children() -> None:
                     )
 
 
+def check_identifiers_are_set_before_insets() -> None:
+    check("A screen names itself before it grows a bar")
+    # `.safeAreaInset` and `.overlay` add a whole subtree beside the view they are applied to.
+    # An accessibility identifier applied *over* that composition is pushed down into the added
+    # subtree too — so a screen root set outside a sticky action bar renames the bar's buttons.
+    #
+    # `EditRentalView` put `editRental.root` on a `Group` wrapping the form and its save bar. The
+    # dump read `Button, identifier: 'editRental.root', label: 'Save changes'`, and the test
+    # waited eight seconds for a button that was on screen, enabled, and renamed by its own
+    # ancestor. `AddRentalView` had the identifier before its inset all along and was fine.
+    #
+    # The rule is about *depth*, not order within one chain: an identifier at the top level of a
+    # declaration whose inset lives deeper is an identifier applied over that inset. Two
+    # modifiers side by side in one chain are fine, because the one written first applies first.
+    # Gated on the root expression, the same way the shadowing check is. `NavigationStack`,
+    # `ScrollView`, `List`, `Form` and `Button` are backed by things that own an accessibility
+    # element, and an identifier set on one of those stays on it: `OperationsMapView` has
+    # `map.root` on a `NavigationStack` over a `safeAreaInset`, and CI resolved `map.openRecord`,
+    # `map.editRecord` and `map.addLocation` inside that inset in the same run. A plain stack or
+    # a `Group` owns nothing, so the identifier goes to whatever it wraps — inset included.
+    roots = ("VStack", "HStack", "ZStack", "Group")
+    insets = (".safeAreaInset(", ".overlay(")
+    declaration = re.compile(
+        r"^\s*(?:@\w+\s+)*(?:private |internal |public |fileprivate )?(?:static )?(?:var|func)\s+(\w+)"
+    )
+
+    for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
+        lines = path.read_text().splitlines()
+        depth = 0
+        in_multiline_string = False
+        open_declarations: list[list] = []
+
+        for index, raw in enumerate(lines):
+            stripped = raw.strip()
+            if in_multiline_string:
+                if '"""' in stripped:
+                    in_multiline_string = False
+                continue
+            if stripped.count('"""') % 2 == 1:
+                in_multiline_string = True
+                continue
+
+            code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', raw).split("//", 1)[0]
+            opens = code.count("{")
+            closes = code.count("}")
+            before = depth
+
+            match = declaration.match(raw)
+            if match and "some View" in raw and opens:
+                # name, base depth, root expression, identifier lines, inset lines, `.contain`
+                open_declarations.append([match.group(1), before, None, [], [], False])
+
+            if open_declarations:
+                current = open_declarations[-1]
+                relative = before - current[1]
+                if current[2] is None and relative == 1 and stripped and not stripped.startswith("//"):
+                    current[2] = stripped
+                if ".accessibilityIdentifier(" in raw and relative == 1:
+                    current[3].append(index + 1)
+                if any(token in raw for token in insets) and relative > 1:
+                    current[4].append(index + 1)
+                if ".accessibilityElement(children: .contain)" in raw and relative == 1:
+                    current[5] = True
+
+            depth += opens - closes
+            while open_declarations and depth <= open_declarations[-1][1]:
+                name, base, root, identifiers, nested_insets, contained = open_declarations.pop()
+                if contained or not identifiers or not nested_insets:
+                    continue
+                if not root or not root.startswith(roots):
+                    continue
+                fail(
+                    "a11y-over-inset",
+                    f"{path.relative_to(ROOT)} «{name}» sets an accessibility identifier at line "
+                    f"{identifiers[0]} over a view that grows an inset at line "
+                    f"{nested_insets[0]}, so the identifier lands on the inset's contents too. "
+                    "Set it on the inner view before the inset, or add "
+                    ".accessibilityElement(children: .contain).",
+                )
+
+
 def check_ui_test_identifiers_match() -> None:
     check("The UI suite's identifier copy matches the app's")
     # The UI test target drives the app as a black box and cannot @testable import it, so it
@@ -1451,6 +1532,7 @@ def main() -> int:
         check_ui_test_identifiers_match,
         check_one_identifier_per_modifier_chain,
         check_container_identifiers_do_not_shadow_children,
+        check_identifiers_are_set_before_insets,
         check_no_colour_only_status,
         check_generated_project_is_current,
         check_website_is_generated,

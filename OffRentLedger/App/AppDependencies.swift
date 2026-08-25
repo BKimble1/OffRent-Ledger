@@ -126,7 +126,6 @@ final class AppDependencies {
         var stubTextRecogniser = false
         var fixedNow: Date?
 
-        var wantsSeeding: Bool { seedWalkthrough || seedFreeLimit }
     }
 
     /// Reads the UI test launch arguments.

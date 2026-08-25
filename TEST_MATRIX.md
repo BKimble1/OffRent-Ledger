@@ -71,7 +71,7 @@ could not have: that the walkthrough ends.
 
 | Check | Result |
 |---|---|
-| `python3 scripts/verify_repository.py` | ✅ 47 invariant checks, 0 problems |
+| `python3 scripts/verify_repository.py` | ✅ 48 invariant checks, 0 problems |
 | `python3 scripts/check_swift_call_sites.py` | ✅ 115 types with initialisers and 168 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
@@ -259,6 +259,34 @@ element whose label is the whole row, so `staticTexts["Mini Excavator"]` is not 
 like — and `XCTAssertFalse(app.staticTexts["Skid Steer Loader 75HP Closed Cab"].exists)` in
 `MismatchUITests` was therefore passing whether or not the scan had written a rental. Both now go
 through `rentalIsListed(_:)`, which matches a label prefix across buttons and static texts.
+
+### Run 32815452222 (`1f06d56`): 13 failures down to 3
+
+Everything before the UI step was green — 48 invariants, 323 domain tests, generated artefacts, a
+simulator build of app and widget, and the unit tests. The three that remained were three more
+defects, and again the app was right about two of them.
+
+1. **`editRental.root` renamed the Save button.** The same broadcast as before, in a shape the
+   first check could not see: the identifier sat on a `Group` wrapping the form *and* its
+   `safeAreaInset`, and an accessibility modifier applied over an inset is pushed into the
+   inset's contents. The dump reads `Button, identifier: 'editRental.root', label: 'Save
+   changes'` — the button was on screen, enabled, and renamed by its own ancestor.
+   `AddRentalView` had the identifier before its inset all along and was fine; `EditRentalView`
+   matches it now, and `check_identifiers_are_set_before_insets` fails the build on the shape.
+   Gated on the root expression, because `NavigationStack` over an inset is *not* affected —
+   `map.openRecord`, `map.editRecord` and `map.addLocation` all resolved inside one in this very
+   run.
+
+2. **A `Form` row that has scrolled off is as absent as one that never scrolled on.** `reveal`
+   fixed the daily-rate field by scrolling down to it — and left the form there, so the next
+   line's `.value` read on the equipment name threw a snapshot error rather than returning nil.
+   `reveal` takes a direction now, and that assertion says which way to look.
+
+3. **`-offrent-reset-state` reset nothing.** It was a permission to seed, not a wipe, so on the
+   on-disk store every scenario inherited the last one's data. Latent until
+   `InvoiceAcceptanceUITests` began passing: it drives the fixture rental to Resolved and leaves
+   it there, and `MismatchUITests` then opened that rental and found `Reopen` where `Mark as
+   done` should have been. See R22.
 
 **What the UI suite still cannot cover, and why:**
 

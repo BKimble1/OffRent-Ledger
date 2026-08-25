@@ -139,10 +139,14 @@ struct RootView: View {
     private func seedIfRequested() {
         #if DEBUG
         let overrides = AppDependencies.testOverrides()
-        guard overrides.wantsSeeding else { return }
-        // Only ever into a store the test asked to be fresh, so a seed cannot land on top of a
-        // real user's rentals.
+        // Only ever a store the test asked to be fresh, so neither the wipe nor the seed can
+        // land on a real user's rentals.
         guard overrides.useInMemoryStore || overrides.resetState else { return }
+        // The wipe happens whether or not a fixture follows, because a scenario that asks for a
+        // fresh store and seeds nothing is asking to start from nothing. Before this,
+        // `-offrent-reset-state` deleted precisely nothing, and every on-disk scenario inherited
+        // whatever the last one left behind.
+        if overrides.resetState { SeedFixtures.wipe(context: context) }
         if overrides.seedWalkthrough || overrides.seedFreeLimit {
             SeedFixtures.seedWalkthrough(context: context, clock: dependencies.clock)
             try? context.save()

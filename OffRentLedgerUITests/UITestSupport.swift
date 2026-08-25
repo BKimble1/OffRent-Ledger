@@ -222,20 +222,28 @@ extension XCUIApplication {
     ///
     /// `tapInContent` scrolls an element that already exists into a clear part of the screen.
     /// This scrolls until it exists in the first place. The two compose: reveal, then tap.
+    /// Which way to look first. A row that has never been built is below; one the form has
+    /// already scrolled past is above. Both directions are tried either way — this only says
+    /// which to spend the first few swipes on, which is eight seconds on the common path.
+    enum RevealDirection { case below, above }
+
     @discardableResult
     func reveal(
         _ element: XCUIElement,
+        searching direction: RevealDirection = .below,
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> XCUIElement {
         if element.exists { return element }
+        let first = direction == .below ? { self.swipeUp() } : { self.swipeDown() }
+        let second = direction == .below ? { self.swipeDown() } : { self.swipeUp() }
         for _ in 0..<8 {
-            swipeUp()
+            first()
             if element.exists { return element }
         }
-        // Back the other way, in case the form was already scrolled past it.
-        for _ in 0..<8 {
-            swipeDown()
+        // The other way, far enough to cross back over the whole screen and past it.
+        for _ in 0..<12 {
+            second()
             if element.exists { return element }
         }
         XCTFail(

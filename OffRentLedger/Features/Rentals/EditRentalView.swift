@@ -47,7 +47,17 @@ struct EditRentalView: View {
     var body: some View {
         Group {
             if item != nil {
+                // The identifier goes on the form, *before* the inset — the same order
+                // `AddRentalView` uses, and for a reason CI showed rather than argued.
+                //
+                // It used to sit on this `Group`, which wraps the form and the save bar
+                // together. An accessibility modifier applied over a `safeAreaInset` is pushed
+                // down into the inset's contents, so `editRental.root` landed on the Save button
+                // as well and replaced `editRental.save`. The dump is unambiguous:
+                // `Button, identifier: 'editRental.root', label: 'Save changes'`. The test
+                // waited eight seconds for a button that was on screen, enabled, and renamed.
                 RentalFormView(draft: draft, showsCapture: false)
+                    .accessibilityIdentifier(A11yID.EditRental.root)
                     .safeAreaInset(edge: .bottom) { saveBar }
             } else {
                 EmptyStateView(
@@ -55,9 +65,9 @@ struct EditRentalView: View {
                     title: "That rental is gone",
                     message: "It was deleted, or the backup it came from no longer has it."
                 )
+                .accessibilityIdentifier(A11yID.EditRental.root)
             }
         }
-        .accessibilityIdentifier(A11yID.EditRental.root)
         .navigationTitle("Edit rental")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: load)

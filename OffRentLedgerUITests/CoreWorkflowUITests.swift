@@ -37,8 +37,13 @@ final class CoreWorkflowUITests: XCTestCase {
         app.fillMinimalRental(
             equipment: "Mini Excavator", company: "Timberline Machinery", dailyRate: "410.00"
         )
+        // Revealed before it is read. Filling the rate scrolled the form down to reach it, and
+        // a `Form` row that has scrolled *off* is gone from the accessibility tree exactly as
+        // surely as one that has never scrolled *on* — reading `.value` on it throws a snapshot
+        // error rather than returning nil, so the failure named the wrong thing entirely.
         XCTAssertEqual(
-            app.textFields[A11yUI.AddRental.equipmentName].value as? String, "Mini Excavator",
+            app.reveal(app.textFields[A11yUI.AddRental.equipmentName], searching: .above).value as? String,
+            "Mini Excavator",
             "creating a company from inside the draft discarded what was already typed"
         )
 

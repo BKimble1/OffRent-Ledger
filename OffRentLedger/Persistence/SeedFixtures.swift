@@ -26,6 +26,29 @@ enum SeedFixtures {
         return calendar.date(from: components) ?? Date(timeIntervalSince1970: 1_777_000_000)
     }
 
+    /// Empties the store, so `-offrent-reset-state` means what its name says.
+    ///
+    /// It did not. The flag was only a *permission* to seed — nothing was ever deleted — and on
+    /// the on-disk store that made every scenario depend on which one ran before it. The suite
+    /// got away with it until `InvoiceAcceptanceUITests` started passing: that scenario drives
+    /// the fixture rental all the way to Resolved and leaves it there, so the next class to ask
+    /// for a fresh store opened the rental and found `Reopen` where `Mark as done` should have
+    /// been. The failure named a screen the test had never touched.
+    ///
+    /// DEBUG only, like every other test hook, and reached only from a launch that asked for it.
+    @MainActor
+    static func wipe(context: ModelContext) {
+        // Deleted in dependency order — items before the agreements they hang off — so a
+        // nullify rule never has to reach a record that has already gone.
+        for item in (try? context.fetch(StoreQueries.allItems())) ?? [] { context.delete(item) }
+        for invoice in (try? context.fetch(StoreQueries.allInvoices())) ?? [] { context.delete(invoice) }
+        for agreement in (try? context.fetch(StoreQueries.allAgreements())) ?? [] { context.delete(agreement) }
+        for site in (try? context.fetch(StoreQueries.allJobSites())) ?? [] { context.delete(site) }
+        for vendor in (try? context.fetch(StoreQueries.allVendors())) ?? [] { context.delete(vendor) }
+        for asset in (try? context.fetch(StoreQueries.allAssets())) ?? [] { context.delete(asset) }
+        try? context.save()
+    }
+
     @MainActor
     @discardableResult
     static func seedWalkthrough(context: ModelContext, clock: any Clock) -> RentalItem {
