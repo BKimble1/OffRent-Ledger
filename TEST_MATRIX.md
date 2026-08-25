@@ -260,6 +260,30 @@ like — and `XCTAssertFalse(app.staticTexts["Skid Steer Loader 75HP Closed Cab"
 `MismatchUITests` was therefore passing whether or not the scan had written a rental. Both now go
 through `rentalIsListed(_:)`, which matches a label prefix across buttons and static texts.
 
+### Run 32818776967 (`fd4b5d5`): green
+
+`** TEST SUCCEEDED **`. 35 UI tests executed, **0 failures**, 1 skipped — and the skip is the
+honest kind: `testScanReviewNeverSavesWithoutConfirmation` calls `XCTSkipUnless` because there is
+no document camera on a simulator, and the log records the reason. What that test would have
+covered at the parser is pinned in the domain suite instead.
+
+| Suite | Tests | Result |
+|---|---:|---|
+| `CoreWorkflowUITests` | 2 | ✅ |
+| `MismatchUITests` | 2 | ✅ 1 passed, 1 skipped (no camera) |
+| `EntitlementUITests` | 4 | ✅ |
+| `AccessibilityUITests` | 4 | ✅ |
+| `OnboardingUITests` | 5 | ✅ |
+| `ReusableRecordsUITests` | 5 | ✅ |
+| `MapAndEditingUITests` | 7 | ✅ |
+| `LayoutObstructionUITests` | 3 | ✅ |
+| `InvoiceAcceptanceUITests` | 3 | ✅ |
+
+Everything before it green too: 48 invariants, 323 domain tests, generated artefacts, a simulator
+build of app and widget, and the unit tests. **Build 8 was archived and uploaded from this exact
+commit** — TestFlight run 32821423420, `UPLOAD SUCCEEDED with no errors`, delivery UUID
+`5d3c3df5-5760-46e1-b1bb-4f099da7ce92`.
+
 ### Run 32815452222 (`1f06d56`): 13 failures down to 3
 
 Everything before the UI step was green — 48 invariants, 323 domain tests, generated artefacts, a
