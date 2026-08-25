@@ -77,14 +77,6 @@ struct InvoiceReviewView: View {
         .navigationTitle(invoice?.invoiceNumber ?? "Invoice")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingFollowUp) { followUpSheet }
-        .alert(
-            "Cannot resolve yet",
-            isPresented: Binding(get: { rejection != nil }, set: { if !$0 { rejection = nil } })
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(rejection?.message ?? "")
-        }
         .onAppear {
             // Opening the review is what moves an invoice out of "not reviewed". It is a state
             // change the user caused, so it is recorded rather than inferred later.
@@ -331,6 +323,24 @@ struct InvoiceReviewView: View {
             Button("Accept this invoice") { acceptInvoice() }
                 .buttonStyle(.offRentPrimary)
                 .accessibilityIdentifier(A11yID.Audit.resolveInvoice)
+        }
+        // The refusal alert lives on the control that raises it, not on the scroll view.
+        //
+        // It used to sit beside `.sheet(isPresented:)` on the same view, and the two fought:
+        // after the alert had been shown and dismissed once, setting `showingFollowUp` did
+        // nothing at all — the button was tapped, the action ran, and no sheet appeared. Twice in
+        // a row, on a simulator, with two and a half seconds between the two taps.
+        //
+        // Which is worse than a test failure. A user refused an accept, told to record a
+        // follow-up instead, then tapping "Record a follow-up" and getting nothing, is a dead
+        // end in the one workflow this screen exists for.
+        .alert(
+            "Cannot resolve yet",
+            isPresented: Binding(get: { rejection != nil }, set: { if !$0 { rejection = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(rejection?.message ?? "")
         }
     }
 

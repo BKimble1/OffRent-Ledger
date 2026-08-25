@@ -59,6 +59,10 @@ final class MismatchUITests: XCTestCase {
         app.tapWhenHittable(app.buttons[A11yUI.Audit.resolveInvoice])
         XCTAssertTrue(app.alerts.element.waitForExistence(timeout: 5))
         app.alerts.buttons["OK"].tap()
+        XCTAssertTrue(
+            app.alerts.element.waitForNonExistence(timeout: 5),
+            "the refusal alert must actually go away before anything else is tapped"
+        )
 
         // Under the Accept bar and the tab bar at this scroll position, so tapping its centre
         // hits the tab bar. Scroll it clear first.
