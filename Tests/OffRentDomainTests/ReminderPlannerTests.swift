@@ -315,6 +315,32 @@ final class ReminderPlannerTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - What iOS will actually hold
+
+    func testThePlanNeverExceedsWhatIOSWillHold() {
+        // iOS keeps 64 pending local notification requests per app and silently discards the
+        // rest. Pro is sold on unlimited open rentals and each open rental can carry several
+        // reminders, so past roughly a dozen rentals the app was asking for more than the system
+        // would keep — and which ones survived was whatever order they happened to be built in.
+        let many = (0..<80).map { _ in context(status: .contactVendor, markedDoneAt: now) }
+        let planned = plan(many)
+        XCTAssertLessThanOrEqual(planned.count, ReminderPlanner.scheduleBudget)
+        XCTAssertLessThan(
+            ReminderPlanner.scheduleBudget, 64,
+            "the system's own limit, with headroom for the test reminder"
+        )
+    }
+
+    func testWhatSurvivesTheCapIsWhatIsDueSoonest() {
+        // A reminder three weeks out matters less than one tomorrow, and by the time the far one
+        // is due the near ones will have fired and freed their slots.
+        let many = (0..<80).map { _ in context(status: .contactVendor, markedDoneAt: now) }
+        let planned = plan(many)
+        let dates = planned.map(\.fireDate)
+        XCTAssertEqual(dates, dates.sorted(), "the cap keeps the soonest, so the order must hold")
+    }
+
 }
 
 final class DeepLinkTests: XCTestCase {

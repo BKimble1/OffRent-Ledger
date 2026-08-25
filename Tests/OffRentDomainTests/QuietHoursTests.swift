@@ -62,7 +62,12 @@ final class QuietHoursTests: XCTestCase {
             now: date("2026-05-09T10:00:00Z"),
             calendar: calendar
         )
-        XCTAssertEqual(moved, date("2026-05-09T21:00:00Z"))
+        // 20:59, not 21:00. The window *starts* at 9pm and `isQuiet(hour:)` reports 21 as
+        // quiet, so returning the instant it opens put the notification inside the very window
+        // it was moved to avoid. This expectation used to be 21:00:00 and was asserting the
+        // defect. Just before is the right side to land on: the user asked not to be disturbed
+        // during those hours, not to be told later than necessary.
+        XCTAssertEqual(moved, date("2026-05-09T20:59:00Z"))
     }
 
     /// The case the direction was chosen for: 3am on the 10th belongs to the window that opened
@@ -74,7 +79,7 @@ final class QuietHoursTests: XCTestCase {
             now: date("2026-05-09T10:00:00Z"),
             calendar: calendar
         )
-        XCTAssertEqual(moved, date("2026-05-09T21:00:00Z"))
+        XCTAssertEqual(moved, date("2026-05-09T20:59:00Z"))
     }
 
     /// When the window already opened, moving earlier would mean scheduling in the past. Then
@@ -167,5 +172,24 @@ final class QuietHoursTests: XCTestCase {
         original.quietHoursEnabled = false
         let data = try JSONEncoder().encode(original)
         XCTAssertEqual(try JSONDecoder().decode(ReminderSettings.self, from: data), original)
+    }
+
+    func testTheMovedTimeIsNeverItselfQuiet() {
+        // The property the two expectations above are instances of, asserted directly: whatever
+        // this function returns, `isQuiet` must not call it quiet. That is the whole contract,
+        // and it was false for every reminder planned earlier in the day than it was due.
+        let configured = settings()
+        let calendar = self.calendar
+        for hour in 0..<24 {
+            let due = date(String(format: "2026-05-09T%02d:30:00Z", hour))
+            let moved = ReminderPlanner.respectingQuietHours(
+                due, settings: configured, now: date("2026-05-09T09:00:00Z"), calendar: calendar
+            )
+            let movedHour = calendar.component(.hour, from: moved)
+            XCTAssertFalse(
+                configured.isQuiet(hour: movedHour),
+                "a reminder due at \(hour):30 was moved to \(movedHour):xx, which is quiet"
+            )
+        }
     }
 }

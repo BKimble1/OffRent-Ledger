@@ -261,10 +261,28 @@ enum ReminderPlanner {
         }
 
         // Stable ordering keeps the diff against pending notifications deterministic.
-        return planned.sorted { lhs, rhs in
+        let ordered = planned.sorted { lhs, rhs in
             lhs.fireDate == rhs.fireDate ? lhs.id < rhs.id : lhs.fireDate < rhs.fireDate
         }
+
+        // iOS holds at most 64 pending local notification requests per app and discards the
+        // rest without telling anyone. Pro is sold on "unlimited open rentals", and each open
+        // rental can carry several reminders — so past roughly a dozen the app was quietly
+        // asking for more than the system would keep, and which ones survived was whatever order
+        // they happened to be submitted in.
+        //
+        // Soonest first, which the sort above already gives: a reminder three weeks out matters
+        // less than one tomorrow, and by the time the far one is due the near ones will have
+        // fired and freed their slots. The budget leaves headroom for the test reminder the
+        // Reminders screen can schedule.
+        return Array(ordered.prefix(scheduleBudget))
     }
+
+    /// How many reminders the app will ask iOS to hold at once.
+    ///
+    /// Four below the system's 64 so that a test reminder, and anything iOS is holding on the
+    /// app's behalf, still fits.
+    static let scheduleBudget = 60
 
     // MARK: - Per kind
 
@@ -412,9 +430,20 @@ enum ReminderPlanner {
         let endDay = endsTomorrow
             ? calendar.addingDaysPreservingTimeOfDay(1, to: date) : date
 
+        // One minute before the window opens, not the instant it opens.
+        //
+        // `at(hour:)` returns 21:00:00 for a quiet period starting at 9 PM, and `isQuiet(hour:)`
+        // reports 21 as quiet — so this branch used to hand back a time inside the very window it
+        // was avoiding, and a rate-rollover notification arrived at nine o'clock on the dot. It
+        // only showed up when the plan was computed earlier in the day than the reminder was due,
+        // which is most of the time.
+        //
+        // Just before the window is the right answer rather than after it: the user asked not to
+        // be disturbed during those hours, not to be told later than necessary.
         if let windowOpens = at(hour: settings.quietHoursStart, on: startDay, calendar: calendar),
-           windowOpens > now {
-            return windowOpens
+           let justBefore = calendar.date(byAdding: .minute, value: -1, to: windowOpens),
+           justBefore > now {
+            return justBefore
         }
         return at(hour: settings.quietHoursEnd, on: endDay, calendar: calendar) ?? date
     }
