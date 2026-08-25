@@ -20,6 +20,10 @@ on:
         description: 'How many recent builds to report. Default 5.'
         required: false
         type: string
+      expect:
+        description: 'A build number that should be there. Reports "not yet" rather than failing.'
+        required: false
+        type: string
 
 env:
   BUNDLE_ID: com.idlery.offrent
@@ -69,6 +73,7 @@ jobs:
           KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
           ISSUER_ID: ${{ secrets.ASC_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID }}
           LIMIT: ${{ inputs.limit }}
+          EXPECT: ${{ inputs.expect }}
         run: |
           python3 - <<'PY'
           import os, sys, time
@@ -78,6 +83,7 @@ jobs:
           issuer = os.environ["ISSUER_ID"].strip()
           bundle = os.environ["BUNDLE_ID"].strip()
           limit = int(os.environ.get("LIMIT") or 5)
+          expect = (os.environ.get("EXPECT") or "").strip()
 
           with open(os.path.join(os.environ["RUNNER_TEMP"], "asc", "key.p8")) as handle:
               private_key = handle.read()
@@ -170,6 +176,16 @@ jobs:
 
           highest = max(rows, key=number_of)
           latest = max(rows, key=lambda b: b["attributes"].get("uploadedDate") or "")
+
+          # A build takes a few minutes to appear at all after `altool` returns. Asked to look for
+          # a specific number, say plainly that it has not arrived yet — the alternative is
+          # reporting the *previous* state as a mismatch and sending somebody to re-upload a build
+          # that is already on its way in.
+          if expect and not any(str(b["attributes"].get("version")).strip() == expect for b in rows):
+              print(f"Build {expect} is not in App Store Connect yet.")
+              print("Apple takes a few minutes to ingest an upload before the build record exists.")
+              print("Re-run this workflow shortly. Nothing below reflects it.")
+              sys.exit(0)
 
           state = highest["attributes"].get("processingState")
           print(f"Highest build number: {highest['attributes'].get('version')} "
