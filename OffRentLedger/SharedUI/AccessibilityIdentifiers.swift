@@ -130,6 +130,7 @@ enum A11yID {
     enum ItemDetail {
         static let root = "itemDetail.root"
         static let edit = "itemDetail.edit"
+        static let delete = "itemDetail.delete"
         static let status = "itemDetail.status"
         static let estimate = "itemDetail.estimate"
         static let markDone = "itemDetail.markDone"

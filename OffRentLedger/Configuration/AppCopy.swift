@@ -129,4 +129,13 @@ enum AppCopy {
         unsure about still stops for you to check, and nothing is saved until you tap Save on \
         the rental.
         """
+
+    /// The footer under "Delete this rental".
+    ///
+    /// Says what deleting does *not* do, because on this app that is the load-bearing half:
+    /// removing your own record is not an act at the rental yard, and §1.1 forbids implying it.
+    static let deleteRentalExplanation = """
+        Removes it from this iPhone completely. The rental company is not told anything, and \
+        nothing about your agreement with them changes.
+        """
 }

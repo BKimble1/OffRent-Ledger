@@ -21,6 +21,7 @@ struct RentalItemDetailView: View {
     @State private var reopenReason = ""
     @State private var reopenTarget: RentalItemStatus = .invoiceReview
     @State private var showingExport = false
+    @State private var confirmingDelete = false
 
     init(itemID: UUID) {
         self.itemID = itemID
@@ -95,8 +96,19 @@ struct RentalItemDetailView: View {
             timelineSection(item)
             evidenceSection(item)
             utilitySection(item)
+            deleteSection(item)
         }
         .listStyle(.insetGrouped)
+        .confirmationDialog(
+            "Delete this rental?",
+            isPresented: $confirmingDelete,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) { delete(item) }
+            Button("Keep", role: .cancel) {}
+        } message: {
+            Text(deletionMessage(item))
+        }
         .offRentFormBackground()
     }
 
@@ -238,6 +250,69 @@ struct RentalItemDetailView: View {
     }
 
     // MARK: - Sections
+
+    /// The way out of a rental you should not have created.
+    ///
+    /// There was none. From `.active` the only allowed transition is `.contactVendor`, so
+    /// removing a rental meant walking the whole workflow — affirming you had telephoned a yard,
+    /// recording a confirmation number, a pickup and an invoice — for a machine that was never on
+    /// site. On the free tier that made one mistaken rental permanent: the open-item limit was
+    /// reached, nothing could clear it, and no second rental could ever be created. It is also
+    /// the first wall anyone evaluating the app runs into.
+    ///
+    /// Deliberately here rather than as a swipe on the Rentals list. A swipe is a gesture people
+    /// make by accident while scrolling, and this cascades to the timeline and the photographs.
+    private func deleteSection(_ item: RentalItem) -> some View {
+        Section {
+            Button("Delete this rental", role: .destructive) { confirmingDelete = true }
+                .accessibilityIdentifier(A11yID.ItemDetail.delete)
+        } footer: {
+            Text(AppCopy.deleteRentalExplanation)
+        }
+    }
+
+    /// Counts what goes, rather than warning in the abstract.
+    private func deletionMessage(_ item: RentalItem) -> String {
+        let events = (item.events ?? []).count
+        let invoices = (item.agreement?.invoices ?? []).count
+        let photographs = (item.agreement?.assets ?? []).count
+        var parts: [String] = []
+        if events > 0 { parts.append("\(events) timeline \(events == 1 ? "entry" : "entries")") }
+        if invoices > 0 { parts.append("\(invoices) invoice\(invoices == 1 ? "" : "s")") }
+        if photographs > 0 {
+            parts.append("\(photographs) photograph\(photographs == 1 ? "" : "s")")
+        }
+        guard !parts.isEmpty else {
+            return "\(item.equipmentName) has nothing else filed under it. This cannot be undone."
+        }
+        let listed = parts.count == 1
+            ? parts[0]
+            : parts.dropLast().joined(separator: ", ") + " and " + (parts.last ?? "")
+        return "This also deletes \(listed), and everything they record. This cannot be undone."
+    }
+
+    private func delete(_ item: RentalItem) {
+        // The agreement goes only when nothing else is on it. One piece of paper can carry two
+        // machines, and deleting the excavator must not take the compactor's contract with it.
+        let agreement = item.agreement
+        let identifier = item.id
+        context.delete(item)
+        if let agreement, (agreement.items ?? []).allSatisfy({ $0.id == identifier }) {
+            context.delete(agreement)
+        }
+        try? context.save()
+        dependencies.derivedStateNeedsRefresh()
+        // The photographs and scanned pages are files, and the records that pointed at them have
+        // gone. Without this they stay on disk forever — counted by the storage figure on the
+        // privacy screen, and reachable from nothing.
+        Task {
+            let service = ExportService(
+                context: context, clock: dependencies.clock, fileStore: dependencies.fileStore
+            )
+            _ = try? await service.reconcileEvidenceFiles()
+        }
+        router.rentalsPath = NavigationPath()
+    }
 
     private func contactVendorSection(_ item: RentalItem) -> some View {
         Section {
