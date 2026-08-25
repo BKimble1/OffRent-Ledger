@@ -4,6 +4,12 @@ import Foundation
 enum SuggestedField: String, CaseIterable, Codable, Sendable {
     case vendorName
     case agreementNumber
+    /// The contractor's own purchase-order or job number, printed on the vendor's paperwork.
+    ///
+    /// The agreement has carried this since schema V3 and the rental form has always offered it,
+    /// but until now nothing could read it off a document — so the one identifier a contractor's
+    /// accounts department actually files by was the one field they always typed twice.
+    case purchaseOrderNumber
     case equipmentName
     case equipmentIdentifier
     case serialNumber
@@ -28,6 +34,7 @@ enum SuggestedField: String, CaseIterable, Codable, Sendable {
         switch self {
         case .vendorName: "Rental company"
         case .agreementNumber: "Agreement number"
+        case .purchaseOrderNumber: "PO number"
         case .equipmentName: "Equipment"
         case .equipmentIdentifier: "Vendor equipment ID"
         case .serialNumber: "Serial number"

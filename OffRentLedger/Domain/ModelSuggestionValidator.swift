@@ -113,8 +113,8 @@ enum ModelSuggestionValidator {
             }
             return .date(date)
 
-        case .vendorName, .agreementNumber, .equipmentName, .equipmentIdentifier,
-             .serialNumber, .invoiceNumber:
+        case .vendorName, .agreementNumber, .purchaseOrderNumber, .equipmentName,
+             .equipmentIdentifier, .serialNumber, .invoiceNumber:
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             // A "value" that is really a whole sentence is a model describing the page rather
             // than quoting it.

@@ -110,6 +110,22 @@ enum DocumentTextParser {
             }
         }
 
+        // Third pass: the equipment table.
+        //
+        // The machine itself is the one thing a rental contract never labels. It is printed in a
+        // table — `QTY  EQUIPMENT  UNIT #  SERIAL` over
+        // `1  CAT 259D3 SKID STEER TRACK LOADER  SS-2214  CAT0259DKTLM12345` — so a rule looking
+        // for `Equipment:` finds nothing, and the app asked the user to type in the name of the
+        // machine they had just photographed.
+        for suggestion in tableRowSuggestions(document, recognitionFactor: recognitionFactor) {
+            // A labelled field always wins. This pass reads a layout, not a label.
+            if let existing = best[suggestion.field], existing.confidence >= suggestion.confidence {
+                continue
+            }
+            best[suggestion.field] = suggestion
+            matchedLineIndices.insert(suggestion.provenance.lineIndex)
+        }
+
         // The vendor's own name is almost never labelled — it is the letterhead. Fall back to the
         // first line that looks like a company, at a confidence low enough that it always arrives
         // unticked.
@@ -178,10 +194,125 @@ enum DocumentTextParser {
                     .trimmingCharacters(in: CharacterSet(charactersIn: " \t:#-–—"))
                     .trimmingCharacters(in: .whitespaces)
                 guard cleaned.count >= 2, cleaned.count <= 120 else { return nil }
+                // A column heading is never a value.
+                //
+                // Rental contracts print the machine in a table, and the header row reads
+                // `QTY  EQUIPMENT  UNIT #  SERIAL`. The unit-number rule matched `UNIT #` and
+                // took the next word — so the app reported the equipment's identifier as
+                // "SERIAL", at 0.90 confidence, which is above the threshold that pre-ticks a
+                // suggestion. A wrong value the user waves through is worse than no value.
+                guard !DocumentTextParser.columnHeadings.contains(cleaned.uppercased()) else {
+                    return nil
+                }
                 return .text(cleaned)
             }
         }
     }
+
+    // MARK: - The equipment table
+
+    /// Which heading means which field. Only the four worth reading.
+    private static let headingFields: [(match: String, field: SuggestedField)] = [
+        ("SERIAL", .serialNumber),
+        ("S/N", .serialNumber),
+        ("UNIT", .equipmentIdentifier),
+        ("ASSET", .equipmentIdentifier),
+        ("EQUIPMENT", .equipmentName),
+        ("DESCRIPTION", .equipmentName),
+    ]
+
+    /// Reads a header row and the row beneath it as a table.
+    ///
+    /// Split on runs of two or more spaces rather than on character positions. Fixed-width
+    /// columns are what the paperwork *prints*, but what Vision hands back is one string per
+    /// recognised line with its inter-column gaps roughly preserved — so counting spaces is
+    /// reliable where counting columns is not.
+    ///
+    /// Both rows must split into the same number of cells. When they do not the table has
+    /// wrapped, or a cell is empty, or the recognition dropped a gap — and a mis-aligned zip
+    /// would confidently file the serial number as the equipment name. Nothing is emitted, and
+    /// the user fills the field in, which is this app's answer to every ambiguous read.
+    private static func tableRowSuggestions(
+        _ document: RecognizedDocument, recognitionFactor: Double
+    ) -> [FieldSuggestion] {
+        var found: [FieldSuggestion] = []
+        for (index, line) in document.lines.enumerated() where index + 1 < document.lines.count {
+            let headings = splitCells(line)
+            guard headings.count >= 2 else { continue }
+
+            let normalised = headings.map {
+                $0.uppercased().trimmingCharacters(in: CharacterSet(charactersIn: " #:."))
+            }
+            // *Every* cell must be a recognised heading, so a row of data never poses as one —
+            // `1  CAT 259D3 SKID STEER  SS-2214` has three cells too.
+            guard normalised.allSatisfy({ heading in
+                columnHeadings.contains(heading)
+                    || headingFields.contains { heading.hasPrefix($0.match) }
+            }) else { continue }
+
+            let mapped = normalised.map { heading in
+                headingFields.first { heading.hasPrefix($0.match) }?.field
+            }
+            guard mapped.contains(where: { $0 != nil }) else { continue }
+
+            let values = splitCells(document.lines[index + 1])
+            guard values.count == headings.count else { continue }
+
+            for (position, field) in mapped.enumerated() {
+                guard let field else { continue }
+                let value = values[position].trimmingCharacters(in: .whitespaces)
+                guard value.count >= 2, value.count <= 120,
+                      !columnHeadings.contains(value.uppercased()),
+                      value.rangeOfCharacter(from: .alphanumerics) != nil
+                else { continue }
+                found.append(
+                    FieldSuggestion(
+                        field: field,
+                        value: .text(value),
+                        // Below `preselectThreshold` on purpose. A labelled field is the document
+                        // telling you what a value is; a table cell is the app inferring it from
+                        // a layout, and that inference is exactly the kind that should arrive
+                        // offered rather than already ticked.
+                        confidence: 0.74 * recognitionFactor,
+                        provenance: SuggestionProvenance(
+                            sourceLine: document.lines[index + 1],
+                            lineIndex: index + 1,
+                            rule: "equipment-table-column",
+                            recognitionConfidence: document.averageRecognitionConfidence,
+                            page: document.page(ofLineAt: index + 1),
+                            valueStart: nil,
+                            valueLength: nil
+                        )
+                    )
+                )
+            }
+            // One table per document. The first is the equipment; later ones are charges.
+            if !found.isEmpty { break }
+        }
+        return found
+    }
+
+    /// Splits a line into cells on runs of two or more spaces.
+    private static func splitCells(_ line: String) -> [String] {
+        line.components(separatedBy: "  ")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Words that appear as table headings on rental paperwork and are therefore never values.
+    ///
+    /// Deliberately only whole-word matches on the *captured* text, not on the line: a machine
+    /// genuinely called "Description" does not exist, but a serial number containing the letters
+    /// of one might, and rejecting a line because a heading appears somewhere in it would throw
+    /// away the row underneath the heading too.
+    static let columnHeadings: Set<String> = [
+        "SERIAL", "SERIAL NO", "SERIAL NUMBER", "DESCRIPTION", "EQUIPMENT", "UNIT", "UNIT NO",
+        "ASSET", "MODEL", "MAKE", "QTY", "QUANTITY", "ITEM", "NUMBER", "NO", "NUM", "TYPE",
+        "DATE", "AMOUNT", "RATE", "RATES", "TOTAL", "CHARGE", "CHARGES", "PRICE", "COST",
+        "SUBTOTAL", "TAX", "FEE", "FEES", "OUT", "IN", "DUE", "REF", "REFERENCE", "CLASS",
+        "CAT", "CATEGORY", "HOURS", "HRS", "METER", "DAYS", "WEEK", "WEEKS", "MONTH", "PO",
+        "CUSTOMER", "JOB", "SITE", "BRANCH", "TERMS", "N/A", "NA", "TBD", "NONE",
+    ]
 
     // Money and date fragments, shared so a change to what counts as an amount applies uniformly.
     //
@@ -234,6 +365,17 @@ enum DocumentTextParser {
              ]),
         Rule(field: .agreementNumber, name: "bare-rental-number", confidence: 0.66, kind: .text,
              patterns: [#"(?i)\brental\s*#\s*([A-Z0-9][A-Z0-9\-/]{2,})"#]),
+
+        // `P.O. #`, `PO NUMBER`, `CUSTOMER PO`, `JOB #` — the four forms this appears in on US
+        // rental paperwork, and the reason the pattern tolerates dots inside the abbreviation.
+        // `JOB` is included because plenty of yards print the contractor's job number in the PO
+        // box; it is the same field as far as the contractor is concerned.
+        Rule(field: .purchaseOrderNumber, name: "labelled-po-number", confidence: 0.92, kind: .text,
+             patterns: [
+                #"(?i)\b(?:customer\s+)?p\.?\s?o\.?\s*(?:no\.?|number|#)?\s*[:#]\s*([A-Z0-9][A-Z0-9\-/]{2,})"#,
+                #"(?i)\b(?:customer\s+)?p\.?\s?o\.?\s*#\s*([A-Z0-9][A-Z0-9\-/]{2,})"#,
+                #"(?i)\bjob\s*(?:no\.?|number|#)\s*[:#]?\s*([A-Z0-9][A-Z0-9\-/]{2,})"#,
+             ]),
 
         Rule(field: .equipmentIdentifier, name: "labelled-unit-number", confidence: 0.9, kind: .text,
              patterns: [

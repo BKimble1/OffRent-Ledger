@@ -145,6 +145,9 @@ final class RentalDraft {
     func apply(scanned values: [SuggestedField: SuggestedValue]) {
         for (field, value) in values {
             switch (field, value) {
+            case let (.purchaseOrderNumber, .text(text)):
+                purchaseOrderNumber = text
+                showsMoreDetails = true
             case let (.agreementNumber, .text(text)):
                 agreementNumber = text
                 // Opened, like the other two identifiers. A value applied into a collapsed

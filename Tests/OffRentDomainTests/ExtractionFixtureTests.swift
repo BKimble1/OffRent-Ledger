@@ -219,4 +219,160 @@ final class ExtractionFixtureTests: XCTestCase {
             "and the screen must still offer them rather than claiming nothing was found"
         )
     }
+
+    // MARK: - Real rental-yard paperwork
+
+    // The two fixtures below were written from the layout US rental yards actually print —
+    // a letterhead, a labelled block, an equipment table with column headings, a rate schedule
+    // and a charge list. Running the parser over them found four defects that no amount of
+    // reading the rules had shown, two of which were confidently wrong values.
+
+    func testTheTaxLineYieldsTheAmountAndNotTheRate() throws {
+        // `SALES TAX 8.25%  130.84` is one line with two numbers on it. The parser used to
+        // report $8.25 — the rate — at 0.90 confidence, which is above `preselectThreshold`, so
+        // it arrived already ticked. Accepting it would have understated the tax by $122.59 and
+        // made the comparison flag a mismatch that was the app's own doing.
+        let result = try parse("invoice_yard_realistic.txt", kind: .vendorInvoice)
+        let tax = try XCTUnwrap(result.suggestions.first { $0.field == .taxAmount })
+        XCTAssertEqual(
+            tax.value.moneyValue, Decimal(string: "130.84", locale: Locale(identifier: "en_US_POSIX")),
+            "the tax is the amount beside the rate, never the rate"
+        )
+    }
+
+    func testAPercentageIsNeverReadAsAnAmountAnywhere() throws {
+        let result = try parse("invoice_yard_realistic.txt", kind: .vendorInvoice)
+        // `RPP (DAMAGE WAIVER) 12%  136.80` is the same shape as the tax line.
+        let damage = try XCTUnwrap(result.suggestions.first { $0.field == .damageCharge })
+        XCTAssertEqual(damage.value.moneyValue, Decimal(string: "136.80", locale: Locale(identifier: "en_US_POSIX")))
+        for suggestion in result.suggestions {
+            guard let amount = suggestion.value.moneyValue else { continue }
+            XCTAssertNotEqual(
+                amount, Decimal(string: "8.25", locale: Locale(identifier: "en_US_POSIX")),
+                "\(suggestion.field) took the tax rate as an amount"
+            )
+            XCTAssertNotEqual(
+                amount, Decimal(string: "12", locale: Locale(identifier: "en_US_POSIX")),
+                "\(suggestion.field) took the waiver rate as an amount"
+            )
+        }
+    }
+
+    func testAColumnHeadingIsNeverReportedAsAValue() throws {
+        // `QTY  EQUIPMENT  UNIT #  SERIAL` is a header row. The unit-number rule matched
+        // `UNIT #` and took the next word, so the app reported this machine's identifier as
+        // "SERIAL" at 0.90 confidence.
+        let result = try parse("contract_yard_realistic.txt", kind: .rentalContract)
+        for suggestion in result.suggestions {
+            guard let text = suggestion.value.textValue else { continue }
+            XCTAssertFalse(
+                DocumentTextParser.columnHeadings.contains(text.uppercased()),
+                "\(suggestion.field) was filled in with the column heading “\(text)”"
+            )
+        }
+    }
+
+    func testTheEquipmentTableYieldsTheMachineItsUnitNumberAndItsSerial() throws {
+        // The machine is the one thing a contract never labels: it is a row under a header.
+        // Before the table pass the app asked the user to type in the name of the machine they
+        // had just photographed.
+        let result = try parse("contract_yard_realistic.txt", kind: .rentalContract)
+        func text(_ field: SuggestedField) throws -> String {
+            try XCTUnwrap(
+                result.suggestions.first { $0.field == field }?.value.textValue,
+                "\(field) was not read from the equipment table"
+            )
+        }
+        XCTAssertEqual(try text(.equipmentName), "CAT 259D3 SKID STEER TRACK LOADER")
+        XCTAssertEqual(try text(.equipmentIdentifier), "SS-2214")
+        XCTAssertEqual(try text(.serialNumber), "CAT0259DKTLM12345")
+    }
+
+    func testATableReadArrivesOfferedRatherThanTicked() throws {
+        // A labelled field is the document saying what a value is. A table cell is the app
+        // inferring it from a layout, and that inference should never be pre-accepted.
+        let result = try parse("contract_yard_realistic.txt", kind: .rentalContract)
+        for suggestion in result.suggestions
+        where suggestion.provenance.rule == "equipment-table-column" {
+            XCTAssertFalse(
+                suggestion.isPreselected,
+                "\(suggestion.field) was read from a layout and must not arrive ticked"
+            )
+        }
+    }
+
+    func testThePurchaseOrderNumberIsReadFromBothDocuments() throws {
+        // The identifier a contractor's accounts department files by, and the one field they
+        // used to type twice: the agreement has carried it since schema V3 and the form has
+        // always offered it, but nothing could read it.
+        let contract = try parse("contract_yard_realistic.txt", kind: .rentalContract)
+        let invoice = try parse("invoice_yard_realistic.txt", kind: .vendorInvoice)
+        for (result, name) in [(contract, "contract"), (invoice, "invoice")] {
+            let po = try XCTUnwrap(
+                result.suggestions.first { $0.field == .purchaseOrderNumber },
+                "no PO number found on the \(name)"
+            )
+            XCTAssertEqual(po.value.textValue, "JOB-2291")
+        }
+    }
+
+    func testTheChargesAYardActuallyPrintsAreAllFound() throws {
+        let result = try parse("invoice_yard_realistic.txt", kind: .vendorInvoice)
+        let byField = Dictionary(
+            uniqueKeysWithValues: result.suggestions.map { ($0.field, $0.value.moneyValue) }
+        )
+        // `PICKUP / HAUL OUT` used to stop the match dead at the slash; `SUBTOTAL` printed on
+        // its own was only matched as `RENTAL SUBTOTAL`.
+        XCTAssertEqual(byField[.pickupCharge] ?? nil, Decimal(string: "125.00", locale: Locale(identifier: "en_US_POSIX")))
+        XCTAssertEqual(byField[.deliveryCharge] ?? nil, Decimal(string: "125.00", locale: Locale(identifier: "en_US_POSIX")))
+        XCTAssertEqual(byField[.fuelCharge] ?? nil, Decimal(string: "42.00", locale: Locale(identifier: "en_US_POSIX")))
+        XCTAssertEqual(byField[.environmentalCharge] ?? nil, Decimal(string: "17.10", locale: Locale(identifier: "en_US_POSIX")))
+        XCTAssertEqual(byField[.rentalSubtotal] ?? nil, Decimal(string: "1585.90", locale: Locale(identifier: "en_US_POSIX")))
+        XCTAssertEqual(byField[.invoiceTotal] ?? nil, Decimal(string: "1716.74", locale: Locale(identifier: "en_US_POSIX")))
+    }
+
+    func testEstReturnIsReadAsTheScheduledEnd() throws {
+        // `EST RETURN` is how it is printed; the rule only knew `estimated return`.
+        let result = try parse("contract_yard_realistic.txt", kind: .rentalContract)
+        XCTAssertNotNil(
+            result.suggestions.first { $0.field == .scheduledEndDate }?.value.dateValue,
+            "the date the machine is due back was not read"
+        )
+    }
+
+    func testTheRealisticContractFillsMostOfTheForm() throws {
+        // The owner's bar: "it should be able to fill out all the info it sees". This pins the
+        // count so a rule change that quietly stops reading a field fails here.
+        let result = try parse("contract_yard_realistic.txt", kind: .rentalContract)
+        XCTAssertGreaterThanOrEqual(
+            result.suggestions.count, 11,
+            "the realistic contract should fill at least eleven fields, found "
+            + "\(result.suggestions.map(\.field.rawValue).sorted().joined(separator: ", "))"
+        )
+    }
+
+    func testARateWithNoAmountBesideItProducesNoCharge() throws {
+        // The half of the percentage problem the widened gap does not solve.
+        //
+        // `FUEL SURCHARGE 10%` on its own line, with the amount elsewhere or not itemised at
+        // all, used to become a $10.00 fuel charge — and `ENVIRONMENTAL FEE 3.5%` a $3.50 one —
+        // both at 0.88 confidence, above `preselectThreshold`. Money the document never said,
+        // pre-ticked, in the right place. The comparison would then flag a mismatch that was
+        // the app's own invention.
+        let result = try parse("invoice_rates_without_amounts.txt", kind: .vendorInvoice)
+        XCTAssertNil(
+            result.suggestions.first { $0.field == .fuelCharge },
+            "a fuel rate of 10% is not a fuel charge of $10"
+        )
+        XCTAssertNil(
+            result.suggestions.first { $0.field == .environmentalCharge },
+            "an environmental rate of 3.5% is not a charge of $3.50"
+        )
+        // And the real total on the same document is still read, so this is a boundary and not
+        // a blanket refusal to read a page with a percentage on it.
+        XCTAssertEqual(
+            result.suggestions.first { $0.field == .invoiceTotal }?.value.moneyValue,
+            Decimal(string: "1200.00", locale: Locale(identifier: "en_US_POSIX"))
+        )
+    }
 }
