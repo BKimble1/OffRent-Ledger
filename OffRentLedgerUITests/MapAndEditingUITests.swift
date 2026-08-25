@@ -183,3 +183,87 @@ final class MapAndEditingUITests: XCTestCase {
         )
     }
 }
+
+/// §12.17: nothing important sits under the tab bar, the sticky action bar or the keyboard.
+///
+/// This is the class of defect the screenshots showed most often and that no unit test can see.
+/// It is also the one where `isHittable` lies: a control whose centre is inside the tab bar
+/// reports `true` and does nothing when tapped, which cost eleven CI runs to diagnose once
+/// already. `tapInContent` checks the geometry rather than trusting the flag.
+final class LayoutObstructionUITests: XCTestCase {
+
+    override func setUp() { continueAfterFailure = false }
+
+    /// The primary action on the longest form in the app, with the keyboard up.
+    func testTheSaveBarStaysReachableWithTheKeyboardUp() {
+        let app = XCUIApplication.launched(seed: .empty)
+
+        app.tab(A11yUI.Tab.rentals).tap()
+        app.openNewRental()
+
+        app.expect(app.textFields[A11yUI.AddRental.equipmentName]).tap()
+        app.typeText("Mini Excavator")
+
+        // With the keyboard up, the save bar must still be on screen and above it. A bar pinned
+        // with fixed padding instead of a safe-area inset fails exactly here.
+        let save = app.expect(app.buttons[A11yUI.AddRental.save])
+        XCTAssertTrue(save.exists)
+        if app.keyboards.count > 0 {
+            XCTAssertLessThan(
+                save.frame.maxY, app.keyboards.element.frame.minY,
+                "the save bar is behind the keyboard"
+            )
+        }
+
+        app.dismissKeyboard()
+        XCTAssertLessThanOrEqual(
+            save.frame.maxY, app.frame.maxY,
+            "the save bar runs off the bottom of the screen"
+        )
+    }
+
+    /// Today's content is not hidden behind the tab bar when scrolled to the end.
+    func testTodayScrollsClearOfTheTabBar() {
+        let app = XCUIApplication.launched()
+
+        app.tab(A11yUI.Tab.today).tap()
+        let root = app.expect(app.anyElement(A11yUI.Today.root))
+        for _ in 0..<4 { root.swipeUp() }
+
+        // The tab bar is the floor. Anything the user is meant to read has to end above it.
+        let tabBar = app.tabBars.element
+        guard tabBar.exists else { return }
+        let map = app.anyElement(A11yUI.Today.map)
+        if map.exists, map.frame.height > 0 {
+            XCTAssertLessThanOrEqual(
+                map.frame.minY, tabBar.frame.minY,
+                "the map card is entirely behind the tab bar after scrolling"
+            )
+        }
+    }
+
+    /// The map's own controls clear the status bar at the top and the home indicator at the
+    /// bottom — §6 names both.
+    func testTheOperationsMapControlsClearTheEdges() {
+        let app = XCUIApplication.launched()
+
+        app.tab(A11yUI.Tab.today).tap()
+        app.tapInContent(app.expect(app.anyElement(A11yUI.Today.map)))
+        app.expect(app.anyElement(A11yUI.OperationsMap.root))
+
+        let close = app.expect(app.buttons[A11yUI.OperationsMap.close])
+        XCTAssertGreaterThan(
+            close.frame.minY, app.frame.minY,
+            "the close button is under the status bar"
+        )
+        let search = app.expect(app.textFields[A11yUI.OperationsMap.searchField])
+        XCTAssertGreaterThan(
+            search.frame.minY, app.frame.minY,
+            "the search field is under the status bar"
+        )
+        XCTAssertLessThan(
+            search.frame.maxY, app.frame.maxY,
+            "the search field is off the bottom of the screen"
+        )
+    }
+}

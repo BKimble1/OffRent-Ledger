@@ -101,7 +101,11 @@ struct JobsiteMapEditor: View {
             // A tap anywhere puts the pin there. It is the whole answer to "this site has no
             // address" — and it is only armed while the user has asked for it, so an ordinary
             // pan on a map they are reading does not move a pin they already placed.
-            .onTapGesture { screenPoint in
+            // The coordinate space is stated rather than defaulted. `onTapGesture` has an
+            // overload taking no parameters and one taking a `CGPoint`, and leaving the type
+            // checker to pick between them from a closure's arity is the kind of ambiguity that
+            // compiles here and not on the next toolchain.
+            .onTapGesture(coordinateSpace: .local) { screenPoint in
                 guard isDroppingByHand else { return }
                 guard let coordinate = proxy.convert(screenPoint, from: .local) else { return }
                 dropPin(at: coordinate)

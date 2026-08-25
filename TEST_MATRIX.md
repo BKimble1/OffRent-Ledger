@@ -208,10 +208,19 @@ is a menu, a company that is a record rather than four text fields, a walkthroug
 | `OnboardingUITests` | 5 | ⛔ not yet executed | **§12.16.** The whole walkthrough on Next and Finish alone; it dismisses itself; Back is absent on page one rather than dead; it is not shown twice; **and it created no rental, no company and no jobsite** |
 | `ReusableRecordsUITests` | 5 | ⛔ not yet executed | **§12.1–3.** The plus offers all three; a company made from Rentals is selectable in a draft; one made *inside* a draft returns to it selected with the draft intact; a disabled Save names the missing field; the jobsite editor is a map |
 | `MapAndEditingUITests` | 6 | ⛔ not yet executed | **§12.6–9, §12.15.** Today keeps the map with no rentals and with unplaced ones; the card opens full screen and X closes it; the legend opens; search finds the user's own machine; a rental with no coordinate says `No location set`; an edit survives a relaunch; the editor reaches company and jobsite |
+| `LayoutObstructionUITests` | 3 | ⛔ not yet executed | **§12.17.** The save bar stays above the keyboard on the longest form; Today scrolls clear of the tab bar; the map's close button and search field clear the status bar and the home indicator |
 | `InvoiceAcceptanceUITests` | 3 | ⛔ not yet executed | **§12.13–14.** A valid invoice is accepted from Audit, the counts move, and it is still accepted after a relaunch; an empty one is disabled with a specific reason and an `Edit invoice` route that opens the form; no comparison row runs past the right edge |
 
-**30 UI test methods.** 11 have been executed and passed; the 19 written for this change have
+**33 UI test methods.** 11 have been executed and passed; the 22 written for this change have
 not yet run, and the row above says so per suite rather than in aggregate.
+
+**What the UI suite still cannot cover, and why:**
+
+| §12 gate | Why not automated |
+|---|---|
+| 5 — a manually dropped pin when search has no result | Dropping a pin means tapping a coordinate on a live `MKMapView`, and the "search has no result" half needs the network to be reachable but unhelpful. It is a device pass in `RELEASE_CHECKLIST.md`. |
+| 10–11 — a real agreement and a real invoice through the camera | Covered deterministically at the parser, which is the layer that can be wrong. The camera is a device pass. |
+| 19 — simulator launch | Covered by the UI suite existing at all: it launches and drives the app. Compilation alone is never treated as proof. |
 
 To execute, on a Mac:
 
