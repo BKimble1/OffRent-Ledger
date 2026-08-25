@@ -137,7 +137,13 @@ enum RentalRateEngine {
         }
 
         let periodsStarted = periodsStarted(daysOnRent: daysOnRent, basis: terms.billingBasis)
-        let total = MoneyMath.rounded(MoneyMath.multiply(amountPerPeriod, by: periodsStarted))
+        let total = accruedTotal(
+            terms: terms,
+            periodsStarted: periodsStarted,
+            amountPerPeriod: amountPerPeriod,
+            asOf: effectiveNow,
+            calendar: calendar
+        )
 
         return RunningEstimate(
             asOf: now,
@@ -153,6 +159,57 @@ enum RentalRateEngine {
             issues: issues,
             hasStoppedAccruing: hasStopped
         )
+    }
+
+    /// What the periods started so far have accrued, honouring a rate change the user confirmed.
+    ///
+    /// The old arithmetic was `amountPerPeriod × periodsStarted`, which ignores
+    /// `expectedNextIncrement` entirely — so a contractor who did exactly what the form asks,
+    /// and recorded that their yard rolls onto a different rate on the 11th, watched the
+    /// estimate go on adding the old rate afterwards. Manual rollover is the *default* mode and
+    /// §6 names calendar-month billing as its reason for existing, which is precisely the case
+    /// where the two amounts differ. The number the whole app is built around was wrong for it.
+    ///
+    /// The rule is one sentence: periods that start before the confirmed rollover accrue the
+    /// rate card's amount, and periods from the rollover onward accrue the amount the user said
+    /// the next period would add.
+    ///
+    /// Note what this is *not*. It does not extrapolate a second, third or fourth rate change —
+    /// the user confirmed one boundary and one amount, and inventing a schedule from that is
+    /// simple-schedule mode wearing a disguise (`projectedRollovers` says the same thing). And
+    /// when the two amounts are equal — which is every rental on a simple schedule, because
+    /// `expectedIncrement` returns the rate card's own figure there — this is arithmetically
+    /// identical to the multiplication it replaces. It changes only the case that was wrong.
+    static func accruedTotal(
+        terms: RentalTerms,
+        periodsStarted: Int,
+        amountPerPeriod: Decimal,
+        asOf now: Date,
+        calendar: Calendar
+    ) -> Decimal {
+        guard periodsStarted > 0 else { return .zero }
+
+        // Only a boundary the user confirmed changes the rate. A projected one carries the rate
+        // card's own amount, so it could not change anything even if it were used.
+        guard terms.rolloverMode == .manual || terms.manualRolloverOverride,
+              let rolloverDate = terms.nextRolloverDate,
+              let newAmount = terms.expectedNextIncrement,
+              newAmount != amountPerPeriod,
+              rolloverDate <= now
+        else {
+            return MoneyMath.rounded(MoneyMath.multiply(amountPerPeriod, by: periodsStarted))
+        }
+
+        // The period the rollover falls in is the first one billed at the new rate.
+        let firstNewPeriod = periodNumber(for: rolloverDate, terms: terms, calendar: calendar)
+        let atOldRate = max(0, min(periodsStarted, firstNewPeriod - 1))
+        let atNewRate = periodsStarted - atOldRate
+
+        // Each half is rounded once, then added — the same discipline as everywhere else in this
+        // engine, so a segmented total cannot drift from an unsegmented one by a rounding step.
+        let old = MoneyMath.rounded(MoneyMath.multiply(amountPerPeriod, by: atOldRate))
+        let new = MoneyMath.rounded(MoneyMath.multiply(newAmount, by: atNewRate))
+        return MoneyMath.rounded(old + new)
     }
 
     /// Billing periods started, counting the one in progress.

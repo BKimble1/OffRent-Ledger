@@ -355,4 +355,129 @@ final class RentalRateEngineTests: XCTestCase {
         XCTAssertEqual(estimate.periodsStarted, 3)
         XCTAssertEqual(estimate.estimatedTotal, money("100.00"))
     }
+
+    // MARK: - A rate change the user confirmed
+
+    // Manual rollover is the default mode, and §6 names calendar-month billing as its reason for
+    // existing — which is precisely the case where the confirmed increment differs from the rate
+    // card. The estimate ignored it entirely, so the one number the whole app is built around
+    // was wrong for the mode most rentals are in.
+
+    func testAConfirmedRateChangeEntersTheRunningTotal() {
+        // Delivered 4 May on a daily rate of $285. The yard rolls onto $400 a day from 11 May,
+        // which the user confirmed on the form. On 13 May: seven days at 285, three at 400.
+        let terms = RentalTerms(
+            deliveryDate: date(2026, 5, 4),
+            rateCard: RateCard(daily: money("285.00")),
+            billingBasis: .daily,
+            rolloverMode: .manual,
+            nextRolloverDate: date(2026, 5, 11),
+            expectedNextIncrement: money("400.00")
+        )
+        let estimate = RentalRateEngine.estimate(
+            terms: terms, asOf: date(2026, 5, 13), calendar: calendar()
+        )
+        XCTAssertEqual(estimate.periodsStarted, 10)
+        XCTAssertEqual(
+            estimate.estimatedTotal, money("3195.00"),   // 285 × 7 + 400 × 3
+            "the rate change the user recorded has to reach the figure they are shown"
+        )
+    }
+
+    func testARateChangeStillInTheFutureChangesNothingYet() {
+        let terms = RentalTerms(
+            deliveryDate: date(2026, 5, 4),
+            rateCard: RateCard(daily: money("285.00")),
+            billingBasis: .daily,
+            rolloverMode: .manual,
+            nextRolloverDate: date(2026, 5, 20),
+            expectedNextIncrement: money("400.00")
+        )
+        let estimate = RentalRateEngine.estimate(
+            terms: terms, asOf: date(2026, 5, 9), calendar: calendar()
+        )
+        XCTAssertEqual(estimate.estimatedTotal, money("1710.00"))   // 285 × 6, unchanged
+    }
+
+    func testAnIncrementEqualToTheRateCardIsArithmeticallyIdentical() {
+        // The reason this change was safe to make: on a simple schedule `expectedIncrement`
+        // returns the rate card's own figure, so segmenting is a no-op and every existing
+        // expectation holds untouched.
+        let plain = RentalTerms(
+            deliveryDate: date(2026, 5, 4),
+            rateCard: RateCard(daily: money("285.00")),
+            billingBasis: .daily
+        )
+        let confirmed = RentalTerms(
+            deliveryDate: date(2026, 5, 4),
+            rateCard: RateCard(daily: money("285.00")),
+            billingBasis: .daily,
+            rolloverMode: .manual,
+            nextRolloverDate: date(2026, 5, 8),
+            expectedNextIncrement: money("285.00")
+        )
+        let asOf = date(2026, 5, 13)
+        XCTAssertEqual(
+            RentalRateEngine.estimate(terms: plain, asOf: asOf, calendar: calendar()).estimatedTotal,
+            RentalRateEngine.estimate(terms: confirmed, asOf: asOf, calendar: calendar()).estimatedTotal
+        )
+    }
+
+    func testTheEngineStillRefusesToExtrapolateASecondRateChange() {
+        // The user confirmed one boundary and one amount. Inventing a schedule out of that is
+        // simple-schedule mode wearing a disguise, and §6 forbids it. Twenty-eight days after a
+        // single confirmed change, every period since is at the one confirmed rate — not at a
+        // second, compounding one.
+        let terms = RentalTerms(
+            deliveryDate: date(2026, 5, 4),
+            rateCard: RateCard(daily: money("285.00")),
+            billingBasis: .daily,
+            rolloverMode: .manual,
+            nextRolloverDate: date(2026, 5, 11),
+            expectedNextIncrement: money("400.00")
+        )
+        let estimate = RentalRateEngine.estimate(
+            terms: terms, asOf: date(2026, 6, 8), calendar: calendar()
+        )
+        // 4 May → 8 June is 35 days on rent, so 36 daily periods: 7 at 285, 29 at 400.
+        XCTAssertEqual(estimate.periodsStarted, 36)
+        XCTAssertEqual(estimate.estimatedTotal, money("13595.00"))
+    }
+
+    func testAWeeklyRentalRollingOntoAMonthlyFigureIsTheDocumentedCase() {
+        // §6: "A vendor billing calendar months is handled in manual rollover mode, where the
+        // user states the next boundary and the app does not infer one." Before this the app
+        // took the boundary, showed it on Today, and then went on billing weeks.
+        let terms = RentalTerms(
+            deliveryDate: date(2026, 5, 4),
+            rateCard: RateCard(weekly: money("855.00")),
+            billingBasis: .weekly,
+            rolloverMode: .manual,
+            nextRolloverDate: date(2026, 6, 1),
+            expectedNextIncrement: money("3200.00")
+        )
+        let estimate = RentalRateEngine.estimate(
+            terms: terms, asOf: date(2026, 6, 3), calendar: calendar()
+        )
+        // 4 May → 3 June is 30 days: 5 weekly periods started. The rollover falls in period 5.
+        XCTAssertEqual(estimate.periodsStarted, 5)
+        XCTAssertEqual(estimate.estimatedTotal, money("6620.00"))   // 855 × 4 + 3200 × 1
+    }
+
+    func testStoppedAccrualStillHonoursTheRateChangeUpToTheStop() {
+        let terms = RentalTerms(
+            deliveryDate: date(2026, 5, 4),
+            rateCard: RateCard(daily: money("285.00")),
+            billingBasis: .daily,
+            rolloverMode: .manual,
+            nextRolloverDate: date(2026, 5, 11),
+            expectedNextIncrement: money("400.00"),
+            accrualStoppedAt: date(2026, 5, 13)
+        )
+        let estimate = RentalRateEngine.estimate(
+            terms: terms, asOf: date(2026, 6, 30), calendar: calendar()
+        )
+        XCTAssertTrue(estimate.hasStoppedAccruing)
+        XCTAssertEqual(estimate.estimatedTotal, money("3195.00"), "frozen at the stop, not at today")
+    }
 }
