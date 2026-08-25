@@ -35,6 +35,7 @@ struct CompanyEditorView: View {
     @State private var notes = ""
     @State private var duplicate: Vendor?
     @State private var hasLoaded = false
+    @State private var saveFailure: String?
     @FocusState private var nameIsFocused: Bool
 
     var body: some View {
@@ -58,7 +59,7 @@ struct CompanyEditorView: View {
                             \(duplicate.branch.map { " · \($0)" } ?? ""). \
                             Use that one instead, or give this a different branch.
                             """)
-                            .foregroundStyle(Palette.attention)
+                            .foregroundStyle(Palette.attentionText)
                     } else {
                         Text("Only the name is required. Everything else can wait.")
                     }
@@ -81,7 +82,7 @@ struct CompanyEditorView: View {
                     if !emailIsPlausible {
                         Text("That does not look like an email address.")
                             .font(Typography.caption)
-                            .foregroundStyle(Palette.attention)
+                            .foregroundStyle(Palette.attentionText)
                     }
                 }
 
@@ -107,6 +108,13 @@ struct CompanyEditorView: View {
                 Section("Notes") {
                     TextField("Anything you want on hand", text: $notes, axis: .vertical)
                         .lineLimit(2...6)
+                }
+
+                if let saveFailure {
+                    Section {
+                        Label(saveFailure, systemImage: "externaldrive.badge.exclamationmark")
+                            .foregroundStyle(Palette.attentionText)
+                    }
                 }
             }
             .offRentFormBackground()
@@ -188,7 +196,11 @@ struct CompanyEditorView: View {
         company.link = link.nilIfBlank
         company.standardNotes = notes.nilIfBlank
         company.modifiedAt = now
-        try? context.save()
+        if let problem = PersistentStore.save(context, describing: "This company") {
+            saveFailure = problem
+            return
+        }
+        saveFailure = nil
         onSaved(company)
         dismiss()
     }
@@ -229,7 +241,7 @@ struct CompanyPickerView: View {
                         creating = true
                     } label: {
                         Label("Add a new rental company", systemImage: "plus.circle.fill")
-                            .foregroundStyle(Palette.accent)
+                            .foregroundStyle(Palette.accentText)
                     }
                     .accessibilityIdentifier(A11yID.Company.addNew)
                 }
@@ -299,7 +311,7 @@ struct CompanyPickerView: View {
             if selection == company.id {
                 Image(systemName: "checkmark")
                     .font(Typography.rowDetail.weight(.semibold))
-                    .foregroundStyle(Palette.accent)
+                    .foregroundStyle(Palette.accentText)
             }
         }
         .contentShape(Rectangle())

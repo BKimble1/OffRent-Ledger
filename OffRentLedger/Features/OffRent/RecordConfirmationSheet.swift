@@ -34,6 +34,7 @@ struct RecordConfirmationSheet: View {
     @State private var isCapturingLocation = false
     @State private var locationName: String?
     @State private var rejection: TransitionRejection?
+    @State private var saveFailure: String?
 
     init(itemID: UUID) {
         self.itemID = itemID
@@ -127,8 +128,15 @@ struct RecordConfirmationSheet: View {
                 if let rejection {
                     Section {
                         Label(rejection.message, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(Palette.attention)
+                            .foregroundStyle(Palette.attentionText)
                             .accessibilityIdentifier(A11yID.Confirmation.validationMessage)
+                    }
+                }
+
+                if let saveFailure {
+                    Section {
+                        Label(saveFailure, systemImage: "externaldrive.badge.exclamationmark")
+                            .foregroundStyle(Palette.attentionText)
                     }
                 }
             }
@@ -287,7 +295,13 @@ struct RecordConfirmationSheet: View {
         let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
         switch workflow.recordConfirmation(evidence, for: item, location: capturedLocation) {
         case .success:
-            try? context.save()
+            // Only dismiss once it is actually written. Dismissing on a failed save was the app
+            // telling somebody their vendor's confirmation number was filed when it was not.
+            if let problem = PersistentStore.save(context, describing: "This confirmation") {
+                saveFailure = problem
+                return
+            }
+            saveFailure = nil
             // The status moved, so the widget, the Shortcuts index and this rental's
             // reminders are all now describing the rental it used to be.
             dependencies.derivedStateNeedsRefresh()

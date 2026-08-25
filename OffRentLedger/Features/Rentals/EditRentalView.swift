@@ -36,6 +36,7 @@ struct EditRentalView: View {
     @State private var draft = RentalDraft()
     @State private var hasLoaded = false
     @State private var isSaving = false
+    @State private var saveFailure: String?
 
     init(itemID: UUID) {
         self.itemID = itemID
@@ -90,6 +91,13 @@ struct EditRentalView: View {
                     Text(note)
                         .font(Typography.micro)
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let saveFailure {
+                    Text(saveFailure)
+                        .font(Typography.micro)
+                        .foregroundStyle(Palette.attentionText)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -166,7 +174,12 @@ struct EditRentalView: View {
         // to drift until the next launch: the cached estimate here, and the widget snapshot, the
         // map annotations, the search index and the reminders on the next `refresh()`.
         RentalWorkflowService(context: context, clock: dependencies.clock).refreshEstimate(for: item)
-        try? context.save()
+        if let problem = PersistentStore.save(context, describing: "Your changes") {
+            saveFailure = problem
+            isSaving = false
+            return
+        }
+        saveFailure = nil
         // §9: an edit reaches the reminders. A changed scheduled end date is the case that
         // matters — the old reminder is for a day that is no longer the day.
         dependencies.derivedStateNeedsRefresh()

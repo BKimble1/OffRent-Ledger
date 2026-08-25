@@ -20,6 +20,7 @@ struct RecordPickupSheet: View {
     @State private var capturedLocation: LocationSnapshotRecord?
     @State private var isCapturingLocation = false
     @State private var rejection: TransitionRejection?
+    @State private var saveFailure: String?
 
     init(itemID: UUID) {
         self.itemID = itemID
@@ -122,7 +123,14 @@ struct RecordPickupSheet: View {
                 if let rejection {
                     Section {
                         Label(rejection.message, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(Palette.attention)
+                            .foregroundStyle(Palette.attentionText)
+                    }
+                }
+
+                if let saveFailure {
+                    Section {
+                        Label(saveFailure, systemImage: "externaldrive.badge.exclamationmark")
+                            .foregroundStyle(Palette.attentionText)
                     }
                 }
             }
@@ -163,7 +171,11 @@ struct RecordPickupSheet: View {
         let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
         switch workflow.recordPickup(evidence, for: item, location: capturedLocation) {
         case .success:
-            try? context.save()
+            if let problem = PersistentStore.save(context, describing: "This pickup") {
+                saveFailure = problem
+                return
+            }
+            saveFailure = nil
             // The status moved, so the widget, the Shortcuts index and this rental's
             // reminders are all now describing the rental it used to be.
             dependencies.derivedStateNeedsRefresh()

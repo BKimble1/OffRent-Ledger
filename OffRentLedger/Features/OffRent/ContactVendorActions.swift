@@ -20,6 +20,7 @@ struct ContactVendorActions: View {
     @State private var attemptMethod: VendorContactMethod = .phone
     @State private var attemptRepresentative = ""
     @State private var attemptNote = ""
+    @State private var saveFailure: String?
 
     private var vendor: Vendor? { item.agreement?.vendor }
 
@@ -89,6 +90,13 @@ struct ContactVendorActions: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            if let saveFailure {
+                Label(saveFailure, systemImage: "externaldrive.badge.exclamationmark")
+                    .font(Typography.rowDetail)
+                    .foregroundStyle(Palette.attentionText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .sheet(isPresented: $showingAttemptSheet) { attemptSheet }
     }
@@ -143,7 +151,8 @@ struct ContactVendorActions: View {
         workflow.recordContactAttempt(
             method: method, representative: representative, note: note, for: item
         )
-        try? context.save()
+        saveFailure = PersistentStore.save(context, describing: "This contact attempt")
+        guard saveFailure == nil else { return }
         // A contact attempt is what the "chase the vendor" reminder is waiting for, so the
         // schedule is wrong from the moment this is written until it is re-planned.
         dependencies.derivedStateNeedsRefresh()

@@ -46,7 +46,7 @@ enum SeedFixtures {
         for site in (try? context.fetch(StoreQueries.allJobSites())) ?? [] { context.delete(site) }
         for vendor in (try? context.fetch(StoreQueries.allVendors())) ?? [] { context.delete(vendor) }
         for asset in (try? context.fetch(StoreQueries.allAssets())) ?? [] { context.delete(asset) }
-        try? context.save()
+        PersistentStore.saveDerived(context, describing: "the wiped fixtures")
     }
 
     @MainActor

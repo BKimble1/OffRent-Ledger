@@ -22,6 +22,7 @@ struct AddRentalView: View {
     @State private var draft = RentalDraft()
     @State private var isSaving = false
     @State private var hasPrepared = false
+    @State private var saveFailure: String?
 
     var body: some View {
         NavigationStack {
@@ -69,6 +70,13 @@ struct AddRentalView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier(A11yID.AddRental.missingRequirement)
                 }
+                if let saveFailure {
+                    Text(saveFailure)
+                        .font(Typography.micro)
+                        .foregroundStyle(Palette.attentionText)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -113,7 +121,14 @@ struct AddRentalView: View {
             in: agreement
         )
 
-        try? context.save()
+        // Dismissing before the write is confirmed would show the contractor a rental that
+        // is not in the ledger. Stay on the form and say so instead.
+        if let problem = PersistentStore.save(context, describing: "This rental") {
+            saveFailure = problem
+            isSaving = false
+            return
+        }
+        saveFailure = nil
         // The estimate, the widget, the Shortcuts index and the reminder for this rental's
         // scheduled end are all derived. Without this they wait for the next foreground.
         dependencies.derivedStateNeedsRefresh()

@@ -17,11 +17,25 @@ struct RentalItemDetailView: View {
 
     @Query private var items: [RentalItem]
     @State private var rejection: TransitionRejection?
-    @State private var showingReopen = false
+    @State private var reopenRejection: TransitionRejection?
     @State private var reopenReason = ""
     @State private var reopenTarget: RentalItemStatus = .invoiceReview
-    @State private var showingExport = false
     @State private var confirmingDelete = false
+    @State private var saveFailure: String?
+
+    /// One sheet state, not two booleans.
+    ///
+    /// Two `.sheet(isPresented:)` modifiers on a single view is the arrangement SwiftUI is least
+    /// reliable about, and it sat here directly beneath an `.alert` on the same chain — the exact
+    /// combination this app already found breaks presentation on the invoice screen. A single
+    /// `.sheet(item:)` cannot express the ambiguity, so neither sheet can go missing.
+    private enum DetailSheet: String, Identifiable {
+        case reopen
+        case export
+        var id: String { rawValue }
+    }
+
+    @State private var presentedSheet: DetailSheet?
 
     init(itemID: UUID) {
         self.itemID = itemID
@@ -64,19 +78,13 @@ struct RentalItemDetailView: View {
                 }
             }
         }
-        .alert(
-            "Cannot do that yet",
-            isPresented: Binding(get: { rejection != nil }, set: { if !$0 { rejection = nil } })
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(rejection?.message ?? "")
-        }
-        .sheet(isPresented: $showingReopen) {
-            if let item { reopenSheet(for: item) }
-        }
-        .sheet(isPresented: $showingExport) {
-            if let item { EvidenceExportSheet(itemID: item.id) }
+        .sheet(item: $presentedSheet) { sheet in
+            if let item {
+                switch sheet {
+                case .reopen: reopenSheet(for: item)
+                case .export: EvidenceExportSheet(itemID: item.id)
+                }
+            }
         }
     }
 
@@ -84,6 +92,12 @@ struct RentalItemDetailView: View {
 
     private func content(for item: RentalItem) -> some View {
         List {
+            if let saveFailure {
+                Section {
+                    Label(saveFailure, systemImage: "externaldrive.badge.exclamationmark")
+                        .foregroundStyle(Palette.attentionText)
+                }
+            }
             Section { summary(for: item) }
             nextStepSection(item)
             if item.status == .contactVendor { contactVendorSection(item) }
@@ -99,15 +113,15 @@ struct RentalItemDetailView: View {
             deleteSection(item)
         }
         .listStyle(.insetGrouped)
-        .confirmationDialog(
-            "Delete this rental?",
-            isPresented: $confirmingDelete,
-            titleVisibility: .visible
+        // The refusal alert lives here rather than on the outer view, where it used to sit
+        // alongside the sheet modifiers. Every control that can raise it is a row of this list.
+        .alert(
+            "Cannot do that yet",
+            isPresented: Binding(get: { rejection != nil }, set: { if !$0 { rejection = nil } })
         ) {
-            Button("Delete", role: .destructive) { delete(item) }
-            Button("Keep", role: .cancel) {}
+            Button("OK", role: .cancel) {}
         } message: {
-            Text(deletionMessage(item))
+            Text(rejection?.message ?? "")
         }
         .offRentFormBackground()
     }
@@ -187,12 +201,12 @@ struct RentalItemDetailView: View {
     private func nextStepControl(for item: RentalItem) -> some View {
         switch item.status {
         case .draft:
-            primary("Mark active") { apply(.activate, to: item) }
+            primary("Mark active") { rejection = apply(.activate, to: item) }
 
         case .active:
             // Not "End rental". The button describes what the *user* did — finished with the
             // machine — not something the app can do to a rental agreement.
-            primary("Mark equipment done") { apply(.markEquipmentDone, to: item) }
+            primary("Mark equipment done") { rejection = apply(.markEquipmentDone, to: item) }
                 .accessibilityIdentifier(A11yID.ItemDetail.markDone)
                 .accessibilityHint(AppCopy.markDoneExplanation)
 
@@ -203,14 +217,14 @@ struct RentalItemDetailView: View {
             .accessibilityIdentifier(A11yID.ItemDetail.recordConfirmation)
 
         case .confirmationRecorded:
-            primary("Awaiting pickup") { apply(.acknowledgeAwaitingPickup, to: item) }
+            primary("Awaiting pickup") { rejection = apply(.acknowledgeAwaitingPickup, to: item) }
 
         case .awaitingPickup:
             primary("Record pickup") { router.presentedSheet = .recordPickup(itemID: item.id) }
                 .accessibilityIdentifier(A11yID.ItemDetail.recordPickup)
 
         case .pickedUp:
-            primary("Awaiting invoice") { apply(.beginAwaitingInvoice, to: item) }
+            primary("Awaiting invoice") { rejection = apply(.beginAwaitingInvoice, to: item) }
 
         case .awaitingInvoice:
             primary("Attach final invoice") {
@@ -224,11 +238,11 @@ struct RentalItemDetailView: View {
                     Label("Review the invoice", systemImage: "list.clipboard")
                 }
             }
-            Button("Resolve") { resolve(item) }
+            Button("Resolve") { rejection = resolve(item) }
                 .accessibilityIdentifier(A11yID.ItemDetail.resolve)
 
         case .resolved:
-            Button("Archive") { apply(.archive, to: item) }
+            Button("Archive") { rejection = apply(.archive, to: item) }
             reopenButton
 
         case .archived:
@@ -245,7 +259,7 @@ struct RentalItemDetailView: View {
     }
 
     private var reopenButton: some View {
-        Button("Reopen") { showingReopen = true }
+        Button("Reopen") { presentedSheet = .reopen }
             .accessibilityIdentifier(A11yID.ItemDetail.reopen)
     }
 
@@ -266,6 +280,16 @@ struct RentalItemDetailView: View {
         Section {
             Button("Delete this rental", role: .destructive) { confirmingDelete = true }
                 .accessibilityIdentifier(A11yID.ItemDetail.delete)
+                .confirmationDialog(
+                    "Delete this rental?",
+                    isPresented: $confirmingDelete,
+                    titleVisibility: .visible
+                ) {
+                    Button("Delete", role: .destructive) { delete(item) }
+                    Button("Keep", role: .cancel) {}
+                } message: {
+                    Text(deletionMessage(item))
+                }
         } footer: {
             Text(AppCopy.deleteRentalExplanation)
         }
@@ -300,7 +324,13 @@ struct RentalItemDetailView: View {
         if let agreement, (agreement.items ?? []).allSatisfy({ $0.id == identifier }) {
             context.delete(agreement)
         }
-        try? context.save()
+        // A delete that did not commit leaves the rental on screen. Saying nothing would make
+        // the app look as though it had ignored the tap.
+        if let problem = PersistentStore.save(context, describing: "This deletion") {
+            saveFailure = problem
+            return
+        }
+        saveFailure = nil
         dependencies.derivedStateNeedsRefresh()
         // The photographs and scanned pages are files, and the records that pointed at them have
         // gone. Without this they stay on disk forever — counted by the storage figure on the
@@ -419,6 +449,15 @@ struct RentalItemDetailView: View {
                 if let method = event.contactMethod {
                     DetailRow(label: "How", value: method.displayName)
                 }
+                if let meter = event.meterReading {
+                    DetailRow(
+                        label: "Meter",
+                        value: Formatters.meterReading(meter, unit: item.meterUnit)
+                    )
+                }
+                if let fuel = event.fuelLevel {
+                    DetailRow(label: "Fuel", value: fuel.displayName)
+                }
                 if let detail = event.detail, !detail.isEmpty {
                     DetailRow(label: "Note", value: detail)
                 }
@@ -435,6 +474,15 @@ struct RentalItemDetailView: View {
         if let event = latestEvent(of: .pickupRecorded, in: item) {
             Section {
                 DetailRow(label: "Recorded", value: Formatters.dateAndTime(event.timestamp))
+                if let meter = event.meterReading {
+                    DetailRow(
+                        label: "Final meter",
+                        value: Formatters.meterReading(meter, unit: item.meterUnit)
+                    )
+                }
+                if let fuel = event.fuelLevel {
+                    DetailRow(label: "Final fuel", value: fuel.displayName)
+                }
                 if let detail = event.detail, !detail.isEmpty {
                     DetailRow(label: "Note", value: detail)
                 }
@@ -519,7 +567,7 @@ struct RentalItemDetailView: View {
     private func utilitySection(_ item: RentalItem) -> some View {
         Section {
             Button {
-                showingExport = true
+                presentedSheet = .export
             } label: {
                 Label("Export evidence packet", systemImage: "square.and.arrow.up")
             }
@@ -566,18 +614,33 @@ struct RentalItemDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { showingReopen = false }
+                    Button("Cancel") { presentedSheet = nil }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Reopen") {
-                        apply(.reopen(to: reopenTarget, reason: reopenReason), to: item)
-                        if rejection == nil {
-                            showingReopen = false
+                        reopenRejection = apply(
+                            .reopen(to: reopenTarget, reason: reopenReason), to: item
+                        )
+                        if reopenRejection == nil {
+                            presentedSheet = nil
                             reopenReason = ""
                         }
                     }
                     .disabled(reopenReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+            }
+            // A refusal raised inside a sheet has to be shown inside that sheet. Presented from
+            // the screen behind it, it would never appear, and the Reopen button would look dead.
+            .alert(
+                "Cannot do that yet",
+                isPresented: Binding(
+                    get: { reopenRejection != nil },
+                    set: { if !$0 { reopenRejection = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(reopenRejection?.message ?? "")
             }
         }
         .presentationDetents([.medium])
@@ -585,19 +648,22 @@ struct RentalItemDetailView: View {
 
     // MARK: - Actions
 
-    private func apply(_ intent: TransitionIntent, to item: RentalItem) {
+    /// Returns the refusal rather than presenting it, so the caller can raise it where the user
+    /// is actually looking — on the list behind, or inside the sheet they are standing in.
+    private func apply(_ intent: TransitionIntent, to item: RentalItem) -> TransitionRejection? {
         let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
         if case let .failure(failure) = workflow.apply(intent, to: item) {
-            rejection = failure
-            return
+            return failure
         }
-        try? context.save()
+        saveFailure = PersistentStore.save(context, describing: "This change")
+        guard saveFailure == nil else { return nil }
         dependencies.derivedStateNeedsRefresh()
+        return nil
     }
 
-    private func resolve(_ item: RentalItem) {
+    private func resolve(_ item: RentalItem) -> TransitionRejection? {
         let openCount = latestInvoice(for: item)?.openDiscrepancyCount ?? 0
-        apply(.resolve(openDiscrepancyCount: openCount), to: item)
+        return apply(.resolve(openDiscrepancyCount: openCount), to: item)
     }
 
     private func latestInvoice(for item: RentalItem) -> VendorInvoice? {
