@@ -517,6 +517,11 @@ struct AttachInvoiceSheet: View {
         // the save landed and then send the user to a review screen for an invoice that might
         // never have been written — the app reporting a filed invoice it did not have.
         if let failure = PersistentStore.save(context, describing: "This invoice") {
+            // Take the insert back before inviting a retry. On a new invoice this has already
+            // inserted a `VendorInvoice`, its lines, and a timeline entry; without the rollback a
+            // second tap on Save filed the same piece of paper twice, and two invoices against
+            // one rental is exactly the confusion this screen exists to prevent.
+            context.rollback()
             saveFailure = failure
             return
         }

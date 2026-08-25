@@ -212,15 +212,45 @@ enum InvoiceComparisonEngine {
             basis = "You entered this expected rental amount."
         } else if let perPeriod = input.terms.rateCard.amount(for: input.terms.billingBasis),
                   perPeriod > .zero {
-            expected = MoneyMath.rounded(MoneyMath.multiply(perPeriod, by: expectedPeriods))
+            // The same function the running estimate uses, not a second multiplication that
+            // happens to agree most of the time.
+            //
+            // It did not agree. Once `RentalRateEngine.accruedTotal` learned to bill the periods
+            // before a confirmed rate change at the old rate and the ones after it at the new
+            // one, this line was still `perPeriod × periods` — so a rental with a rate change the
+            // user had confirmed showed one figure on its own screen and was compared against a
+            // different one here. The gap between them became a "possible variance" against an
+            // invoice that was correct. Telling a contractor their yard has overbilled them, on
+            // arithmetic the app contradicts two screens away, is the worst thing this engine can
+            // do.
+            //
+            // `asOf: billedThrough` and not `input.now`: a rate change that lands after the
+            // period being billed must not be applied to it.
+            expected = RentalRateEngine.accruedTotal(
+                terms: input.terms,
+                periodsStarted: expectedPeriods,
+                amountPerPeriod: perPeriod,
+                asOf: billedThrough,
+                calendar: input.calendar
+            )
             let source = input.confirmationDate != nil
                 ? "the date you recorded the vendor's confirmation"
                 : (input.pickupDate != nil ? "the pickup date you recorded" : "today")
-            basis = """
-                Based on the terms you confirmed: \(expectedPeriods) \
-                \(expectedPeriods == 1 ? input.terms.billingBasis.shortName : input.terms.billingBasis.shortName + "s") \
-                at the \(input.terms.billingBasis.shortName) rate, counted from delivery through \(source).
-                """
+            let changed = RentalRateEngine.rateChangeApplies(
+                terms: input.terms, asOf: billedThrough
+            )
+            basis = changed
+                ? """
+                    Based on the terms you confirmed: \(expectedPeriods) \
+                    \(expectedPeriods == 1 ? input.terms.billingBasis.shortName : input.terms.billingBasis.shortName + "s") \
+                    counted from delivery through \(source), with the rate change you confirmed \
+                    applied from the period it falls in.
+                    """
+                : """
+                    Based on the terms you confirmed: \(expectedPeriods) \
+                    \(expectedPeriods == 1 ? input.terms.billingBasis.shortName : input.terms.billingBasis.shortName + "s") \
+                    at the \(input.terms.billingBasis.shortName) rate, counted from delivery through \(source).
+                    """
         } else {
             expected = nil
             basis = """

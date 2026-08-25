@@ -263,6 +263,79 @@ final class InvoiceComparisonTests: XCTestCase {
         )
         XCTAssertTrue(comparison.findings.isEmpty)
     }
+
+    // MARK: - The two engines must not contradict each other
+
+    /// The rental's own screen and the invoice comparison must reach the same figure.
+    ///
+    /// `RentalRateEngine.accruedTotal` bills the periods before a confirmed rate change at the old
+    /// rate and the ones after it at the new one. This engine used to run its own
+    /// `perPeriod × periods` instead, so a rental with a rate change the user had confirmed showed
+    /// one total on its detail screen and was compared against a different one here — and the gap
+    /// between the app's two answers was reported to the contractor as a possible variance against
+    /// an invoice that was correct.
+    func testTheComparisonExpectsWhatTheRentalScreenShows() {
+        let terms = RentalTerms.skidSteer(
+            delivered: delivered,
+            mode: .manual,
+            nextRollover: date(2026, 5, 8, 7),   // day 4: periods 5 onwards bill at the new rate
+            expectedIncrement: "310.00"
+        )
+        // Confirmed off-rent on 05-11 → 8 daily periods: 4 at 285, 4 at 310.
+        let expectedTotal = money("2380.00")
+
+        let onScreen = RentalRateEngine.accruedTotal(
+            terms: terms,
+            periodsStarted: RentalRateEngine.periodsStarted(daysOnRent: 7, basis: .daily),
+            amountPerPeriod: money("285.00"),
+            asOf: confirmed,
+            calendar: calendar()
+        )
+        XCTAssertEqual(onScreen, expectedTotal)
+
+        let result = InvoiceComparisonEngine.compare(
+            input(
+                invoice: InvoiceValue(receivedDate: date(2026, 5, 18)),
+                confirmationDate: confirmed,
+                terms: terms
+            )
+        )
+        XCTAssertEqual(
+            result.expectedRentalSubtotal, expectedTotal,
+            "the comparison must expect the figure the rental's own screen shows"
+        )
+    }
+
+    /// And the explanation says the rate change was applied, rather than claiming a flat rate.
+    func testTheExplanationNamesTheRateChangeWhenOneApplies() {
+        let terms = RentalTerms.skidSteer(
+            delivered: delivered,
+            mode: .manual,
+            nextRollover: date(2026, 5, 8, 7),
+            expectedIncrement: "310.00"
+        )
+        let result = InvoiceComparisonEngine.compare(
+            input(
+                invoice: InvoiceValue(receivedDate: date(2026, 5, 18)),
+                confirmationDate: confirmed,
+                terms: terms
+            )
+        )
+        XCTAssertTrue(result.expectationBasis.contains("rate change you confirmed"))
+        XCTAssertTrue(result.expectationBasis.hasPrefix("Based on the terms you confirmed"))
+    }
+
+    /// With no rate change confirmed, the wording and the figure are exactly as they were.
+    func testAFlatRentalIsUnchangedInBothFigureAndWording() {
+        let result = InvoiceComparisonEngine.compare(
+            input(
+                invoice: InvoiceValue(receivedDate: date(2026, 5, 18)),
+                confirmationDate: confirmed
+            )
+        )
+        XCTAssertEqual(result.expectedRentalSubtotal, money("2280.00"))  // 285 × 8
+        XCTAssertTrue(result.expectationBasis.contains("at the day rate"))
+    }
 }
 
 /// §19 of the product specification, executed end to end against the domain engines.

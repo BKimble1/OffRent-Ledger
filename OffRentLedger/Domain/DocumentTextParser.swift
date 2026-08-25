@@ -199,9 +199,55 @@ enum DocumentTextParser {
                     let runUp = text.substring(with: NSRange(location: start, length: range.location - start))
                     if RegexCache.matches(pattern: excludeIfPrecededBy, in: runUp) { continue }
                 }
+                // Only when the rule stopped on a bare integer. A capture that already looks
+                // like an amount is one — including on a rate table printed as a single line,
+                // `DAY 285.00  WEEK 855.00  4WK 2,280.00`, where three rules each match their own
+                // figure and the rightmost belongs to none of the other two.
+                if kind == .money, Rule.isBareCount(trimmed),
+                   let corrected = Rule.amountColumn(after: captured.range, in: line) {
+                    return corrected
+                }
                 return (trimmed, captured.range)
             }
             return nil
+        }
+
+        /// Whether the captured text is a bare count rather than an amount.
+        ///
+        /// No decimal part and no currency symbol: `1`, `2`, `14`. Those are the quantity and
+        /// rate columns. `63.00`, `$63`, `2,280.00` are amounts and are left alone.
+        static func isBareCount(_ text: String) -> Bool {
+            !text.contains(".") && !text.contains("$") && text.contains(where: \.isNumber)
+        }
+
+        /// The figure in the amount column, when the rule stopped on something to its left.
+        ///
+        /// Rental invoices print a charge line as label, then quantity or rate, then the amount:
+        /// `LDW 2 DAYS @ 12.50 ...... 25.00`, `CDW  1  63.00`, `RPP … 14 PCT ..... 63.00`. A rule
+        /// anchored on the label matched the first number after it and read the *quantity* as the
+        /// charge — $2.00 for a $25.00 waiver, $1.00 for a $63.00 one — at a confidence above the
+        /// preselect threshold, so it arrived already ticked. Understating an invoice is the one
+        /// direction this app must never be wrong in: the whole product is a comparison against
+        /// what the vendor billed.
+        ///
+        /// So on a money rule, anything to the right of the capture that is unmistakably an
+        /// amount — two decimal places, or a currency symbol — wins, and the rightmost of those
+        /// is the amount column. A bare integer to the right is *not* enough: `LDW 87.50 EA 2`
+        /// must keep 87.50.
+        private static let amountShape =
+            #"(?<![0-9.,])(?:\$\s*[0-9][0-9,]*(?:\.[0-9]{2})?|[0-9][0-9,]*\.[0-9]{2})(?![0-9])"#
+
+        static func amountColumn(after range: NSRange?, in line: String) -> (String, NSRange?)? {
+            guard let range, let expression = RegexCache.expression(for: amountShape) else {
+                return nil
+            }
+            let text = line as NSString
+            let tailStart = range.location + range.length
+            guard tailStart < text.length else { return nil }
+            let tail = NSRange(location: tailStart, length: text.length - tailStart)
+            guard let last = expression.matches(in: line, range: tail).last else { return nil }
+            let value = text.substring(with: last.range).trimmingCharacters(in: .whitespaces)
+            return value.isEmpty ? nil : (value, last.range)
         }
 
         func interpret(_ raw: String, calendar: Calendar) -> SuggestedValue? {

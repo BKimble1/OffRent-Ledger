@@ -399,4 +399,50 @@ final class ModelSuggestionValidatorTests: XCTestCase {
         )
         XCTAssertEqual(accepted.first?.value, .money(money("118.80")))
     }
+
+    /// An inches mark is not a quotation mark.
+    ///
+    /// A yard's paperwork carries several — `48" FORKS`, `36" BUCKET` — and two of them used to
+    /// count as a matched quotation pair, blanking everything printed between them out of the
+    /// check. A correct model suggestion reading a figure from that span was then rejected as not
+    /// being on the page at all.
+    func testTwoInchesMarksDoNotBlankTheDocumentBetweenThem() {
+        let document = RecognizedDocument(
+            rawText: """
+                48" PALLET FORKS                    UNIT # PF-118
+                DELIVERY                          120.00
+                36" GRADING BUCKET                  UNIT # GB-204
+                """,
+            averageRecognitionConfidence: 0.95
+        )
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "deliveryCharge", value: "120.00",
+                sourceLine: "DELIVERY                          120.00"
+            )],
+            against: document, existing: [], calendar: calendar
+        )
+        XCTAssertEqual(
+            accepted.count, 1,
+            "the delivery charge is printed between two inches marks, not inside a quotation"
+        )
+    }
+
+    /// A real quoted span is still removed.
+    func testAGenuinelyQuotedFigureIsStillNotEvidence() {
+        let document = RecognizedDocument(
+            rawText: """
+                CONDITIONS: the "standard delivery charge of 120.00" applies unless agreed.
+                """,
+            averageRecognitionConfidence: 0.95
+        )
+        let accepted = ModelSuggestionValidator.validate(
+            [ProposedField(
+                field: "deliveryCharge", value: "120.00",
+                sourceLine: "CONDITIONS: the \"standard delivery charge of 120.00\" applies unless agreed."
+            )],
+            against: document, existing: [], calendar: calendar
+        )
+        XCTAssertTrue(accepted.isEmpty)
+    }
 }

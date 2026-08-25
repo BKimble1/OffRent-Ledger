@@ -647,4 +647,68 @@ final class ExtractionFixtureTests: XCTestCase {
         XCTAssertTrue(fields.contains(.invoiceNumber))
         XCTAssertTrue(fields.contains(.deliveryCharge))
     }
+
+    // MARK: - The amount column, not the quantity column
+
+    /// A charge line prints label, then quantity or rate, then the amount.
+    ///
+    /// The waiver rule matched the first number after its label, so `CDW  1  63.00` was read as a
+    /// one-dollar damage waiver and `LDW 2 DAYS @ 12.50 ...... 25.00` as a two-dollar one — at a
+    /// confidence above the preselect threshold, so both arrived already ticked. Understating an
+    /// invoice is the one direction this app must never be wrong in.
+    private func waiver(_ line: String) -> Decimal? {
+        let result = parseRecognisedText(line, kind: .vendorInvoice)
+        guard case let .money(amount)? = result.suggestions
+            .first(where: { $0.field == .damageCharge })?.value
+        else { return nil }
+        return amount
+    }
+
+    func testAQuantityColumnIsNotReadAsTheCharge() {
+        let posix = Locale(identifier: "en_US_POSIX")
+        XCTAssertEqual(waiver("CDW  1  63.00"), Decimal(string: "63.00", locale: posix))
+        XCTAssertEqual(
+            waiver("LDW 2 DAYS @ 12.50 ...................... 25.00"),
+            Decimal(string: "25.00", locale: posix)
+        )
+        XCTAssertEqual(
+            waiver("RPP (RENTAL PROTECTION PLAN) 14 PCT ..... 63.00"),
+            Decimal(string: "63.00", locale: posix)
+        )
+    }
+
+    func testTheOrdinaryWaiverLinesAreUnchanged() {
+        let posix = Locale(identifier: "en_US_POSIX")
+        XCTAssertEqual(
+            waiver("RPP (14%) ............................... 63.00"),
+            Decimal(string: "63.00", locale: posix)
+        )
+        XCTAssertEqual(waiver("LDW  87.50"), Decimal(string: "87.50", locale: posix))
+        XCTAssertEqual(
+            waiver("DAMAGE WAIVER (DW) ...... 63.00"),
+            Decimal(string: "63.00", locale: posix)
+        )
+    }
+
+    /// A bare integer to the right is not an amount, so it cannot displace one.
+    func testATrailingCountDoesNotDisplaceTheAmount() {
+        XCTAssertEqual(
+            waiver("LDW 87.50 EA 2"),
+            Decimal(string: "87.50", locale: Locale(identifier: "en_US_POSIX"))
+        )
+    }
+
+    /// And a rate table printed on one line keeps three separate figures: the correction must not
+    /// hand every rule the rightmost number on the row.
+    func testASingleLineRateTableStillYieldsThreeDifferentRates() throws {
+        let result = try parse("contract_single_line_rate_table.txt", kind: .rentalContract)
+        func money(_ field: SuggestedField) -> Decimal? {
+            guard case let .money(amount)? = result.suggestions
+                .first(where: { $0.field == field })?.value
+            else { return nil }
+            return amount
+        }
+        XCTAssertNotEqual(money(.dailyRate), money(.fourWeekRate))
+        XCTAssertNotEqual(money(.weeklyRate), money(.fourWeekRate))
+    }
 }

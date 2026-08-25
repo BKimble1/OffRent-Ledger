@@ -279,10 +279,17 @@ struct EvidenceExportSheet: View {
 
             RentalWorkflowService(context: context, clock: dependencies.clock)
                 .append(event: .evidenceExported, to: item, detail: "Evidence packet generated.")
-            // The packet itself is already on disk, so this only fails to record that it was
-            // made. Say so rather than leaving the timeline quietly short of an entry.
-            if let problem = PersistentStore.save(context, describing: "This export") {
-                failure = problem
+            // The packet itself is already on disk and is on screen to share. A failure here
+            // only means the timeline entry recording the export did not save — so it says that,
+            // rather than "This export could not be saved. …try again", which told the user their
+            // finished packet had failed.
+            if PersistentStore.save(context, describing: "This export") != nil {
+                failure = """
+                    The packet is ready to share below. \(AppConfiguration.displayName) could not \
+                    add a line to this rental's timeline recording that you made it.
+                    """
+            } else {
+                failure = nil
             }
         } catch {
             failure = "The packet could not be generated. \(error.localizedDescription)"

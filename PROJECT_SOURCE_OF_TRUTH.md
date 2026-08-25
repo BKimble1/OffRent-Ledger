@@ -199,7 +199,7 @@ the counter, so there is no path by which recomputing triggers another recomputa
 
 ## 4. Domain model
 
-Nine entities, on schema V3. SwiftData `@Model` classes live in `Persistence/`; each has a matching pure value
+Nine entities, on schema V4. SwiftData `@Model` classes live in `Persistence/`; each has a matching pure value
 type in `Domain/` used by the engines and by export/import.
 
 | Entity | Key fields |

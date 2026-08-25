@@ -79,16 +79,6 @@ struct BackupAndTransferView: View {
                 onCancel: { pendingImport = nil }
             )
         }
-        .alert(
-            "Import failed",
-            isPresented: Binding(
-                get: { importFailure != nil }, set: { if !$0 { importFailure = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(importFailure ?? "")
-        }
     }
 
     // MARK: - Status
@@ -226,6 +216,21 @@ struct BackupAndTransferView: View {
                     tint: Palette.accent
                 ) { showingImporter = true }
                     .accessibilityIdentifier(A11yID.Settings.importBackup)
+                    // On the row that starts the import, not on the screen — where it sat beside
+                    // `.sheet(item:)` for the import preview. One failed import and the preview
+                    // sheet stopped presenting, so the next file the user picked was accepted
+                    // with no chance to see what it would change.
+                    .alert(
+                        "Import failed",
+                        isPresented: Binding(
+                            get: { importFailure != nil },
+                            set: { if !$0 { importFailure = nil } }
+                        )
+                    ) {
+                        Button("OK", role: .cancel) {}
+                    } message: {
+                        Text(importFailure ?? "")
+                    }
             }
 
             Text("""

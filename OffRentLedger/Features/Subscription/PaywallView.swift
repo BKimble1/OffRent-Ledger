@@ -59,14 +59,6 @@ struct PaywallView: View {
             .sheet(item: $showingLegal) { document in
                 NavigationStack { LegalDocumentView(document: document) }
             }
-            .alert(
-                "Subscription",
-                isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })
-            ) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(message ?? "")
-            }
         }
     }
 
@@ -233,6 +225,26 @@ struct PaywallView: View {
     }
 
     private var purchaseBar: some View {
+        purchaseControls
+            .alert(
+                "Subscription",
+                isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(message ?? "")
+            }
+    }
+
+    private var purchaseControls: some View {
+        // The purchase alert lives on the bar that raises it, not on the screen.
+        //
+        // It sat on the same modifier chain as `.sheet(item: $showingLegal)`, which is the
+        // arrangement this app has already been bitten by twice: once the alert has shown and
+        // been dismissed, setting the sheet's item stops presenting it. Every route through this
+        // screen shows that alert — a completed purchase, a cancelled one, a restore with nothing
+        // to restore — and after any of them "Privacy Policy" and "Terms of Use" became dead
+        // taps. App Review opens both.
         StickyActionBar {
             VStack(spacing: Space.snug) {
                 Button {

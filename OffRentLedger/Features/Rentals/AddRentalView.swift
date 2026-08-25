@@ -124,6 +124,10 @@ struct AddRentalView: View {
         // Dismissing before the write is confirmed would show the contractor a rental that
         // is not in the ledger. Stay on the form and say so instead.
         if let problem = PersistentStore.save(context, describing: "This rental") {
+            // Take the insert back before inviting a retry. `context.insert` puts the record in
+            // the context whether or not the save lands, so a second tap on Save inserted a
+            // second one — and the message on screen is asking for exactly that second tap.
+            context.rollback()
             saveFailure = problem
             isSaving = false
             return

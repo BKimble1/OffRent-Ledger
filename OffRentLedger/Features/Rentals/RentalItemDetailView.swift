@@ -295,11 +295,30 @@ struct RentalItemDetailView: View {
         }
     }
 
+    /// Whether deleting this rental also takes its agreement, and everything filed on it.
+    ///
+    /// The same test `delete(_:)` applies, so the warning and the deletion cannot disagree about
+    /// what is going.
+    private func agreementGoesToo(with item: RentalItem) -> Bool {
+        guard let agreement = item.agreement else { return false }
+        return (agreement.items ?? []).allSatisfy { $0.id == item.id }
+    }
+
     /// Counts what goes, rather than warning in the abstract.
+    ///
+    /// It used to count `item.agreement?.assets`, which is not where a rental's photographs live.
+    /// `EvidenceManagerView` files every one of them as `EvidenceAsset(..., item: item)`, so they
+    /// are on `item.assets` — the same array this screen draws two sections higher — and the
+    /// cascade on `\RentalItemModel.assets` destroys all of them. The one irreversible action in
+    /// the app was under-reporting exactly the records a contractor would most regret losing.
+    /// It also promised to delete the agreement's invoices on a two-machine agreement that
+    /// `delete(_:)` deliberately leaves standing.
     private func deletionMessage(_ item: RentalItem) -> String {
+        let agreementGoes = agreementGoesToo(with: item)
         let events = (item.events ?? []).count
-        let invoices = (item.agreement?.invoices ?? []).count
-        let photographs = (item.agreement?.assets ?? []).count
+        let invoices = agreementGoes ? (item.agreement?.invoices ?? []).count : 0
+        let photographs = (item.assets ?? []).count
+            + (agreementGoes ? (item.agreement?.assets ?? []).count : 0)
         var parts: [String] = []
         if events > 0 { parts.append("\(events) timeline \(events == 1 ? "entry" : "entries")") }
         if invoices > 0 { parts.append("\(invoices) invoice\(invoices == 1 ? "" : "s")") }
@@ -324,9 +343,15 @@ struct RentalItemDetailView: View {
         if let agreement, (agreement.items ?? []).allSatisfy({ $0.id == identifier }) {
             context.delete(agreement)
         }
-        // A delete that did not commit leaves the rental on screen. Saying nothing would make
-        // the app look as though it had ignored the tap.
+        // A delete that did not commit has to be taken back, not merely reported.
+        //
+        // `context.delete` removes the object from the context immediately, so `@Query` stops
+        // returning it and this screen falls to its "This rental is no longer here" branch — the
+        // branch that does not draw the failure banner. The user would have been told the rental
+        // was gone, seen it back on the Rentals list at the next launch, and never learned why.
+        // Rolling back puts it where it was, and then the banner has a screen to appear on.
         if let problem = PersistentStore.save(context, describing: "This deletion") {
+            context.rollback()
             saveFailure = problem
             return
         }
@@ -341,7 +366,7 @@ struct RentalItemDetailView: View {
             )
             _ = try? await service.reconcileEvidenceFiles()
         }
-        router.rentalsPath = NavigationPath()
+        router.popToRoot()
     }
 
     private func contactVendorSection(_ item: RentalItem) -> some View {

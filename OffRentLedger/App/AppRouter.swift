@@ -50,6 +50,21 @@ final class AppRouter {
         return true
     }
 
+    /// Returns the tab the user is on to its root.
+    ///
+    /// For screens that delete the record they are showing. `RentalItemDetailView` used to clear
+    /// `rentalsPath` unconditionally, but a rental is reachable from Today's map and from the
+    /// Audit tab too — so deleting one from either left the user staring at "This rental is no
+    /// longer here" while a tab they were not looking at quietly popped.
+    func popToRoot() {
+        switch selectedTab {
+        case .today: todayPath = NavigationPath()
+        case .rentals: rentalsPath = NavigationPath()
+        case .audit: auditPath = NavigationPath()
+        case .settings: settingsPath = NavigationPath()
+        }
+    }
+
     func handle(_ link: DeepLink) {
         switch link {
         case .today:

@@ -212,6 +212,20 @@ enum RentalRateEngine {
         return MoneyMath.rounded(old + new)
     }
 
+    /// Whether a rate change the user confirmed actually lands on or before `asOf`.
+    ///
+    /// The same five conditions `accruedTotal` guards on, exposed so a caller can say *why* a
+    /// figure is what it is without re-deriving the rule and drifting from it.
+    static func rateChangeApplies(terms: RentalTerms, asOf: Date) -> Bool {
+        guard terms.rolloverMode == .manual || terms.manualRolloverOverride,
+              let rolloverDate = terms.nextRolloverDate,
+              let newAmount = terms.expectedNextIncrement,
+              newAmount != terms.rateCard.amount(for: terms.billingBasis),
+              rolloverDate <= asOf
+        else { return false }
+        return true
+    }
+
     /// Billing periods started, counting the one in progress.
     ///
     /// A machine delivered this morning and still on site is on its first day, not its zeroth —

@@ -191,19 +191,42 @@ enum ModelSuggestionValidator {
     /// what a recogniser returns for an inches mark on a fork or a hose, and treating one of those
     /// as an opening would silently delete the rest of the document from the check.
     static func outsideQuotation(_ text: String) -> String {
-        let paired = text.filter { $0 == "\"" }.count / 2 * 2
+        // An inches mark is not a quotation mark.
+        //
+        // A yard's paperwork is full of them — `48" FORKS`, `36" BUCKET`, `72" BROOM` — and two
+        // on one page used to count as a matched pair, so everything printed between them was
+        // blanked out of the check. A model suggestion reading a figure from that span was then
+        // rejected as "not on the page", and a correct value was silently dropped.
+        //
+        // Only the *opening* mark of a pair can tell the two apart. A closing quotation mark
+        // follows a digit as readily as an inches mark does — `charge of 120.00"` — so the test
+        // has to be asymmetric: a pair whose opening mark sits directly after a digit is a
+        // measurement and the span between it and the next mark is left alone.
+        let characters = Array(text)
+        let marks = characters.indices.filter { characters[$0] == "\"" }
+        let paired = marks.count / 2 * 2
         guard paired >= 2 else { return text }
 
+        var blanked = Set<Int>()
+        var opensSpan = Set<Int>()
+        for pair in stride(from: 0, to: paired, by: 2) {
+            let open = marks[pair]
+            let close = marks[pair + 1]
+            let previous = open > 0 ? characters[open - 1] : nil
+            guard !(previous?.isNumber ?? false) else { continue }
+            opensSpan.insert(open)
+            opensSpan.insert(close)
+            for index in open...close { blanked.insert(index) }
+        }
+        guard !blanked.isEmpty else { return text }
+
         var result = ""
-        var seen = 0
-        var inside = false
-        for character in text {
-            if character == "\"", seen < paired {
-                seen += 1
-                inside = seen % 2 == 1
+        for (index, character) in characters.enumerated() {
+            if opensSpan.contains(index) {
                 result.append(" ")
                 continue
             }
+            let inside = blanked.contains(index)
             // Replaced rather than deleted, so the text either side of a quotation does not fuse
             // into a token the page never printed.
             result.append(inside ? " " : character)

@@ -576,7 +576,13 @@ struct InvoiceReviewView: View {
         invoice.reviewStatusRaw = InvoiceReviewStatus.followUpRecorded.rawValue
 
         if let problem = PersistentStore.save(context, describing: "This follow-up") {
+            // The discrepancy inserts and the status change go back, so a retry records one
+            // follow-up rather than two. The sheet closes as well: its message would otherwise be
+            // drawn on the screen behind it, where the user cannot see it, and the retry would
+            // look like a button that does nothing.
+            context.rollback()
             saveFailure = problem
+            showingFollowUp = false
             return
         }
         saveFailure = nil
