@@ -2,11 +2,15 @@ import Foundation
 
 /// What the scanner is allowed to do without being asked each time.
 ///
-/// One setting, off by default. "Auto scan and fill if you allow it" is a real convenience — a
-/// clear photograph of a contract can fill nine fields — but it is an opt-in because a value the
-/// app applied without the user looking at it is exactly the thing §7 spends its length guarding
-/// against. Turning it on does not change *what* is applied: only high-confidence suggestions
-/// ever were, and nothing is written to the store until Save on the rental itself.
+/// One setting, on by default, and switchable in Settings.
+///
+/// It shipped off, which meant the scanner's best behaviour was the one nobody saw. Turning it on
+/// does not change *what* is applied — only high-confidence suggestions ever were — and it does
+/// not write anything: the values land in the rental form, and the form still has to be saved.
+/// What it skips is a confirmation screen on a scan the app has no uncertainty about at all.
+///
+/// The guards below are what make that safe, and they are strict on purpose: three fields
+/// minimum, and not one thing on the page read at less than full confidence.
 struct ScanSettings: Codable, Sendable, Equatable {
 
     /// Skip the review screen when a scan is clear enough to stand on its own.
@@ -19,7 +23,7 @@ struct ScanSettings: Codable, Sendable, Equatable {
     /// failed. Three is the point at which the form visibly did some work.
     static let minimumFieldsForAutoFill = 3
 
-    init(autoFillConfidentScans: Bool = false) {
+    init(autoFillConfidentScans: Bool = true) {
         self.autoFillConfidentScans = autoFillConfidentScans
     }
 

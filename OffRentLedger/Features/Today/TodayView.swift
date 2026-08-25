@@ -34,6 +34,14 @@ struct TodayView: View {
                     summary
                 }
 
+                // The scanner, on the home screen and above everything it feeds.
+                //
+                // It sat four taps in — Rentals, +, New rental, Scan the rental contract — which
+                // is a long way from the thing the app is fastest at. Outside the branch for the
+                // same reason as the map: a user with nothing on rent is exactly the one who
+                // most needs the quickest way to put a contract in.
+                scanCard
+
                 // Outside the branch on purpose. The map used to live in the `else`, so a user
                 // with nothing on rent never saw it — and neither did a user whose only rental
                 // had no location, because the panel drew nothing in that case either. Between
@@ -151,6 +159,46 @@ struct TodayView: View {
         }
         return "Estimated rent running, \(Formatters.currencyAccessible(totalRunning)). "
             + AppCopy.estimateQualifier
+    }
+
+    // MARK: - Scan
+
+    private var scanCard: some View {
+        VStack(alignment: .leading, spacing: Space.base) {
+            CardHeader(
+                title: "Scan a rental contract",
+                subtitle: scanSubtitle,
+                symbol: "doc.viewfinder",
+                tint: Palette.accent
+            )
+
+            Button("Scan a contract") {
+                router.selectedTab = .rentals
+                router.presentedSheet = .scanRental
+            }
+            .buttonStyle(.offRentPrimary)
+            .accessibilityIdentifier(A11yID.Today.scanStart)
+
+            Text(AppCopy.ocrLocalOnly)
+                .font(Typography.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .offRentCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(A11yID.Today.scanCard)
+    }
+
+    /// Says what the scan will actually do, which depends on what this iPhone can run.
+    ///
+    /// Naming the on-device model only when it is available is the difference between a promise
+    /// and a description. On a device that cannot run it the rules still read the page, and the
+    /// line says so rather than advertising something the user will not get.
+    private var scanSubtitle: String {
+        dependencies.documentIntelligence.isAvailable
+            ? "Point it at the paperwork. Apple Intelligence reads the tables, the rates and the company, and fills the form for you."
+            : "Point it at the paperwork and \(AppConfiguration.displayName) reads the rates, the dates and the company off it."
     }
 
     // MARK: - Sections

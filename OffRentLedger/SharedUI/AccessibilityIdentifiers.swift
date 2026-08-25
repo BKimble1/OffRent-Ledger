@@ -19,6 +19,8 @@ enum A11yID {
         static let actionQueue = "today.actionQueue"
         static let emptyState = "today.emptyState"
         static let addRental = "today.addRental"
+        static let scanCard = "today.scanCard"
+        static let scanStart = "today.scanStart"
         static let map = "today.map"
         static let mapEmptyOverlay = "today.map.empty"
     }
@@ -271,6 +273,9 @@ enum A11yID {
         static let remindersRoot = "settings.reminders.root"
         static let remindersPermission = "settings.reminders.permission"
         static let remindersEnable = "settings.reminders.enable"
+        static let remindersPriming = "settings.reminders.priming"
+        static let remindersPrimingContinue = "settings.reminders.priming.continue"
+        static let remindersPrimingNotNow = "settings.reminders.priming.notNow"
         static let remindersOpenSystemSettings = "settings.reminders.openSystemSettings"
         static let remindersTest = "settings.reminders.test"
         static let remindersQuietHours = "settings.reminders.quietHours"

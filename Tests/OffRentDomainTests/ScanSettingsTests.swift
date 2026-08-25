@@ -5,11 +5,23 @@ import XCTest
 /// "It should auto scan and fill if you allow it" — and the three conditions on *allow*.
 final class ScanSettingsTests: XCTestCase {
 
-    func testTheShortcutIsOffUntilItIsTurnedOn() {
-        XCTAssertFalse(ScanSettings.default.autoFillConfidentScans)
+    /// On by default now: the scanner's best behaviour was the one nobody saw.
+    ///
+    /// The guards are what make that safe, and they are asserted individually below — three
+    /// fields minimum, and nothing on the page read at less than full confidence.
+    func testTheShortcutIsOnByDefault() {
+        XCTAssertTrue(ScanSettings.default.autoFillConfidentScans)
+        XCTAssertTrue(
+            ScanSettings.default.shouldFillAutomatically(preselectedCount: 9, hasAnythingUnticked: false)
+        )
+    }
+
+    /// And it can still be switched off, which is the whole point of it being a setting.
+    func testTurningItOffStopsEveryShortcut() {
+        let settings = ScanSettings(autoFillConfidentScans: false)
         XCTAssertFalse(
-            ScanSettings.default.shouldFillAutomatically(preselectedCount: 9, hasAnythingUnticked: false),
-            "a clear scan still stops at the review screen until the user opts in"
+            settings.shouldFillAutomatically(preselectedCount: 9, hasAnythingUnticked: false),
+            "a scan as clear as this one still stops at the review screen when the user said to"
         )
     }
 
@@ -39,8 +51,14 @@ final class ScanSettingsTests: XCTestCase {
     func testTheSettingSurvivesARoundTrip() {
         let defaults = UserDefaults(suiteName: "ScanSettingsTests")!
         defaults.removePersistentDomain(forName: "ScanSettingsTests")
-        XCTAssertFalse(ScanSettingsStore.load(from: defaults).autoFillConfidentScans)
-        ScanSettingsStore.save(ScanSettings(autoFillConfidentScans: true), to: defaults)
-        XCTAssertTrue(ScanSettingsStore.load(from: defaults).autoFillConfidentScans)
+        XCTAssertTrue(
+            ScanSettingsStore.load(from: defaults).autoFillConfidentScans,
+            "an empty store reads as the default, which is on"
+        )
+        ScanSettingsStore.save(ScanSettings(autoFillConfidentScans: false), to: defaults)
+        XCTAssertFalse(
+            ScanSettingsStore.load(from: defaults).autoFillConfidentScans,
+            "and a user who switched it off keeps it off across launches"
+        )
     }
 }

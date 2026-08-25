@@ -167,4 +167,48 @@ struct AttachInvoiceRobot {
         // have matched any other Save that happened to be on screen.
         app.expect(app.buttons[A11yUI.Audit.saveInvoice]).tap()
     }
+
+    /// The scanner is on the home screen.
+    ///
+    /// It used to sit four taps in — Rentals, +, New rental, Scan the rental contract — which is
+    /// a long way from the thing the app is fastest at. The card is asserted on Today with a
+    /// rental present *and* on an empty install, because the user with nothing on rent is the one
+    /// who most needs it.
+    func testTheScannerIsOnTheHomeScreen() {
+        let app = XCUIApplication.launched()
+        XCTAssertTrue(app.expect(app.anyElement(A11yUI.Today.scanCard)).exists)
+        XCTAssertTrue(app.expect(app.buttons[A11yUI.Today.scanStart]).isEnabled)
+    }
+
+    func testTheScannerIsThereWithNothingOnRentEither() {
+        let app = XCUIApplication.launched(seed: .empty)
+        XCTAssertTrue(app.expect(app.anyElement(A11yUI.Today.emptyState)).exists)
+        XCTAssertTrue(
+            app.reveal(app.anyElement(A11yUI.Today.scanCard)).exists,
+            "an empty Today is exactly where the quickest way to add a contract belongs"
+        )
+    }
+
+    /// iOS is never asked without the reason being shown first.
+    ///
+    /// The permission alert can be answered once. "Turn on reminders" opens an explanation with a
+    /// Continue button, and only Continue reaches `requestAuthorization` — so a user who reads it
+    /// and backs out has spent nothing, and App Review sees the purpose before the prompt.
+    func testTurningOnRemindersExplainsItselfBeforeAskingIOS() {
+        let app = XCUIApplication.launched()
+
+        app.tab(A11yUI.Tab.settings).tap()
+        app.revealAndTap(app.anyElement(A11yUI.Settings.reminders))
+        app.revealAndTap(app.buttons[A11yUI.Settings.remindersEnable])
+
+        XCTAssertTrue(
+            app.expect(app.anyElement(A11yUI.Settings.remindersPriming)).exists,
+            "the explanation must come before the system prompt, not after it"
+        )
+        XCTAssertTrue(app.expect(app.buttons[A11yUI.Settings.remindersPrimingContinue]).isEnabled)
+
+        // Backing out costs nothing: iOS was never asked, and the button is still there.
+        app.expect(app.buttons[A11yUI.Settings.remindersPrimingNotNow]).tap()
+        XCTAssertTrue(app.expect(app.buttons[A11yUI.Settings.remindersEnable]).exists)
+    }
 }

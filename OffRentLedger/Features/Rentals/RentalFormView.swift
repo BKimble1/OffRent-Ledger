@@ -20,6 +20,8 @@ struct RentalFormView: View {
     /// New Rental offers the scanner; Edit Rental does not — a rental already has its evidence,
     /// and re-scanning over a saved record is a different operation with different consequences.
     var showsCapture: Bool = true
+    /// Opens the scanner as the form appears. Set by the Today entry point.
+    var startScanning: Bool = false
 
     @Environment(AppDependencies.self) private var dependencies
 
@@ -33,6 +35,9 @@ struct RentalFormView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var showingFileImporter = false
     @State private var scanError: String?
+    /// Once only. Without the guard the camera reopens every time the form redraws — including
+    /// the redraw that happens when the review sheet fills the draft.
+    @State private var hasAutoStartedScan = false
 
     var body: some View {
         Form {
@@ -107,6 +112,18 @@ struct RentalFormView: View {
             allowsMultipleSelection: false
         ) { result in
             handleFileImport(result)
+        }
+        .onAppear {
+            // Today's scan card lands here. The camera comes up on its own, and on a device
+            // without a document camera — a simulator, or an iPhone whose camera is unavailable —
+            // it falls back to the PDF importer rather than doing nothing and looking broken.
+            guard startScanning, showsCapture, !hasAutoStartedScan else { return }
+            hasAutoStartedScan = true
+            if DocumentScannerView.isSupported {
+                showingCamera = true
+            } else {
+                showingFileImporter = true
+            }
         }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }

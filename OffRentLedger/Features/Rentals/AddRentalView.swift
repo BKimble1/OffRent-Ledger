@@ -12,6 +12,13 @@ import SwiftUI
 /// draft into a company, an agreement and an item, in that order.
 struct AddRentalView: View {
 
+    /// Opens the scanner as the screen appears, for the entry point on Today.
+    ///
+    /// The scan is the accelerator, not a second way to create a rental: it fills this same draft
+    /// and lands in the same review sheet, and cancelling the camera leaves an ordinary empty New
+    /// Rental form rather than dead-ending.
+    var startScanning: Bool = false
+
     @Environment(AppDependencies.self) private var dependencies
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -26,7 +33,7 @@ struct AddRentalView: View {
 
     var body: some View {
         NavigationStack {
-            RentalFormView(draft: draft)
+            RentalFormView(draft: draft, startScanning: startScanning)
                 .accessibilityIdentifier(A11yID.AddRental.root)
                 .safeAreaInset(edge: .bottom) { saveBar }
                 .navigationTitle("New rental")

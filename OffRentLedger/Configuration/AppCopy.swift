@@ -124,10 +124,10 @@ enum AppCopy {
     /// the rental themselves. §7 spends its length on not applying a value nobody looked at, and
     /// an opt-in that quietly relaxed that would undo it.
     static let autoFillScansExplanation = """
-        Off, every scan opens a review screen first. On, a scan that reads at least three fields \
-        clearly and leaves nothing uncertain goes straight into the form. Anything the app was \
-        unsure about still stops for you to check, and nothing is saved until you tap Save on \
-        the rental.
+        On to begin with. A scan that reads at least three fields clearly and leaves nothing \
+        uncertain goes straight into the form; anything the app was unsure about still stops for \
+        you to check, and nothing is saved until you tap Save on the rental. Switch this off and \
+        every scan opens a review screen first.
         """
 
     /// The footer under "Delete this rental".

@@ -21,6 +21,13 @@ struct ReminderSettingsView: View {
 
     @State private var status: UNAuthorizationStatus = .notDetermined
     @State private var testMessage: String?
+    /// The explanation shown before iOS is asked anything.
+    ///
+    /// Apple asks for the reason *before* the system prompt, not after it, and App Review looks
+    /// for it: the alert iOS shows can be answered once and never again, so an app that spends it
+    /// without having explained itself has spent it. "Turn on reminders" opens this; only
+    /// "Continue" inside it reaches `requestAuthorization`.
+    @State private var showingPriming = false
 
     /// Recomputed when something that could change it changes, rather than on every body
     /// evaluation. The planner walks every rental and its relationships; running that on each
@@ -35,7 +42,7 @@ struct ReminderSettingsView: View {
                     status: status,
                     scheduledCount: plan.count,
                     testMessage: testMessage,
-                    onEnable: { Task { await requestPermission() } },
+                    onEnable: { showingPriming = true },
                     onOpenSettings: openSystemSettings,
                     onTest: { Task { await sendTestReminder() } }
                 )
@@ -66,6 +73,15 @@ struct ReminderSettingsView: View {
             dependencies.derivedStateNeedsRefresh()
         }
         .onChange(of: items.count) { _, _ in recomputePlan() }
+        .sheet(isPresented: $showingPriming) {
+            NotificationPrimingSheet(
+                onContinue: {
+                    showingPriming = false
+                    Task { await requestPermission() }
+                },
+                onNotNow: { showingPriming = false }
+            )
+        }
         // Somebody who leaves to change the iOS switch has to come back to a screen that agrees
         // with what they just did.
         .onChange(of: scenePhase) { _, phase in
@@ -145,11 +161,32 @@ struct ReminderSettingsView: View {
     private func requestPermission() async {
         let current = await dependencies.notifications.authorizationStatus()
         if current == .notDetermined {
-            _ = await dependencies.notifications.requestAuthorization()
+            let granted = await dependencies.notifications.requestAuthorization()
+            if granted { turnOnTheDefaultReminders() }
         } else if current == .denied {
             openSystemSettings()
         }
         await refreshStatusAsync()
+        recomputePlan()
+    }
+
+    /// Permission on its own schedules nothing.
+    ///
+    /// `ReminderSettings.default.enabledKinds` is empty, so granting permission from this card and
+    /// stopping there left the user having answered an iOS prompt in exchange for nothing at all —
+    /// the card would then read "Reminders are on · 0 waiting", which is true and useless. The
+    /// button says "Turn on reminders", so it turns them on.
+    ///
+    /// Every kind, not the free ones only: the planner already drops the Pro kinds for a free
+    /// user, so enabling all of them means an upgrade later simply starts working rather than
+    /// sending somebody back to this screen to find switches they never knew were off.
+    ///
+    /// Only when nothing is on. A user who has been here before and deliberately left one switch
+    /// off does not get it turned back on by re-granting permission.
+    private func turnOnTheDefaultReminders() {
+        guard dependencies.reminderSettings.enabledKinds.isEmpty else { return }
+        dependencies.reminderSettings.enabledKinds = Set(ReminderKind.allCases)
+        dependencies.derivedStateNeedsRefresh()
     }
 
     private func openSystemSettings() {
@@ -452,5 +489,115 @@ private struct TimingCard: View {
         case 1...11: return "\(clamped)am"
         default: return "\(clamped - 12)pm"
         }
+    }
+}
+
+// MARK: - Priming
+
+/// The reason, before iOS is asked.
+///
+/// iOS shows its permission alert exactly once. An app that spends that one chance without having
+/// said what the notifications are for gets a "Don't Allow" it can never take back, and App Review
+/// treats an unexplained prompt as a defect rather than a style choice. So the explanation is a
+/// screen the user reads first, with a plain Continue, and "Not now" costs them nothing — the
+/// system prompt is untouched and the button on the card is still there tomorrow.
+private struct NotificationPrimingSheet: View {
+
+    let onContinue: () -> Void
+    let onNotNow: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.section) {
+                    VStack(alignment: .leading, spacing: Space.snug) {
+                        Text("Before iOS asks")
+                            .font(Typography.hero)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(
+                            """
+                            iOS will ask once whether \(AppConfiguration.displayName) may send \
+                            you notifications. Here is what it would send, so the answer is yours \
+                            rather than a guess.
+                            """
+                        )
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    VStack(alignment: .leading, spacing: Space.base) {
+                        point(
+                            "clock.badge.exclamationmark",
+                            "Before a rate changes",
+                            "So you can decide whether to keep the machine another week, rather than reading about it on the invoice."
+                        )
+                        point(
+                            "phone.badge.waveform",
+                            "When a confirmation is still missing",
+                            "You marked a machine done and no confirmation number has been recorded yet."
+                        )
+                        point(
+                            "truck.box",
+                            "When something is still awaiting pickup",
+                            "The vendor confirmed off-rent and the equipment has not left the site."
+                        )
+                        point(
+                            "doc.text.magnifyingglass",
+                            "When an invoice is waiting to be checked",
+                            "While the details are still fresh, and before the vendor's own review window runs out."
+                        )
+                    }
+
+                    Text(
+                        """
+                        These are scheduled on this iPhone. There is no server and no account, so \
+                        they arrive whether or not you have signal, and nothing about your rentals \
+                        leaves the device. You can turn any of them off afterwards.
+                        """
+                    )
+                    .font(Typography.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, Space.comfortable)
+                .padding(.top, Space.comfortable)
+                .padding(.bottom, Space.screenBottom)
+            }
+            .offRentScreen()
+            .accessibilityIdentifier(A11yID.Settings.remindersPriming)
+            .safeAreaInset(edge: .bottom) {
+                StickyActionBar {
+                    VStack(spacing: Space.snug) {
+                        Button("Continue", action: onContinue)
+                            .buttonStyle(.offRentPrimary)
+                            .accessibilityIdentifier(A11yID.Settings.remindersPrimingContinue)
+                        Button("Not now", action: onNotNow)
+                            .buttonStyle(.offRentSecondary)
+                            .accessibilityIdentifier(A11yID.Settings.remindersPrimingNotNow)
+                    }
+                }
+            }
+            .navigationTitle("Reminders")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private func point(_ symbol: String, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: Space.base) {
+            Image(systemName: symbol)
+                .font(.system(size: Layout.symbolInline, weight: .semibold))
+                .foregroundStyle(Palette.accentText)
+                .frame(width: Layout.symbolInline + 4)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(Typography.rowTitle)
+                Text(detail)
+                    .font(Typography.rowDetail)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

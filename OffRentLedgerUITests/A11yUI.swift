@@ -22,6 +22,8 @@ enum A11yUI {
         static let estimatedRentRunning = "today.estimatedRentRunning"
         static let emptyState = "today.emptyState"
         static let addRental = "today.addRental"
+        static let scanCard = "today.scanCard"
+        static let scanStart = "today.scanStart"
         static let map = "today.map"
         static let mapEmptyOverlay = "today.map.empty"
     }
@@ -185,5 +187,10 @@ enum A11yUI {
         static let backupAndTransfer = "settings.backupAndTransfer"
         static let exportBackup = "settings.exportBackup"
         static let deleteAllData = "settings.deleteAllData"
+        static let reminders = "settings.reminders"
+        static let remindersEnable = "settings.reminders.enable"
+        static let remindersPriming = "settings.reminders.priming"
+        static let remindersPrimingContinue = "settings.reminders.priming.continue"
+        static let remindersPrimingNotNow = "settings.reminders.priming.notNow"
     }
 }

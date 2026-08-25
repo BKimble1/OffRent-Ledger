@@ -143,6 +143,12 @@ enum SettingsDestination: Hashable {
 
 enum AppSheet: Identifiable, Hashable {
     case addRental
+    /// New Rental with the camera already up.
+    ///
+    /// A separate case rather than an argument on `addRental`, so the two have different sheet
+    /// identities: presenting one while the other is up must replace it, not be ignored as the
+    /// same sheet.
+    case scanRental
     case recordConfirmation(itemID: UUID)
     case recordPickup(itemID: UUID)
     case attachInvoice(itemID: UUID)
@@ -151,6 +157,7 @@ enum AppSheet: Identifiable, Hashable {
     var id: String {
         switch self {
         case .addRental: "addRental"
+        case .scanRental: "scanRental"
         case let .recordConfirmation(itemID): "confirm-\(itemID)"
         case let .recordPickup(itemID): "pickup-\(itemID)"
         case let .attachInvoice(itemID): "invoice-\(itemID)"

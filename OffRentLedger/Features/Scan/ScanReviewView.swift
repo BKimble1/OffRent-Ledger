@@ -115,8 +115,13 @@ struct ScanReviewView: View {
     private func autoFillIfAllowed() {
         guard !hasAutoFilled, model.phase == .reviewing else { return }
         let unticked = model.suggestions.contains { !$0.isPreselected }
+        // `acceptedValueCount`, not `selection.count`: the gate is deciding whether this scan is
+        // good enough to skip the confirmation screen, so it has to count what will actually be
+        // written. A field that is ticked but whose text will not parse is dropped on commit, and
+        // skipping review to write two fields while believing four is the shape of mistake this
+        // whole screen exists to prevent.
         guard dependencies.scanSettings.shouldFillAutomatically(
-            preselectedCount: model.selection.count,
+            preselectedCount: model.acceptedValueCount,
             hasAnythingUnticked: unticked
         ) else { return }
         hasAutoFilled = true

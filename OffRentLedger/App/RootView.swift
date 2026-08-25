@@ -139,6 +139,8 @@ struct RootView: View {
         switch sheet {
         case .addRental:
             AddRentalView()
+        case .scanRental:
+            AddRentalView(startScanning: true)
         case let .recordConfirmation(itemID):
             RecordConfirmationSheet(itemID: itemID)
         case let .recordPickup(itemID):
