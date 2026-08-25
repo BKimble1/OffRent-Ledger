@@ -64,9 +64,9 @@ final class MismatchUITests: XCTestCase {
             "the refusal alert must actually go away before anything else is tapped"
         )
 
-        // Under the Accept bar and the tab bar at this scroll position, so tapping its centre
-        // hits the tab bar. Scroll it clear first.
-        app.tapWhenHittable(app.buttons[A11yUI.Audit.recordFollowUp])
+        // This one is in scrollable content and drifts under the pinned Accept bar and the
+        // tab bar, so it has to be scrolled clear rather than merely found.
+        app.tapInContent(app.buttons[A11yUI.Audit.recordFollowUp])
         app.expect(app.anyElement(A11yUI.Audit.followUpReason)).tap()
         app.typeText("Billed one day past the OR-44921 confirmation.")
         app.tapWhenHittable(app.buttons["Save"])

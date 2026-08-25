@@ -139,13 +139,11 @@ extension XCUIApplication {
         navigationBars.buttons.element(boundBy: 0).tap()
     }
 
-    /// Scrolls until an element is genuinely tappable, then taps it.
+    /// Waits for a control and taps it.
     ///
-    /// XCUITest's own scroll-to-visible stops as soon as any part of the element is on screen.
-    /// On a screen with a pinned bottom bar that is not the same as reachable: the last run left
-    /// "Record a follow-up" with its top four points under the Accept bar and its centre under
-    /// the tab bar, so the synthesised tap selected the Audit tab instead and the sheet never
-    /// opened. `isHittable` is the property that accounts for what is drawn on top.
+    /// For controls that belong where they are drawn: a pinned bottom bar, a navigation bar, a
+    /// sheet's toolbar. Being at the edge of the screen is correct for those, and the only
+    /// question is whether they have arrived yet.
     func tapWhenHittable(
         _ element: XCUIElement,
         file: StaticString = #filePath,
@@ -162,15 +160,36 @@ extension XCUIApplication {
             )
             return
         }
-        // `isHittable` alone is not enough, which the last run proved: "Record a follow-up" sat
-        // at y 779–823 on an 874-point screen, with the tab bar starting at 795, so its centre
-        // was inside the tab bar — and `isHittable` still returned true. The tap went to the
-        // already-selected Audit tab, which does nothing visible, so the app looked unchanged
-        // and the sheet never opened.
-        //
-        // So position is checked as well as hittability: the control has to be clear of the
-        // bottom of the screen, where the tab bar and whatever bar a screen pins above it live,
-        // and clear of the top, where the navigation bar is.
+        element.tap()
+    }
+
+    /// Scrolls a control that lives in scrollable content until it is clear of the bars at the
+    /// edges of the screen, then taps it.
+    ///
+    /// `isHittable` is not enough on its own, which a run proved: "Record a follow-up" sat at
+    /// y 779–823 on an 874-point screen with the tab bar starting at 795, so its centre was
+    /// inside the tab bar — and `isHittable` still returned true. The tap went to the
+    /// already-selected Audit tab, which does nothing visible, so the screen looked untouched.
+    ///
+    /// Only for content that scrolls. A control pinned to the bottom of a screen can never come
+    /// clear of the bottom of the screen, and asking it to is how the previous version of this
+    /// failed on the Save bar.
+    func tapInContent(
+        _ element: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard element.waitForExistence(timeout: 8) else {
+            XCTFail(
+                """
+                element never appeared, so it could not be tapped.
+                Identified elements on screen:
+                \(identifiedElements())
+                """,
+                file: file, line: line
+            )
+            return
+        }
         let clearOfBottom = frame.height * 0.82
         let clearOfTop = frame.height * 0.15
         for _ in 0..<6 {
@@ -185,7 +204,7 @@ extension XCUIApplication {
         }
         XCTFail(
             """
-            element existed but never came clear of the bars at the edges of the screen.
+            element never came clear of the bars at the edges of the screen.
             Identified elements on screen:
             \(identifiedElements())
             """,
