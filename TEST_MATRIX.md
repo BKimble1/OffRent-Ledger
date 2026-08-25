@@ -27,33 +27,52 @@ Run with `swift test` against the root `Package.swift`, which compiles
 `OffRentLedger/Domain` and `OffRentShared` — **the same files the Xcode app target compiles**,
 not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SWIFT_VERSION`.
 
-**168 tests. 168 passed. 0 failed.**
+**317 tests. 317 passed. 0 failed.** Last run 2026-08-25 against commit `2ce9042`.
 
 | Suite | Tests | Result | What it covers |
 |---|---:|---|---|
 | `RentalRateEngineTests` | 26 | ✅ pass | Period counting, DST spring-forward and fall-back, time-zone stability, missing/negative/zero rates, manual vs scheduled rollover, override precedence, rounding drift over 400 periods |
-| `DocumentTextParserTests` | 22 | ✅ pass | OCR parsing against 7 synthetic fixtures; "7 DAY RATE" not read as a daily rate; confidence degradation; provenance; determinism |
-| `StatusTransitionTests` | 20 | ✅ pass | The whole transition table; **exhaustive proof that no intent reaches Confirmation Recorded without the user affirming contact**; reopen rules; banned vocabulary |
+| `MapSearchTests` | 24 | ✅ pass | Local search across equipment, class, vendor ID, serial, company, jobsite, address, agreement number, PO and status; every-word-must-match narrowing; clustering at one metre; **a record with no coordinate is never placed at one**; the most urgent rental decides a shared marker; VoiceOver labels name the entity and its status rather than saying "pin" |
+| `DocumentTextParserTests` | 22 | ✅ pass | OCR parsing against the fixtures; "7 DAY RATE" not read as a daily rate; confidence degradation; provenance; determinism |
+| `StatusTransitionTests` | 22 | ✅ pass | The whole transition table; **exhaustive proof that no intent reaches Confirmation Recorded without the user affirming contact**; reopen rules; banned vocabulary |
 | `ReminderPlannerTests` | 20 | ✅ pass | Each reminder kind, opt-in default, closed items never nag, stable identifiers, entitlement gating, DST |
+| `PlaceNamingTests` | 16 | ✅ pass | **The `07820` pin.** Digit-dominant and Canadian codes recognised; UK postcodes deliberately not, with the reason; uppercase site names like `ZONE 4` survive; the fallback chain from business name to street to town; a dropped pin is never labelled with its coordinate |
+| `ExtractionFixtureTests` | 16 | ✅ pass | **The residential-lease negative test**: OCR reads it, the extractor finds nothing, and the outcome is `nothingFound` rather than `Use 0 values`. Also a third vendor layout with dotted-leader rate tables and split labels; multipage page attribution; `4,18O.00` refused rather than read as $418; a clean amount before a full stop still parses |
 | `BackupArchiveTests` | 15 | ✅ pass | Round trip, byte stability, version gate, additive-only import, orphan handling, missing files |
 | `InvoiceComparisonTests` | 14 | ✅ pass | Expectation runs to the confirmation not to pickup; zero variance; extra-day mismatch; review flags vs findings |
+| `WalkthroughScriptTests` | 14 | ✅ pass | The sequence has a first and a last; Finish appears exactly once and on the last page; an index past the end does not crash; all four tabs are pointed at; re-presentation only on a version bump; **no page claims the app contacts a vendor or guarantees anything** |
+| `ModelSuggestionValidatorTests` | 13 | ✅ pass | The five rules a model proposal must survive; nothing from a model arrives ticked |
+| `InvoiceAcceptanceTests` | 12 | ✅ pass | **The button that did nothing.** The screenshot's record is blocked with a reason and an `Edit invoice` route; a genuine zero-dollar invoice is accepted; live findings block as well as stored ones; a second press cannot write a second acceptance |
+| `QuietHoursTests` | 12 | ✅ pass | Windows that wrap past midnight; a reminder moves earlier, never later; existing settings survive a decode |
+| `CompanyMatchingTests` | 10 | ✅ pass | Case, punctuation and spacing ignored; **a different branch of the same chain is not a duplicate**; a suffix difference is not assumed to be the same company; editing a record does not find itself |
+| `LegalDocumentOutlineTests` | 10 | ✅ pass | Markdown to clauses, preamble, bullets |
+| `ScanOutcomeTests` | 10 | ✅ pass | Invoice fields on a contract do not count as rental details; **the commit button refuses to render a zero**; the empty state names what was not found and offers three ways on |
 | `EntitlementPolicyTests` | 9 | ✅ pass | Free limit; **every guarantee that entitlement never removes access to existing records** |
 | `CSVExportTests` | 8 | ✅ pass | RFC 4180 quoting, formula-injection neutralisation, blank-not-zero for incomplete estimates |
 | `EvidencePacketTests` | 6 | ✅ pass | Disclaimer denies every prohibited claim; completeness reporting |
 | `MoneyParsingTests` | 6 | ✅ pass | Accepted and rejected forms; banker's rounding; cent-level equality |
 | `SnapshotBuilderTests` | 6 | ✅ pass | Aggregation; **the widget snapshot cannot carry identifying detail** |
+| `SafePathTests` | 5 | ✅ pass | Filename sanitisation: traversal contained to one component, ordinary names unmangled, no input yields an unusable name |
 | `DateTextParserTests` | 4 | ✅ pass | US paperwork formats; noon anchoring; implausible years rejected |
 | `DeepLinkTests` | 4 | ✅ pass | Round trip of every case; foreign schemes and malformed IDs rejected |
+| `UnaddressedFindingsTests` | 4 | ✅ pass | A finding nothing has been recorded against is still open |
+| `EmailValidationTests` | 3 | ✅ pass | Ordinary addresses accepted, blank accepted because the field is optional, impossible shapes rejected |
+| `RecognizedDocumentPageTests` | 3 | ✅ pass | A line knows its page; a document with no attribution reports page 0 rather than crashing; a page is only named when there is more than one |
 | `FinancialWalkthroughTests` | 2 | ✅ pass | **§19 of the specification, both paths**, end to end through the engines |
-| `SafePathTests` | 5 | ✅ pass | Filename sanitisation: traversal contained to one component, ordinary names unmangled, no input yields an unusable name |
 | `StatusTransitionDocTests` | 1 | ✅ pass | The generated transition table matches the code |
+
+**Removed in this change:** `GuidedTourTests` (8 tests). Not deleted to make a suite pass — the
+feature it covered was removed by product decision. It asserted that the hands-on walkthrough
+derived its step from a rental's status, which is precisely the design §10 of the brief replaced.
+`WalkthroughScriptTests` (14) covers what took its place, and asserts the property the old design
+could not have: that the walkthrough ends.
 
 ### Also executed and passed
 
 | Check | Result |
 |---|---|
-| `python3 scripts/verify_repository.py` | ✅ 41 invariant checks, 0 problems |
-| `python3 scripts/check_swift_call_sites.py` | ✅ 91 types with initialisers and 117 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
+| `python3 scripts/verify_repository.py` | ✅ 44 invariant checks, 0 problems |
+| `python3 scripts/check_swift_call_sites.py` | ✅ 115 types with initialisers and 168 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
 | `python3 scripts/generate_website.py --check` | ✅ the site matches its generator; privacy and terms render from the app's own Markdown |
@@ -167,17 +186,32 @@ been run again since.
 
 ---
 
-## C. Written, NOT executed — the UI suite
+## C. Executed on the simulator — the UI suite
 
-**11 UI test methods.** They need a booted simulator running the app, which is the
-UI scenarios below, and they have not been run.
+The suite ran for the first time on 2026-08-24 and reached green on commit `b3057d1`
+(GitHub Actions run `32797297734`). Before that it had never launched the app at all, and the
+eleven runs it took to get there are recorded in the commit history from `c9240b0` to `b3057d1`.
+
+It found two real defects that no unit test could have: an invoice with a live mismatch on
+screen could be accepted without a word, and a control whose centre sat inside the tab bar
+reported `isHittable == true` while a tap on it did nothing.
+
+**Rewritten in this change.** The suites below reflect the flows as they now are — a plus that
+is a menu, a company that is a record rather than four text fields, a walkthrough that ends.
 
 | Suite | Tests | Status | Covers |
 |---|---:|---|---|
-| `CoreWorkflowUITests` | 2 | ⛔ not executed | Manual creation + relaunch; full workflow to resolution with zero variance |
-| `MismatchUITests` | 2 | ⛔ not executed | Extra-day mismatch survives relaunch; **scan review never saves without confirmation** |
-| `EntitlementUITests` | 3 | ⛔ not executed | Free limit, Pro unlock via the StoreKit test configuration, entitlement loss |
-| `AccessibilityUITests` | 4 | ⛔ not executed | Tabs labelled, estimate spoken as an estimate, disclosure readable, status spoken |
+| `CoreWorkflowUITests` | 2 | ✅ green at `b3057d1`, rewritten | Manual creation + relaunch, now through the company picker; full workflow to resolution with zero variance |
+| `MismatchUITests` | 2 | ✅ green at `b3057d1`, rewritten | Extra-day mismatch survives relaunch; **scan review never saves without confirmation** |
+| `EntitlementUITests` | 3 | ✅ green at `b3057d1`, rewritten | Free limit, Pro unlock, entitlement loss |
+| `AccessibilityUITests` | 4 | ✅ green at `b3057d1` | Tabs labelled, estimate spoken as an estimate, disclosure readable, status spoken |
+| `OnboardingUITests` | 5 | ⛔ not yet executed | **§12.16.** The whole walkthrough on Next and Finish alone; it dismisses itself; Back is absent on page one rather than dead; it is not shown twice; **and it created no rental, no company and no jobsite** |
+| `ReusableRecordsUITests` | 5 | ⛔ not yet executed | **§12.1–3.** The plus offers all three; a company made from Rentals is selectable in a draft; one made *inside* a draft returns to it selected with the draft intact; a disabled Save names the missing field; the jobsite editor is a map |
+| `MapAndEditingUITests` | 6 | ⛔ not yet executed | **§12.6–9, §12.15.** Today keeps the map with no rentals and with unplaced ones; the card opens full screen and X closes it; the legend opens; search finds the user's own machine; a rental with no coordinate says `No location set`; an edit survives a relaunch; the editor reaches company and jobsite |
+| `InvoiceAcceptanceUITests` | 3 | ⛔ not yet executed | **§12.13–14.** A valid invoice is accepted from Audit, the counts move, and it is still accepted after a relaunch; an empty one is disabled with a specific reason and an `Edit invoice` route that opens the form; no comparison row runs past the right edge |
+
+**30 UI test methods.** 11 have been executed and passed; the 19 written for this change have
+not yet run, and the row above says so per suite rather than in aggregate.
 
 To execute, on a Mac:
 
@@ -198,9 +232,13 @@ of them.
 | The Xcode project builds | ✅ **verified in CI** — `xcodebuild clean build`, app and widget, Xcode 26.4 |
 | The SwiftUI / SwiftData / StoreKit code compiles | ✅ **verified in CI** — zero errors; `docs/RISK_REGISTER.md` R2 and R3 are closed |
 | The Xcode project opens in the Xcode UI | ⛔ unverified — CI drives `xcodebuild`, which is not the same thing |
-| Simulator run of the app | ⛔ unverified |
+| Simulator run of the app | ✅ **verified in CI** — the UI suite launches and drives the app on a booted simulator |
 | Release archive, signing, export | ⛔ unverified |
 | Live document camera | ⛔ unverified |
+| **OCR orientation on a photo smaller than the downscale cap** | ⛔ unverified — the fix passes `image.imageOrientation` to Vision, which is correct by inspection and by Apple's documentation, but no image has been through it here |
+| **Map search, pin drop and reverse geocoding** | ⛔ unverified — `MKLocalSearch` and `CLGeocoder` both need a network and a device |
+| **The full-screen map's markers and clustering** | ⛔ unverified — the clustering *rule* is covered by `MapSearchTests`; what MapKit draws is not |
+| **Apple Foundation Models on a supported device** | ⛔ unverified — the guardrail is tested, the model's accuracy is not |
 | Photo picker and PDF import on device | ⛔ unverified |
 | OCR against real vendor contracts | ⛔ unverified |
 | Local notification delivery | ⛔ unverified |

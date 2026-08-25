@@ -180,20 +180,35 @@ from a user document.
 
 ## 4. Domain model
 
-Nine entities. SwiftData `@Model` classes live in `Persistence/`; each has a matching pure value
+Nine entities, on schema V3. SwiftData `@Model` classes live in `Persistence/`; each has a matching pure value
 type in `Domain/` used by the engines and by export/import.
 
 | Entity | Key fields |
 |---|---|
-| `Vendor` | id, name, branch, phone, email, link, standardNotes, created/modified |
-| `JobSite` | id, name, projectIdentifier, address, notes, created/modified |
-| `RentalAgreement` | id, vendor, jobsite, agreementNumber, startDate, scheduledEndDate, disputeWindowDaysOverride, notes, attachments, created/modified |
+| `Vendor` | id, name, branch, **contactName**, phone, email, **address**, link, standardNotes, created/modified |
+| `JobSite` | id, name, projectIdentifier, address, notes, placeName, latitude, longitude, created/modified |
+| `RentalAgreement` | id, vendor, jobsite, agreementNumber, **purchaseOrderNumber**, startDate, scheduledEndDate, disputeWindowDaysOverride, notes, attachments, created/modified |
 | `RentalItem` | id, agreement, equipmentName, equipmentClass, vendorEquipmentIdentifier, serialNumber, deliveryDate, status, dailyRate, weeklyRate, fourWeekRate, billingBasis, nextRolloverDate, expectedNextIncrement, includedUsageNotes, manualRolloverOverride, estimatedRunningCost, meterUnit, notes, created/modified |
 | `RentalEvent` | id, item, type, timestamp, detail, contactMethod, vendorRepresentative, confirmationNumber, locationSnapshot, created |
 | `EvidenceAsset` | id, owner ref, relativePath, mediaType, displayName, capturedAt, coordinate?, caption, sha256, thumbnailPath |
 | `VendorInvoice` | id, agreement, invoiceNumber, receivedDate, billedThroughDate, category totals, invoiceTotal, attachment, reviewStatus, notes |
 | `InvoiceLine` | id, invoice, category, detail, quantity, unitPrice, amount, appearedInContract, reviewState |
 | `Discrepancy` | id, invoice/line, type, expectedAmount, invoicedAmount, difference, explanation, status, resolutionNotes, created/resolved |
+
+**`Vendor` and `JobSite` are reusable records, and the UI treats them as such.** A rental
+*references* a company and, optionally, a jobsite; it never carries a copy of either. The Rentals
+tab creates both directly, `New Rental` and `Edit Rental` select from them through the same
+editors, and creating one from inside a rental draft returns to that draft with the new record
+selected. Duplicate creation is guarded by `CompanyMatching` on a normalised name plus branch —
+narrow on purpose, so that two branches of one chain remain two records.
+
+**Equipment is not an entity and will not become one.** A machine *is* a `RentalItem`. Its marker
+on the map, its row in map search and its detail card are all derived from that rental, so there
+is nothing to keep in step and no second table to drift.
+
+**`RentalAgreement.agreementNumber` and `purchaseOrderNumber` are different strings.** The first is
+the vendor's number for the paperwork; the second is the contractor's own reference. Both appear
+on an invoice, both find a rental in search and on the map, and conflating them would lose one.
 
 `EvidenceAsset.sha256` is an **integrity aid only**. The UI labels it "File checksum (integrity aid
 only)". It is never described as tamper-proof, authoritative, or legally meaningful. Build-enforced.
@@ -270,6 +285,31 @@ image/PDF ──VisionTextRecognizer──▶ RecognizedDocument (raw text + lin
 confidence ≥ `FieldSuggestion.preselectThreshold` (0.80) are preselected; the rest are shown
 unchecked. Raw recognized text is retained separately from normalized suggestions.
 
+Each suggestion carries where it came from: the line, the page, and the range of the value inside
+that line. On a five-page invoice the rate table and the summary are nowhere near each other, and
+"read from: TOTAL DUE $3,214.00" with no page is not something a user can go and check.
+
+Three rules the parser holds to, each of which exists because a fixture caught it failing:
+
+- **A label and its value need not share a line.** A second pass joins a line with no digits in it
+  to the line beneath and re-runs the rules, at slightly lower confidence so an inline match of
+  the same rule always wins. `RENTAL AGREEMENT NUMBER` / `NG-77304` is a real vendor layout, and
+  before this pass the field simply went missing.
+- **A rate table may be printed with dotted leaders.** `DAY .................. 465.00` is matched
+  by the shared label-to-value gap, which permits a colon, an equals, or a run of two or more
+  leader characters — two, so a single stray dot cannot join two unrelated things.
+- **A garbled amount is refused, not truncated.** Vision reads `4,18O.00` for `4,180.00` — a
+  capital O where a zero belongs — and a pattern that simply stops at the first non-digit captures
+  `4,18`. That is $418 for a $4,180 line: a plausible number, in the right place, at high
+  confidence. The amount pattern now requires the number to actually end where it stops, so the
+  field arrives empty with the raw line visible under **Recognised text**.
+
+**What the review screen will not say.** When nothing on a document maps to a field that kind of
+document can carry, the screen is `No rental details found` with `Rescan`, `Add pages` and
+`Enter manually` — never a commit button offering to use zero values. `ScanOutcome` decides;
+`ScanReviewCopy.useValues(selected:)` returns `nil` rather than a string for a count of zero, so
+the old wording cannot come back by accident.
+
 ### 7.1 The on-device model
 
 The rule parser matches a label against a figure **on the same line**, which is why rate tables
@@ -315,9 +355,15 @@ no cloud OCR, no background location. The app is fully usable with every permiss
   legibility, but the **coordinate stays the record** — the name is Apple's opinion about a point
   and arrives over the network.
 - Places: job sites are located with `MKLocalSearch`, which is a map query and carries no rental
-  data. A confirmation's location is still a measured GPS fix and never a place picked off a
-  list: "where this phone was when the call was made" and "a place the user chose" are different
-  claims, and only one of them is evidence.
+  data. The search is biased towards the **map's visible region**, not the device's location, so
+  the jobsite editor needs no location permission at all. A pin the user drops by hand is
+  reverse-geocoded for legibility only, and the coordinate they placed stays the record whether
+  or not that request returns. A confirmation's location is still a measured GPS fix and never a
+  place picked off a list: "where this phone was when the call was made" and "a place the user
+  chose" are different claims, and only one of them is evidence.
+- The maps: the Today card and the full-screen operations map draw only what is in the store, and
+  the operations map's search field searches the store — never the web. A record with no
+  coordinate is listed as `No location set` and is never drawn at a substituted one.
 - The on-device model: `SystemLanguageModel`, local. No page, no figure and no company name
   leaves the device, which is also why a cloud model was never an option here.
 - Photos: `PhotosPicker` (no library authorization prompt). Camera authorization requested only on
@@ -329,6 +375,21 @@ no cloud OCR, no background location. The app is fully usable with every permiss
 
 **Cancelling Pro never deletes or hides a record.** Entitlement loss only prevents creating an
 *additional* open rental item beyond the free limit.
+
+---
+
+### 8.0.1 The walkthrough
+
+Seven pages, advanced by `Next`, `Back`, `Skip` and `Finish`. It **writes nothing**: no sample
+rental, no company, no jobsite, no defaults changed. The figures on its illustrations are
+obviously illustrative and are never persisted, and a UI test asserts that walking the whole
+thing leaves an empty store empty.
+
+It replaced a guide that read a real rental's status and would not advance until the user
+performed each step of the workflow for real. That could not be completed on the day somebody
+installs the app, and `Skip` was its only exit. Completion is recorded as a *version*
+(`WalkthroughScript.version`) rather than a flag, so a materially rewritten walkthrough can be
+shown once to an existing user and never again.
 
 ---
 

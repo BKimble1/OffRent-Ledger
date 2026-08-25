@@ -66,7 +66,13 @@ Once this section is complete, the project is **locally complete**.
 ### The on-device model (new)
 
 - [ ] Scan a contract whose rates are printed as a **table** — labels on one row, figures on the
-      next. This is the case the rule parser cannot do and the whole reason the model exists.
+      next. The rule parser now joins a bare label to the line beneath it, so check whether the
+      deterministic pass gets there on its own before crediting the model.
+- [ ] Scan something that is **not** a rental agreement — a lease, a delivery note, a receipt. It
+      must show `No rental details found` with Rescan / Add pages / Enter manually, and there must
+      be **no button offering to use zero values** anywhere on that screen.
+- [ ] Photograph a contract in portrait, close up, so the image is small. It must still be read —
+      this is the orientation path that only bites below the downscale cap.
 - [ ] Check every figure it proposes against the paper. Confirm none of them arrives ticked.
 - [ ] Confirm the review screen names the line each value was read from, and that the line is
       really on the page.
@@ -74,51 +80,88 @@ Once this section is complete, the project is **locally complete**.
       and the screen must say in one sentence why tables are not being read.
 - [ ] Scan on a device that cannot run the model at all. Same expectation.
 
-### Places and the map (new)
+### Confirmation location (unchanged)
 
-- [ ] Search for a real jobsite by address and by business name. Confirm the pin lands where it
-      should.
-- [ ] Give an *existing* jobsite a place from the jobsite list, and confirm it appears on Today.
-- [ ] Confirm Today shows **no map at all** when no jobsite has a place.
-- [ ] Tap a pin, open a rental from it, and come back.
 - [ ] Record a confirmation with location allowed. Confirm the row reads as a **place name**, with
       the coordinate underneath — and that the coordinate is what the evidence export carries.
 - [ ] Do the same with no network. The coordinate must still be recorded and displayed.
+- [ ] Deny location. The confirmation must still save.
 
-### The guided walkthrough (new)
+### The walkthrough (rewritten)
 
-- [ ] Start it from the end of the tour and from Settings.
-- [ ] Walk a rental all the way through. Confirm the bar's step follows the rental's real status,
-      including when you arrive at a screen from a notification rather than from the bar.
-- [ ] Confirm the steps that need a phone call to the rental company offer **no button**.
-- [ ] Force-quit mid-walkthrough and reopen. The guide must still be on the same step.
-- [ ] Skip it. It must not come back on the next launch.
-- [ ] Run each App Intent from Shortcuts. Confirm the confirmation intent **opens the sheet and
-      records nothing**.
-- [ ] Generate an evidence packet and read **every page**. Check the disclaimer, the timeline, the
-      photos and the invoice comparison.
-- [ ] Share the packet by AirDrop and by email.
-- [ ] Export CSV; open it in Numbers and in Excel; confirm the amount columns sum.
-- [ ] Export a backup, delete all data, re-import, confirm the preview counts are right.
-- [ ] **Upgrade path:** install the previous TestFlight build, create a rental with a jobsite,
-      then install this one over the top. Confirm the store migrates to schema V2 and nothing is
-      lost. This is the only way R10 gets closed.
-- [ ] Import a backup exported by the previous build. Job sites without a place must import
-      cleanly.
-- [ ] Turn on quiet hours, set a reminder that would land inside them, and confirm it fires
-      *before* the window opens rather than after it closes.
-- [ ] VoiceOver: traverse Today, Rentals, item detail, Contact Vendor, confirmation, pickup,
-      invoice review, paywall and settings. Every control announced; no duplicate or orphaned
-      elements.
-- [ ] Dynamic Type at the largest accessibility size on every screen above. Nothing clipped,
-      nothing unreachable, no hit target under the keyboard.
-- [ ] Light and dark. Bright sunlight if you can get it — this is a jobsite app.
-- [ ] Smallest supported iPhone and largest current iPhone.
-- [ ] Reduce Motion on.
-- [ ] Create 1,000 rental items (import a generated backup) and scroll the list. **Measure** it in
-      Instruments; do not assume it is fine.
+- [ ] From a clean install, take the tour from the welcome screen.
+- [ ] Walk it end to end with **Next only**. Confirm it never waits for you to do something in
+      the app, and that the last page's button reads **Finish**.
+- [ ] Tap Finish. It must dismiss itself immediately, leave no overlay, restore the tab bar, and
+      land on Today. You should not have to tap anything else or swipe anything away.
+- [ ] Check the Rentals tab, Rental companies and Jobsites. **All three must be empty.** The
+      walkthrough is not allowed to have created anything.
+- [ ] Relaunch. It must not reappear.
+- [ ] Settings → Replay the walkthrough. Same behaviour, and `Skip` on page one exits cleanly.
 
----
+### Reusable companies and jobsites (new)
+
+- [ ] Rentals → `+`. Confirm the menu offers **New rental**, **New rental company** and
+      **New jobsite**.
+- [ ] Create a company from that menu. It must appear under Rental companies straight away.
+- [ ] Start a New Rental, type an equipment name, then tap the **Rental company** row and use
+      `Add New`. Save the company. **You must land back on the rental draft with the equipment
+      name still in it and the new company selected.** This is the one that would be worst to get
+      wrong; do it deliberately.
+- [ ] Try to create the same company again with the same branch. It must name the one you already
+      have rather than silently making a second.
+- [ ] Create it again with a *different* branch. That must be allowed.
+- [ ] Leave the form empty and read the line under the disabled Save. It must name both missing
+      fields, then narrow as you fill them in.
+
+### The jobsite map editor (new)
+
+- [ ] Search for a real address. Results appear as you type; picking one centres the map, drops a
+      pin, and fills the name with something a person would say — **never a bare postal code**.
+- [ ] Search for somewhere with no street address (a rural site). Check what the name field gets.
+- [ ] Turn off Wi-Fi and cellular. Search must fail gracefully and still let you drop a pin.
+- [ ] Drop a pin by hand and confirm the location. Name it yourself.
+- [ ] Reopen that jobsite for editing. The pin and the name must be where you left them.
+- [ ] Confirm no location permission prompt appears anywhere in this flow.
+
+### The maps (new)
+
+- [ ] Today with no rentals at all: the map card is present, with **No rentals in progress** over
+      it.
+- [ ] Today with a rental that has no jobsite location: the card is still present and the caption
+      says how many rentals have no location.
+- [ ] Tap the card anywhere — not just on a pin. It must open the full-screen map.
+- [ ] `X` closes it and returns to Today in the same state.
+- [ ] Search for a machine by name, by vendor equipment ID, by serial, by company, by jobsite and
+      by PO number. Each must find it. Search for something you do not own: nothing, not the web.
+- [ ] Select a result. The map centres, the card shows status and company, and Open and Edit both
+      work.
+- [ ] Put two machines at the same jobsite. The marker must carry a count and tapping it must let
+      you choose between them — not bury one under the other.
+- [ ] VoiceOver over a marker: it must name the entity and its status, not say "pin".
+
+### Invoice acceptance (new)
+
+- [ ] Attach an invoice with **no total and no lines**. On the review screen, `Accept this
+      invoice` must be **disabled**, with a specific reason under it and an `Edit invoice`
+      button that opens the form preloaded.
+- [ ] Attach a matching invoice. Accept it. You must get immediate feedback, a confirmation, and
+      a return to Audit. The rental must move to Resolved and the Audit counts must change.
+- [ ] Relaunch. It must still be accepted.
+- [ ] Turn the text size up to the largest accessibility setting and reopen a comparison. No label
+      or figure may run off the right-hand edge.
+
+### Editing a rental (new)
+
+- [ ] Open any rental. **Edit** must be visible in the navigation bar.
+- [ ] Everything you entered must be preloaded, including the company, the jobsite, the
+      identifiers, the PO and the dates.
+- [ ] Change the company. Save. Check the Rentals list, Today, the map and search all agree.
+- [ ] Take a rental with no location, give it a jobsite with a place, and check it appears on the
+      Today map and on the full-screen map — then relaunch and check again.
+- [ ] Edit a rental that is already off rent. Its confirmation, its pickup and its attached
+      invoice must be untouched, and the estimate must not start running again.
+
 
 ## 3. Apple accounts and signing — none of this exists yet
 
