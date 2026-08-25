@@ -132,6 +132,13 @@ struct MapCluster: Sendable, Equatable, Identifiable {
     /// Whether tapping this marker should go straight to a detail card rather than a list.
     var isSingle: Bool { listedRecords.count == 1 }
 
+    /// The number on the marker.
+    ///
+    /// `listedRecords`, not `records`. A jobsite with two machines on it holds three records, and
+    /// a marker reading "Ridgeline Phase 2 · 3" over a card listing two machines is the map
+    /// contradicting itself — the third is the place the badge is already sitting on.
+    var badgeCount: Int { listedRecords.count }
+
     /// The record whose colour and symbol the marker takes. A jobsite loses to any rental on it,
     /// and among rentals the most urgent wins — a yard with one machine waiting on a phone call
     /// must not read as settled because the other three are.

@@ -238,6 +238,30 @@ final class MapClusterListingTests: XCTestCase {
         XCTAssertEqual(cluster?.listedRecords.map(\.title), ["Skid Steer Loader"])
     }
 
+    func testTheMarkerBadgeCountsWhatTappingItWillShow() {
+        // Three records at one point — a site and two machines — but the card that opens lists
+        // two. A badge reading 3 over a list of 2 is the map disagreeing with itself, and the
+        // record it counts and does not show is the place the badge is already sitting on.
+        let cluster = MapClustering.cluster([
+            jobsite("Ridgeline Phase 2", at: point),
+            rental("Skid Steer Loader", at: point),
+            rental("Mini Excavator", at: point),
+        ]).first
+        XCTAssertEqual(cluster?.count, 3, "all three are still clustered")
+        XCTAssertEqual(cluster?.badgeCount, 2, "but the badge counts the rows the tap will show")
+        XCTAssertEqual(cluster?.badgeCount, cluster?.listedRecords.count)
+    }
+
+    func testAJobsiteOnItsOwnBadgesAsWhatItIs() {
+        // The other direction: nothing on rent means the site itself is the row, so the badge
+        // must not fall to zero and leave a marker claiming to hold nothing.
+        let cluster = MapClustering.cluster([
+            jobsite("Quarry Lane Yard", at: point),
+            jobsite("Quarry Lane Office", at: point),
+        ]).first
+        XCTAssertEqual(cluster?.badgeCount, 2)
+    }
+
     func testTwoMachinesAtAJobsiteListBothAndNotTheJobsite() {
         let cluster = MapClustering.cluster([
             jobsite("Ridgeline Phase 2", at: point),

@@ -107,7 +107,7 @@ struct OperationsMapView: View {
 
     /// The count is on the marker, so a stack of four is visibly four before it is tapped.
     private func markerTitle(_ cluster: MapCluster) -> String {
-        cluster.isSingle ? cluster.title : "\(cluster.title) · \(cluster.count)"
+        cluster.isSingle ? cluster.title : "\(cluster.title) · \(cluster.badgeCount)"
     }
 
     // MARK: - The controls over the map

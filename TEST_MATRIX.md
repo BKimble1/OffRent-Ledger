@@ -27,7 +27,7 @@ Run with `swift test` against the root `Package.swift`, which compiles
 `OffRentLedger/Domain` and `OffRentShared` — **the same files the Xcode app target compiles**,
 not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SWIFT_VERSION`.
 
-**317 tests. 317 passed. 0 failed.** Last run 2026-08-25 against commit `2ce9042`.
+**323 tests. 323 passed. 0 failed.** Last run 2026-08-25 against commit `8eb4c7b`.
 
 | Suite | Tests | Result | What it covers |
 |---|---:|---|---|
