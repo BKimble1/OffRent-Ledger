@@ -137,6 +137,10 @@ jobs:
             -only-testing:OffRentLedgerUITests/EntitlementUITests \
             -only-testing:OffRentLedgerUITests/AccessibilityUITests \
             -only-testing:OffRentLedgerUITests/OnboardingUITests \
+            -only-testing:OffRentLedgerUITests/ReusableRecordsUITests \
+            -only-testing:OffRentLedgerUITests/MapAndEditingUITests \
+            -only-testing:OffRentLedgerUITests/LayoutObstructionUITests \
+            -only-testing:OffRentLedgerUITests/InvoiceAcceptanceUITests \
             -resultBundlePath OffRentLedgerUITests.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             | tee xcodebuild-uitests.log || STATUS=$?

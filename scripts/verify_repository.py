@@ -1135,6 +1135,46 @@ def check_call_sites_resolve() -> None:
         fail("call-sites", "; ".join(detail[:6]) or result.stdout.strip()[-400:])
 
 
+def check_every_ui_suite_actually_runs() -> None:
+    """Every UI test class is named in the workflow step that runs UI tests.
+
+    `verify.yml` lists its UI suites with `-only-testing:`, which is deliberate — it keeps the
+    step's runtime predictable and its failures attributable. The cost is that a suite added to
+    the target and *not* added to that list never runs, and CI stays green while it does nothing.
+
+    That happened: four new suites, twenty-two tests, compiled and shipped and never executed.
+    The run reported "Executed 17 tests" and looked exactly like a pass. A test that passes by
+    not running is the failure this whole file exists to prevent, so it is checked here.
+    """
+    check("Every UI test suite is named in the workflow that runs them")
+    workflow = ROOT / ".github" / "workflows" / "verify.yml"
+    ui_tests = ROOT / "OffRentLedgerUITests"
+    if not workflow.exists() or not ui_tests.exists():
+        return
+
+    listed = set(re.findall(r"-only-testing:OffRentLedgerUITests/(\w+)", workflow.read_text()))
+    for path in swift_files(ui_tests):
+        for match in re.finditer(r"^(?:final )?class (\w+): XCTestCase", path.read_text(), re.M):
+            suite = match.group(1)
+            if suite not in listed:
+                fail(
+                    "ui-suite-not-run",
+                    f"{suite} in {path.relative_to(ROOT)} is never run: add "
+                    f"-only-testing:OffRentLedgerUITests/{suite} to verify.yml",
+                )
+
+    # And the other direction: a name in the workflow that no longer exists fails the whole step
+    # with "no tests matching", after the build.
+    declared: set[str] = set()
+    for path in swift_files(ui_tests):
+        declared.update(re.findall(r"^(?:final )?class (\w+): XCTestCase", path.read_text(), re.M))
+    for suite in sorted(listed - declared):
+        fail(
+            "ui-suite-missing",
+            f"verify.yml runs OffRentLedgerUITests/{suite}, which does not exist",
+        )
+
+
 def check_github_workflows() -> None:
     """The two GitHub Actions workflows still do what their names say.
 
@@ -1274,6 +1314,7 @@ def main() -> int:
         check_app_icon,
         check_ocr_fixtures_exist,
         check_call_sites_resolve,
+        check_every_ui_suite_actually_runs,
         check_github_workflows,
         check_docs_exist,
     ]:
