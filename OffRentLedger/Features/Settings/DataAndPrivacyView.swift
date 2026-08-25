@@ -173,6 +173,22 @@ struct ImportPreviewView: View {
                     }
                 }
 
+                if preview.assetsWithoutFiles > 0 {
+                    Section {
+                        Text("""
+                            This file carries records, not photographs. \
+                            \(preview.assetsWithoutFiles) attachment\
+                            \(preview.assetsWithoutFiles == 1 ? "" : "s") will import as \
+                            entries with no image behind them. Anything else in the backup comes \
+                            across in full.
+                            """)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    } header: {
+                        Text("Photographs and documents")
+                    }
+                }
+
                 if !preview.missingEvidenceFiles.isEmpty {
                     Section {
                         Text("""

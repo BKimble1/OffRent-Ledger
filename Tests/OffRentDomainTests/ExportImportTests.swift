@@ -359,6 +359,22 @@ final class BackupArchiveTests: XCTestCase {
         XCTAssertFalse(preview.includesEvidenceFiles)
     }
 
+    func testAMetadataOnlyBackupSaysHowManyAttachmentsArriveEmpty() {
+        // Nothing has ever produced an archive that carries files: `encodeArchive` takes
+        // `includeEvidenceFiles` and every call site leaves it false. So a backup restored on a
+        // new phone created a record for every photograph, each pointing at a file that will
+        // never exist, and the preview said nothing — the test above asserts only that it does
+        // not call them *missing*, which was true and unhelpful. The user met grey placeholders
+        // with a checksum under them and no explanation.
+        let source = archive(includesFiles: false)
+        let preview = BackupImporter.preview(archive: source, existing: .none)
+        XCTAssertEqual(preview.willAdd.assets, source.assets.count)
+        XCTAssertEqual(
+            preview.assetsWithoutFiles, source.assets.count,
+            "the import screen has to be able to say this before the user commits to it"
+        )
+    }
+
     func testEvidencePathsAreRelativeNeverAbsolute() {
         for asset in archive().assets {
             XCTAssertFalse(

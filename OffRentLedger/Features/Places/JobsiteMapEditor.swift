@@ -297,6 +297,31 @@ struct JobsiteMapEditor: View {
                         .font(Typography.micro)
                         .foregroundStyle(.secondary)
                 }
+            } else if existing != nil || !siteName.trimmingCharacters(in: .whitespaces).isEmpty {
+                // A site that has a name but no pin. Either it predates places entirely, or the
+                // user is naming somewhere the map does not help with. Both are saveable: the
+                // name is what the schema requires.
+                TextField("Jobsite name", text: $siteName)
+                    .font(Typography.rowTitle)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier(A11yID.Jobsite.name)
+
+                Text("This site has no location on the map yet. You can still save its name, or drop a pin first.")
+                    .font(Typography.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button("Save jobsite", action: save)
+                    .buttonStyle(.offRentPrimary)
+                    .disabled(!canSave)
+                    .accessibilityIdentifier(A11yID.Jobsite.saveWithoutPin)
+
+                Button(isDroppingByHand ? "Cancel dropping a pin" : "Drop a pin") {
+                    beginManualPin()
+                }
+                .buttonStyle(.offRentSecondary)
+                .accessibilityIdentifier(A11yID.Jobsite.dropPinEmpty)
             } else {
                 Text(
                     isDroppingByHand
@@ -326,8 +351,18 @@ struct JobsiteMapEditor: View {
         .accessibilityIdentifier(A11yID.Jobsite.panel)
     }
 
+    /// A name is all the schema requires, and all this screen should.
+    ///
+    /// It used to require a pin as well, which made every jobsite that predates places
+    /// permanently uneditable: a contractor upgrading from an earlier build opened "Ridgeline
+    /// Phase 2", found the spelling wrong, and could not save the correction because the site
+    /// had no coordinate and the map had nothing to confirm. It also made a name-only jobsite —
+    /// a yard, a shop, anywhere the map is beside the point — impossible to create at all.
+    ///
+    /// §4 still holds: a *pin* is only ever written when the user has explicitly confirmed one.
+    /// This is about the record, not the pin.
     private var canSave: Bool {
-        pinned != nil && !siteName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !siteName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     // MARK: - Actions
@@ -424,7 +459,7 @@ struct JobsiteMapEditor: View {
     }
 
     private func save() {
-        guard let pinned, canSave else { return }
+        guard canSave else { return }
         let now = dependencies.clock.now
         let site: JobSite
         if let existing {
@@ -435,10 +470,14 @@ struct JobsiteMapEditor: View {
         }
         site.name = siteName.trimmingCharacters(in: .whitespacesAndNewlines)
         site.projectIdentifier = projectIdentifier.nilIfBlank
-        site.placeName = pinned.placeName
-        site.address = pinned.address
-        site.latitude = pinned.latitude
-        site.longitude = pinned.longitude
+        // Only written when there is one. Saving a name must never clear a place the site
+        // already had, and must never invent one it has not got.
+        if let pinned {
+            site.placeName = pinned.placeName
+            site.address = pinned.address
+            site.latitude = pinned.latitude
+            site.longitude = pinned.longitude
+        }
         site.modifiedAt = now
         try? context.save()
         onSaved(site)

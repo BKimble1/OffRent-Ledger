@@ -140,9 +140,14 @@ struct BackupAndTransferView: View {
             )
 
             ListGroup {
+                // The subtitle used to end "…, attachments", and the file has never contained a
+                // single one. `encodeArchive()` takes `includeEvidenceFiles` and every call site
+                // leaves it false, and the archive is one JSON document with nowhere to put the
+                // bytes. So a contractor following the three steps below arrived on a new phone
+                // with every rental intact and every photograph gone, told nothing.
                 ActionRow(
-                    title: "Export a full backup file",
-                    subtitle: "Everything: rentals, confirmations, pickups, invoices, attachments",
+                    title: "Export your records",
+                    subtitle: "Rentals, confirmations, pickups, invoices and their details",
                     symbol: "arrow.down.doc",
                     tint: Palette.accent,
                     isEnabled: !busy
@@ -190,9 +195,10 @@ struct BackupAndTransferView: View {
             CardHeader(title: "Move to a new iPhone")
 
             VStack(alignment: .leading, spacing: Space.snug) {
-                step(1, "Export a full backup here and share it somewhere you can reach — iCloud Drive, Files, an email to yourself.")
+                step(1, "Export your records here and share the file somewhere you can reach — iCloud Drive, Files, an email to yourself.")
                 step(2, "Install \(AppConfiguration.displayName) on the new iPhone.")
                 step(3, "Come back to this screen there and import the file.")
+                step(4, "Photographs and scanned documents do not travel in that file. Keep the old iPhone until you have what you need from it, or export the evidence packet for any rental whose photographs matter.")
             }
 
             ListGroup {

@@ -87,6 +87,7 @@ enum A11yID {
         static let dropPin = "jobsite.dropPin"
         static let dropPinPanel = "jobsite.dropPinPanel"
         static let dropPinEmpty = "jobsite.dropPinEmpty"
+        static let saveWithoutPin = "jobsite.saveWithoutPin"
         static let panel = "jobsite.panel"
         static let name = "jobsite.name"
         static let address = "jobsite.address"

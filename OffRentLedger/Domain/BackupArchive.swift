@@ -124,6 +124,16 @@ struct ImportPreview: Sendable, Equatable {
     /// shows as missing rather than the whole import failing.
     var missingEvidenceFiles: [String]
 
+    /// Attachments arriving as records with no file behind them, because the archive carries no
+    /// files at all.
+    ///
+    /// `missingEvidenceFiles` above only ever populated when the archive *claimed* to carry
+    /// files, and nothing has ever produced one that does — so a backup restored on a new phone
+    /// created a photograph record for every photograph, each pointing at a file that will never
+    /// exist, and said nothing. The user saw grey placeholders with a checksum printed under
+    /// them and no explanation. This is the count that lets the import screen say it in advance.
+    var assetsWithoutFiles: Int = 0
+
     var isEmpty: Bool { willAdd.total == 0 }
 
     var summary: String {
@@ -236,6 +246,7 @@ enum BackupImporter {
         }
 
         var missingFiles: [String] = []
+        var withoutFiles = 0
         for asset in archive.assets {
             if existing.assets.contains(asset.id) { skip.assets += 1; continue }
             let ownerKnown: Bool = switch asset.ownerKind {
@@ -246,8 +257,12 @@ enum BackupImporter {
             }
             guard ownerKnown else { orphaned.assets += 1; continue }
             add.assets += 1
-            if archive.includesEvidenceFiles, !availableEvidenceFiles.contains(asset.relativePath) {
-                missingFiles.append(asset.relativePath)
+            if archive.includesEvidenceFiles {
+                if !availableEvidenceFiles.contains(asset.relativePath) {
+                    missingFiles.append(asset.relativePath)
+                }
+            } else {
+                withoutFiles += 1
             }
         }
 
@@ -259,7 +274,8 @@ enum BackupImporter {
             willAdd: add,
             willSkipExisting: skip,
             willSkipOrphaned: orphaned,
-            missingEvidenceFiles: missingFiles
+            missingEvidenceFiles: missingFiles,
+            assetsWithoutFiles: withoutFiles
         )
     }
 }
