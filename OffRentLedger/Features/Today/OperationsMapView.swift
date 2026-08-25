@@ -29,7 +29,12 @@ struct OperationsMapView: View {
     @State private var query = ""
     @State private var filter: MapFilter = .all
     @State private var selectedClusterID: String?
-    @State private var selectedRecordID: UUID?
+    /// A record the user opened *explicitly* — from a search result or from a cluster's list.
+    ///
+    /// Distinct from the map's own selection, which is a marker. Keeping them apart is what
+    /// stops one clobbering the other; see `focusedRecord` for the rule that decides between
+    /// them when both are set.
+    @State private var focusedRecordID: UUID?
     @State private var showsLegend = false
     @State private var editingJobSiteID: UUID?
 
@@ -61,11 +66,21 @@ struct OperationsMapView: View {
         .task(id: indexKey) { allRecords = MapIndex.build(items: items, jobSites: jobSites) }
     }
 
-    /// Cheap to compute, and changes exactly when the index would.
-    private var indexKey: String {
-        let rentals = items.map { "\($0.id)-\($0.statusRaw)-\($0.modifiedAt.timeIntervalSince1970)" }
-        let sites = jobSites.map { "\($0.id)-\($0.modifiedAt.timeIntervalSince1970)" }
-        return (rentals + sites).joined(separator: "|")
+    /// What `.task(id:)` compares to decide whether the index needs rebuilding.
+    ///
+    /// Three numbers, and no allocation. The first version of this built a string per rental and
+    /// joined them, which is the very cost the cached index exists to avoid — `.task(id:)`
+    /// evaluates its id on *every* render, so a thousand rentals meant a thousand string
+    /// interpolations per keystroke.
+    ///
+    /// The latest `modifiedAt` is enough to notice an edit because every write path stamps it
+    /// with the current time, so any change moves the maximum forward. The two counts catch an
+    /// insertion or a deletion.
+    private var indexKey: MapIndexKey {
+        var latest: TimeInterval = 0
+        for item in items { latest = max(latest, item.modifiedAt.timeIntervalSince1970) }
+        for site in jobSites { latest = max(latest, site.modifiedAt.timeIntervalSince1970) }
+        return MapIndexKey(items: items.count, jobSites: jobSites.count, latestChange: latest)
     }
 
     // MARK: - Map
@@ -88,15 +103,6 @@ struct OperationsMapView: View {
         .mapControls { MapCompass(); MapScaleView() }
         .ignoresSafeArea()
         .accessibilityIdentifier(A11yID.OperationsMap.map)
-        .onChange(of: selectedClusterID) { _, id in
-            // Selecting a marker selects its single record, or leaves the cluster's list showing
-            // so the user can choose which of the three machines at that yard they meant.
-            guard let id, let cluster = clusters.first(where: { $0.id == id }) else {
-                selectedRecordID = nil
-                return
-            }
-            selectedRecordID = cluster.isSingle ? cluster.records.first?.id : nil
-        }
     }
 
     /// The count is on the marker, so a stack of four is visibly four before it is tapped.
@@ -167,6 +173,10 @@ struct OperationsMapView: View {
         .padding(.horizontal, Space.base)
         .frame(height: Layout.minimumTapTarget)
         .background(.regularMaterial, in: Capsule())
+        // The shape is stated so the whole pill takes the tap, not only the glyphs inside it.
+        // Without it a tap between the magnifying glass and the placeholder falls through to the
+        // map underneath, which pans instead of focusing the field.
+        .contentShape(Capsule())
     }
 
     private var filterRow: some View {
@@ -293,10 +303,14 @@ struct OperationsMapView: View {
 
     @ViewBuilder
     private var bottomPanel: some View {
-        if let record = selectedRecord {
+        if let record = focusedRecord {
             detailCard(record)
-        } else if let cluster = selectedCluster, !cluster.isSingle {
-            clusterCard(cluster)
+        } else if let cluster = selectedCluster {
+            if cluster.isSingle, let only = cluster.listedRecords.first {
+                detailCard(only)
+            } else {
+                clusterCard(cluster)
+            }
         } else if !unplacedRentals.isEmpty, query.isEmpty {
             unplacedCard
         }
@@ -315,7 +329,7 @@ struct OperationsMapView: View {
                 }
                 Spacer(minLength: Space.snug)
                 Button {
-                    selectedRecordID = nil
+                    focusedRecordID = nil
                     selectedClusterID = nil
                 } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -385,12 +399,12 @@ struct OperationsMapView: View {
     private func clusterCard(_ cluster: MapCluster) -> some View {
         VStack(alignment: .leading, spacing: Space.snug) {
             Text(cluster.title).font(Typography.rowTitle.weight(.semibold))
-            Text("\(cluster.count) records at this place")
+            Text("\(cluster.listedRecords.count) rentals at this place")
                 .font(Typography.caption)
                 .foregroundStyle(.secondary)
-            ForEach(Array(cluster.records.enumerated()), id: \.element.id) { index, record in
+            ForEach(Array(cluster.listedRecords.enumerated()), id: \.element.id) { index, record in
                 if index > 0 { RowDivider(inset: 0) }
-                Button { selectedRecordID = record.id } label: { resultRow(record) }
+                Button { focusedRecordID = record.id } label: { resultRow(record) }
                     .buttonStyle(.plain)
             }
         }
@@ -423,7 +437,7 @@ struct OperationsMapView: View {
     // MARK: - Actions
 
     private func select(_ record: MapRecord) {
-        selectedRecordID = record.id
+        focusedRecordID = record.id
         query = ""
         guard let latitude = record.latitude, let longitude = record.longitude else {
             selectedClusterID = nil
@@ -480,9 +494,26 @@ struct OperationsMapView: View {
         return clusters.first { $0.id == selectedClusterID }
     }
 
-    private var selectedRecord: MapRecord? {
-        guard let selectedRecordID else { return nil }
-        return allRecords.first { $0.id == selectedRecordID }
+    /// The record whose detail card is showing, or nil to fall through to the marker's cluster.
+    ///
+    /// This used to be an `onChange` on the map's selection that set and cleared the focused
+    /// record, and it fought itself: `select(_:)` wrote the record and then wrote the cluster,
+    /// the change handler ran after both, saw a cluster with three machines in it, and cleared
+    /// the very card the user had just asked for. A search result for a machine at a busy yard
+    /// opened a list instead — and one for a machine with no coordinate at all opened nothing.
+    ///
+    /// Derived instead. The rule is a sentence: an explicitly opened record wins, unless the
+    /// user has since tapped a marker that does not contain it, in which case the marker is the
+    /// more recent gesture and wins.
+    private var focusedRecord: MapRecord? {
+        guard let focusedRecordID,
+              let record = allRecords.first(where: { $0.id == focusedRecordID })
+        else { return nil }
+        if let cluster = selectedCluster,
+           !cluster.records.contains(where: { $0.id == focusedRecordID }) {
+            return nil
+        }
+        return record
     }
 
     private func count(for candidate: MapFilter) -> Int {

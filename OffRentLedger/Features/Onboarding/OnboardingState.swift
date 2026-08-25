@@ -69,9 +69,6 @@ final class OnboardingState {
         WalkthroughScript.shouldPresent(seenVersion: completedTourVersion)
     }
 
-    /// True once the current walkthrough has been finished or skipped.
-    var hasSeenTour: Bool { !shouldPresentTour }
-
     func markWelcomed() {
         hasBeenWelcomed = true
         defaults.set(true, forKey: Key.welcomed)

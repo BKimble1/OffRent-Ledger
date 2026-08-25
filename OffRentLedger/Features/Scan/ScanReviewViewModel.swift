@@ -70,8 +70,8 @@ final class ScanReviewViewModel {
         self.intelligence = intelligence
     }
 
-    /// Whether this device can read tables as well as lines, and why not when it cannot.
-    var intelligenceIsAvailable: Bool { intelligence.isAvailable }
+    /// Why this device cannot read tables as well as lines, when it cannot. Shown as one
+    /// sentence on the review screen; `nil` when the model is available.
     var intelligenceUnavailableReason: String? { intelligence.unavailableReason }
 
     // No `deinit { task?.cancel() }`. `deinit` is nonisolated, this type is `@MainActor`, and

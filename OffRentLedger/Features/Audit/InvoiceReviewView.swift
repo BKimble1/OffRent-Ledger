@@ -81,7 +81,20 @@ struct InvoiceReviewView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingFollowUp) { followUpSheet }
         .sheet(isPresented: $showingEditInvoice) {
-            if let item { AttachInvoiceSheet(itemID: item.id, editing: invoice?.id) }
+            if let item {
+                AttachInvoiceSheet(itemID: item.id, editing: invoice?.id)
+            } else {
+                // Unreachable while the button that sets this is guarded on `item`, and present
+                // anyway: a sheet whose content builder produces nothing is a blank screen the
+                // user cannot dismiss.
+                EmptyStateView(
+                    symbol: "questionmark.folder",
+                    title: "That rental is gone",
+                    message: "The invoice is still here, but the rental it belongs to is not.",
+                    actionTitle: "Close",
+                    action: { showingEditInvoice = false }
+                )
+            }
         }
         .onAppear {
             // Opening the review is what moves an invoice out of "not reviewed". It is a state
@@ -401,7 +414,10 @@ struct InvoiceReviewView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier(A11yID.Audit.resolveBlockedReason)
 
-                        if let route = block.editRouteTitle {
+                        // Only offered when there is a rental to hang the form off. An invoice
+                        // whose item has been deleted has no editor to open, and a sheet built
+                        // from an `if let` that fails presents an empty screen with no way out.
+                        if let route = block.editRouteTitle, item != nil {
                             Button(route) { showingEditInvoice = true }
                                 .buttonStyle(.offRentSecondary)
                                 .accessibilityIdentifier(A11yID.Audit.editInvoice)

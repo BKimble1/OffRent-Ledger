@@ -33,7 +33,7 @@ final class AccessibilityUITests: XCTestCase {
     func testTheDisclosureIsAnAccessibilityElementWithItsFullText() {
         let app = XCUIApplication.launched()
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.staticTexts["Skid Steer Loader"]).tap()
+        app.openRental(named: "Skid Steer Loader")
         app.expect(app.buttons[A11yUI.ItemDetail.markDone]).tap()
 
         // A StaticText, not an Other: the banner combines its symbol and its sentence into one
@@ -46,7 +46,7 @@ final class AccessibilityUITests: XCTestCase {
     func testStatusIsAnnouncedAsTextNotOnlyAsColour() {
         let app = XCUIApplication.launched()
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.staticTexts["Skid Steer Loader"]).tap()
+        app.openRental(named: "Skid Steer Loader")
 
         let status = app.expect(app.otherElements[A11yUI.ItemDetail.status])
         XCTAssertTrue(status.label.hasPrefix("Status:"), "status must be spoken, not only tinted")

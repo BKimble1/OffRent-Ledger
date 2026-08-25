@@ -59,7 +59,7 @@ final class CoreWorkflowUITests: XCTestCase {
         let app = XCUIApplication.launched()
 
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.staticTexts["Skid Steer Loader"]).tap()
+        app.openRental(named: "Skid Steer Loader")
 
         // Mark done. The app must route through Contact Vendor with the disclosure visible.
         app.expect(app.buttons[A11yUI.ItemDetail.markDone]).tap()

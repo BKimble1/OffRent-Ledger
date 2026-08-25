@@ -144,6 +144,7 @@ enum A11yUI {
     }
 
     enum Audit {
+        static let root = "audit.root"
         static let possibleMismatches = "audit.possibleMismatches"
         static let possibleVariance = "audit.possibleVariance"
         static let recordFollowUp = "audit.recordFollowUp"

@@ -72,8 +72,16 @@ final class MapAndEditingUITests: XCTestCase {
         app.tapInContent(app.expect(app.anyElement(A11yUI.Today.map)))
         app.expect(app.anyElement(A11yUI.OperationsMap.root))
 
-        app.expect(app.textFields[A11yUI.OperationsMap.searchField]).tap()
-        app.typeText("Skid")
+        // Typed into the field itself rather than into the application.
+        //
+        // `app.typeText` goes to whatever currently holds keyboard focus. This field sits over a
+        // live `MKMapView`, whose own gesture recognisers can win the tap, and when they do the
+        // tap reports success, nothing gains focus, the characters go nowhere, and the failure
+        // surfaces eight seconds later as a search result that never arrived.
+        // `XCUIElement.typeText` targets the element.
+        let field = app.expect(app.textFields[A11yUI.OperationsMap.searchField])
+        field.tap()
+        field.typeText("Skid")
 
         let result = app.expect(app.anyElement(A11yUI.OperationsMap.searchResult), timeout: 8)
         XCTAssertTrue(
@@ -102,8 +110,9 @@ final class MapAndEditingUITests: XCTestCase {
         app.tapInContent(app.expect(app.anyElement(A11yUI.Today.map)))
         app.expect(app.anyElement(A11yUI.OperationsMap.root))
 
-        app.expect(app.textFields[A11yUI.OperationsMap.searchField]).tap()
-        app.typeText("Skid")
+        let field = app.expect(app.textFields[A11yUI.OperationsMap.searchField])
+        field.tap()
+        field.typeText("Skid")
         app.expect(app.anyElement(A11yUI.OperationsMap.searchResult), timeout: 8).tap()
 
         let card = app.expect(app.anyElement(A11yUI.OperationsMap.detailCard), timeout: 8)
@@ -133,7 +142,7 @@ final class MapAndEditingUITests: XCTestCase {
         app.launch()
 
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.staticTexts["Skid Steer Loader"]).tap()
+        app.openRental(named: "Skid Steer Loader")
 
         // Edit is in the navigation bar, where iOS users look for it. Before this it existed
         // only as a link called "Edit terms", four sections down, that reached six fields.
@@ -169,7 +178,7 @@ final class MapAndEditingUITests: XCTestCase {
         let app = XCUIApplication.launched()
 
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.staticTexts["Skid Steer Loader"]).tap()
+        app.openRental(named: "Skid Steer Loader")
         app.tapWhenHittable(app.expect(app.buttons[A11yUI.ItemDetail.edit]))
 
         app.expect(app.anyElement(A11yUI.EditRental.root))

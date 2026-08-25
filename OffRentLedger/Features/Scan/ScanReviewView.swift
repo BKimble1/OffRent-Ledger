@@ -18,6 +18,13 @@ struct ScanReviewView: View {
     @Bindable var model: ScanReviewViewModel
     let onSave: ([SuggestedField: SuggestedValue]) -> Void
     let onCancel: () -> Void
+    /// Closes this review and opens the scanner again.
+    ///
+    /// Separate from `onCancel` because they are different intentions and the words on the
+    /// buttons say so. Cancel means "forget this"; Rescan means "that photo was no good, let me
+    /// take another" — and a `Rescan` button that merely closed the sheet would be asking the
+    /// user to go and find the Scan button themselves.
+    var onRescan: (() -> Void)?
 
     @State private var enlargedPage: Int?
     @State private var showsRecognizedText = false
@@ -136,7 +143,7 @@ struct ScanReviewView: View {
                     HStack(spacing: Space.snug) {
                         Button(ScanReviewCopy.rescan) {
                             model.cancel()
-                            onCancel()
+                            if let onRescan { onRescan() } else { onCancel() }
                         }
                         .buttonStyle(.offRentSecondary)
                         .accessibilityIdentifier(A11yID.Scan.rescan)

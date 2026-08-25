@@ -87,8 +87,21 @@ struct EditRentalView: View {
         }
     }
 
-    /// Says what this screen will not change, on the rentals where that is not obvious.
+    /// Says what this screen will not change, and what it will change beyond this one rental.
     private var historyNote: String? {
+        // The sharing note first: it is the surprising one. An agreement carrying two machines
+        // is one piece of paper, so the company, the jobsite, the dates and the reference
+        // numbers belong to both — and changing them here changes them for both. New Rental
+        // always makes a fresh agreement, so this only arises for an imported backup, but a
+        // silent edit to a rental the user is not looking at is not something to leave unsaid.
+        if let siblings = item?.agreement?.items?.count, siblings > 1 {
+            let others = siblings - 1
+            return """
+                This rental shares its agreement with \(others) other\(others == 1 ? "" : "s"). \
+                The company, jobsite, dates and reference numbers are on the agreement, so \
+                changing them here changes them there too.
+                """
+        }
         guard let item, item.status.order > RentalItemStatus.active.order else { return nil }
         return """
             Your confirmation, pickup and any attached invoice are kept as they are. Use Reopen \

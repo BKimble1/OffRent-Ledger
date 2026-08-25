@@ -24,7 +24,7 @@ final class MismatchUITests: XCTestCase {
         app.launch()
 
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.staticTexts["Skid Steer Loader"]).tap()
+        app.openRental(named: "Skid Steer Loader")
 
         app.expect(app.buttons[A11yUI.ItemDetail.markDone]).tap()
         app.expect(app.buttons[A11yUI.ItemDetail.recordConfirmation]).tap()

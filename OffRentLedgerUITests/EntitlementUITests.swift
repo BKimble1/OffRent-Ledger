@@ -123,7 +123,7 @@ final class EntitlementUITests: XCTestCase {
         let app = XCUIApplication.launched(seed: .walkthrough, entitlement: .free)
 
         app.tab(A11yUI.Tab.rentals).tap()
-        app.expect(app.staticTexts["Skid Steer Loader"]).tap()
+        app.openRental(named: "Skid Steer Loader")
 
         // Everything about the existing item still works at the free tier.
         XCTAssertTrue(app.buttons[A11yUI.ItemDetail.markDone].exists)

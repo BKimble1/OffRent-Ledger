@@ -33,7 +33,6 @@ struct RentalFormView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var showingFileImporter = false
     @State private var scanError: String?
-    @FocusState private var equipmentIsFocused: Bool
 
     var body: some View {
         Form {
@@ -69,7 +68,17 @@ struct RentalFormView: View {
                     draft.noteScannedCompany(values)
                     scanModel = nil
                 },
-                onCancel: { scanModel = nil }
+                onCancel: { scanModel = nil },
+                onRescan: {
+                    // Close the review and put the camera straight back up. Anything else makes
+                    // "Rescan" a button that asks the user to go and find the Scan button.
+                    scanModel = nil
+                    if DocumentScannerView.isSupported {
+                        showingCamera = true
+                    } else {
+                        showingFileImporter = true
+                    }
+                }
             )
         }
         .fullScreenCover(isPresented: $showingCamera) {
@@ -105,22 +114,21 @@ struct RentalFormView: View {
         } message: {
             Text((scanError ?? "") + "\n\nYou can still enter everything by hand.")
         }
-        .onAppear {
-            // Straight into the first field on a new rental. The sheet exists to capture an
-            // equipment name, and making somebody tap once before they can type it is a tap for
-            // nothing. Not on the edit path, where the field is already full and raising the
-            // keyboard would hide the rest of what they came to change.
-            guard showsCapture, draft.equipmentName.isEmpty else { return }
-            equipmentIsFocused = true
-        }
     }
 
     // MARK: - Sections
 
     private var equipmentSection: some View {
         Section("Equipment") {
+            // Deliberately not auto-focused.
+            //
+            // The old form put the cursor here on appear, which was right when the next thing
+            // below was another text field. It is wrong now: the two rows this redesign exists
+            // for — Rental company and Jobsite — sit just below the fold, and a keyboard raised
+            // on appear puts them behind the pinned Save bar with nothing on screen suggesting
+            // they are there. The UI suite found it by being unable to reach the company row at
+            // all; a person would have found it by concluding the app could not do it.
             TextField("What is it?", text: $draft.equipmentName)
-                .focused($equipmentIsFocused)
                 .submitLabel(.next)
                 .accessibilityIdentifier(A11yID.AddRental.equipmentName)
             TextField("Class or description (optional)", text: $draft.equipmentClass)

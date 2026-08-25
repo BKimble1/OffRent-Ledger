@@ -117,7 +117,20 @@ struct MapCluster: Sendable, Equatable, Identifiable {
     var records: [MapRecord]
 
     var count: Int { records.count }
-    var isSingle: Bool { records.count == 1 }
+
+    /// What the cluster's list should offer to open.
+    ///
+    /// When rentals share a coordinate with their jobsite, the jobsite is the *place* — it is
+    /// already the cluster's title — and listing it beside the machines on it is a row that says
+    /// the same thing twice. A cluster with no rentals lists what it has, which is how a saved
+    /// jobsite with nothing on rent stays reachable.
+    var listedRecords: [MapRecord] {
+        let rentals = records.filter { $0.kind == .rental }
+        return rentals.isEmpty ? records : rentals
+    }
+
+    /// Whether tapping this marker should go straight to a detail card rather than a list.
+    var isSingle: Bool { listedRecords.count == 1 }
 
     /// The record whose colour and symbol the marker takes. A jobsite loses to any rental on it,
     /// and among rentals the most urgent wins — a yard with one machine waiting on a phone call

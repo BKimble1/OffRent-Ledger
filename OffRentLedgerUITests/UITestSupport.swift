@@ -319,6 +319,62 @@ extension XCUIApplication {
         return buttons[title]
     }
 
+    /// Opens a rental from the Rentals list by its equipment name.
+    ///
+    /// Not `app.staticTexts[name].tap()`, which is what every test here used to do and what
+    /// broke the moment a second screen carried the same words. A row is a *combined*
+    /// accessibility element whose label is the whole row, Today's upcoming-rate-change row
+    /// carries the same equipment name, and a bare label lookup that matches two elements fails
+    /// on the tap rather than on the wait — reporting "multiple matching elements" and naming
+    /// neither of them.
+    ///
+    /// Scoped to the rentals list and matched on a label prefix, so it addresses one row on one
+    /// screen and says which if it cannot find it.
+    func openRental(named name: String, file: StaticString = #filePath, line: UInt = #line) {
+        let list = anyElement(A11yUI.Rentals.root)
+        guard list.waitForExistence(timeout: 8) else {
+            XCTFail("the rentals list never appeared.\n\(identifiedElements())", file: file, line: line)
+            return
+        }
+        let prefix = NSPredicate(format: "label BEGINSWITH %@", name)
+        for query in [list.buttons, list.staticTexts, list.cells] {
+            let row = query.matching(prefix).firstMatch
+            if row.waitForExistence(timeout: 4) {
+                tapInContent(row, file: file, line: line)
+                return
+            }
+        }
+        XCTFail(
+            "no row in the rentals list begins with “\(name)”.\n\(identifiedElements())",
+            file: file, line: line
+        )
+    }
+
+    /// Opens an invoice from the Audit list, addressed by the company on its row.
+    ///
+    /// Scoped to the Audit list for the same reason `openRental` is scoped to the rentals one:
+    /// the company name appears on a rental row too, and an unscoped lookup finds whichever the
+    /// tree happens to order first.
+    func openInvoice(from company: String, file: StaticString = #filePath, line: UInt = #line) {
+        let list = anyElement(A11yUI.Audit.root)
+        guard list.waitForExistence(timeout: 10) else {
+            XCTFail("the audit list never appeared.\n\(identifiedElements())", file: file, line: line)
+            return
+        }
+        let prefix = NSPredicate(format: "label CONTAINS %@", company)
+        for query in [list.buttons, list.cells, list.staticTexts] {
+            let row = query.matching(prefix).firstMatch
+            if row.waitForExistence(timeout: 4) {
+                tapInContent(row, file: file, line: line)
+                return
+            }
+        }
+        XCTFail(
+            "no invoice in the audit list mentions “\(company)”.\n\(identifiedElements())",
+            file: file, line: line
+        )
+    }
+
     /// Opens New Rental from the Rentals tab.
     ///
     /// The plus is a menu now — New Rental, New Rental Company, New Jobsite — so reaching the

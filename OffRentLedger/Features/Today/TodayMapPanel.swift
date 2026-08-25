@@ -58,12 +58,21 @@ struct TodayMapPanel: View {
         .task(id: indexKey) { rebuild() }
     }
 
-    /// Cheap to compute and changes exactly when the index would. Comparing it is what makes
-    /// `.task(id:)` a rebuild trigger rather than a rebuild on every render.
-    private var indexKey: String {
-        let rentals = items.map { "\($0.id)-\($0.statusRaw)-\($0.modifiedAt.timeIntervalSince1970)" }
-        let sites = jobSites.map { "\($0.id)-\($0.modifiedAt.timeIntervalSince1970)" }
-        return (rentals + sites).joined(separator: "|")
+    /// What `.task(id:)` compares to decide whether the index needs rebuilding.
+    ///
+    /// Three numbers, and no allocation. The first version of this built a string per rental and
+    /// joined them, which is the very cost the cached index exists to avoid — `.task(id:)`
+    /// evaluates its id on *every* render, so a thousand rentals meant a thousand string
+    /// interpolations per keystroke.
+    ///
+    /// The latest `modifiedAt` is enough to notice an edit because every write path stamps it
+    /// with the current time, so any change moves the maximum forward. The two counts catch an
+    /// insertion or a deletion.
+    private var indexKey: MapIndexKey {
+        var latest: TimeInterval = 0
+        for item in items { latest = max(latest, item.modifiedAt.timeIntervalSince1970) }
+        for site in jobSites { latest = max(latest, site.modifiedAt.timeIntervalSince1970) }
+        return MapIndexKey(items: items.count, jobSites: jobSites.count, latestChange: latest)
     }
 
     private func rebuild() {

@@ -10,6 +10,13 @@ import SwiftData
 ///
 /// Equipment is *derived*, never duplicated. A machine has no table of its own — it is a
 /// `RentalItem` — so its marker carries that rental's identifier and opening it opens the rental.
+/// What the two map screens compare to decide whether their cached index is stale.
+struct MapIndexKey: Hashable {
+    var items: Int
+    var jobSites: Int
+    var latestChange: TimeInterval
+}
+
 enum MapIndex {
 
     /// Every jobsite and every rental, whether or not it has somewhere to be drawn.

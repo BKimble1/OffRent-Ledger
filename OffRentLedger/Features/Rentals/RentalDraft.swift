@@ -86,9 +86,10 @@ final class RentalDraft {
         notes = item.notes ?? ""
 
         // Opened when there is something in it, so an edit does not hide the value it is meant
-        // to let somebody correct.
+        // to let somebody correct. The agreement number counts: it is inside the disclosure too,
+        // and a rental that has one and nothing else would have opened with it hidden.
         showsMoreDetails = !vendorEquipmentIdentifier.isEmpty || !serialNumber.isEmpty
-            || !purchaseOrderNumber.isEmpty
+            || !purchaseOrderNumber.isEmpty || !agreementNumber.isEmpty
     }
 
     // MARK: - What it produces

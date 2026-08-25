@@ -205,3 +205,64 @@ final class MapSearchTests: XCTestCase {
         }
     }
 }
+
+/// What a marker offers when it is tapped.
+final class MapClusterListingTests: XCTestCase {
+
+    private func rental(_ title: String, at coordinate: (Double, Double)?) -> MapRecord {
+        MapRecord(
+            id: UUID(), kind: .rental, title: title, status: .active,
+            latitude: coordinate?.0, longitude: coordinate?.1, searchTerms: [title]
+        )
+    }
+
+    private func jobsite(_ title: String, at coordinate: (Double, Double)) -> MapRecord {
+        MapRecord(
+            id: UUID(), kind: .jobsite, title: title,
+            latitude: coordinate.0, longitude: coordinate.1, searchTerms: [title]
+        )
+    }
+
+    private let point = (40.9012, -74.8123)
+
+    func testOneMachineAtAJobsiteOpensTheMachineRatherThanAListOfTwo() {
+        // The jobsite is the *place*, and it is already the cluster's title. Listing it beside
+        // the one machine on it is a row that says the same thing twice, and it turns a single
+        // tap into two.
+        let cluster = MapClustering.cluster([
+            jobsite("Ridgeline Phase 2", at: point),
+            rental("Skid Steer Loader", at: point),
+        ]).first
+        XCTAssertEqual(cluster?.count, 2, "both records are still on the marker")
+        XCTAssertTrue(cluster?.isSingle ?? false, "but only one of them is worth opening")
+        XCTAssertEqual(cluster?.listedRecords.map(\.title), ["Skid Steer Loader"])
+    }
+
+    func testTwoMachinesAtAJobsiteListBothAndNotTheJobsite() {
+        let cluster = MapClustering.cluster([
+            jobsite("Ridgeline Phase 2", at: point),
+            rental("Skid Steer Loader", at: point),
+            rental("Mini Excavator", at: point),
+        ]).first
+        XCTAssertFalse(cluster?.isSingle ?? true)
+        XCTAssertEqual(cluster?.listedRecords.count, 2)
+        XCTAssertFalse(cluster?.listedRecords.contains { $0.kind == .jobsite } ?? true)
+    }
+
+    func testAJobsiteWithNothingOnRentIsStillReachable() {
+        // The case the filter must not swallow: a saved site with no rentals lists itself, so a
+        // user can still tap it and fix its location.
+        let cluster = MapClustering.cluster([jobsite("Quarry Lane Yard", at: point)]).first
+        XCTAssertTrue(cluster?.isSingle ?? false)
+        XCTAssertEqual(cluster?.listedRecords.map(\.title), ["Quarry Lane Yard"])
+    }
+
+    func testTheMarkerTitleStillNamesThePlaceRatherThanOneMachine() {
+        let cluster = MapClustering.cluster([
+            jobsite("Ridgeline Phase 2", at: point),
+            rental("Skid Steer Loader", at: point),
+            rental("Mini Excavator", at: point),
+        ]).first
+        XCTAssertEqual(cluster?.title, "Ridgeline Phase 2")
+    }
+}

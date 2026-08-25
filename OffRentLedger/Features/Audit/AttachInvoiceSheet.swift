@@ -201,7 +201,15 @@ struct AttachInvoiceSheet: View {
                         apply(scanned: values)
                         scanModel = nil
                     },
-                    onCancel: { scanModel = nil }
+                    onCancel: { scanModel = nil },
+                    onRescan: {
+                        scanModel = nil
+                        if DocumentScannerView.isSupported {
+                            showingCamera = true
+                        } else {
+                            showingFileImporter = true
+                        }
+                    }
                 )
             }
             .fullScreenCover(isPresented: $showingCamera) {
