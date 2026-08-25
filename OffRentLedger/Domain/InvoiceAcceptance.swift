@@ -103,5 +103,10 @@ enum InvoiceAcceptance {
     }
 
     /// The line shown after a successful acceptance.
-    static let confirmation = "Invoice accepted. The rental is closed out."
+    ///
+    /// "In your records", not "closed out". Closing a rental out is something a yard does, and
+    /// this app does not talk to the yard — §1.1. What actually happened is that the user
+    /// finished reviewing an invoice and their own record moved to Resolved, which is what the
+    /// sentence now says.
+    static let confirmation = "Invoice accepted. This rental is now resolved in your records."
 }
