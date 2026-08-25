@@ -28,3 +28,4 @@ the test, to exercise the rule that a marginal scan must not produce preselected
 | `contract_abbreviated_serial.txt` | A contract whose serial number is printed `S/N 4TNV88-1234` rather than spelled out, which is how nearly every ticket and plate writes it. |
 | `invoice_waiver_abbreviation.txt` | An invoice billing the optional damage waiver as `RPP (14%)`, and heading itself `INVOICE NO 44821` with no colon. Carries a `MIDWAY` line item so that `DW` matching inside a longer word stays caught. |
 | `unrelated_residential_lease.txt` | The **negative test**. OCR reads it perfectly; the extractor must find nothing, because nothing on it is a machine, a rate or a rental date. |
+| `invoice_letterhead_without_suffix.txt` | A yard whose letterhead carries no company suffix, above a `BILL TO:` block that does. Synthetic. |

@@ -564,12 +564,27 @@ enum DocumentTextParser {
         "co", "co.", "company", "corp", "corp.", "leasing", "machinery", "tool", "tools",
     ]
 
+    /// Headers that mean the letterhead has ended and the customer's block has begun.
+    ///
+    /// Everything at or after one of these is the *contractor's* own details — their company, on
+    /// their own invoice — which is precisely the name this must not read as the rental yard's.
+    /// On paperwork with a short letterhead the two blocks are within a line or two of each other,
+    /// so scanning a fixed six lines from the top was not enough on its own.
+    private static let customerBlockHeadings = [
+        "bill to", "billed to", "sold to", "ship to", "shipped to", "deliver to",
+        "delivered to", "customer", "job site", "jobsite",
+    ]
+
     private static func vendorNameFallback(
         _ document: RecognizedDocument, recognitionFactor: Double
     ) -> FieldSuggestion? {
-        // Only the top of the page. A "…LLC" three quarters of the way down an invoice is a
-        // liability clause, not the letterhead.
-        for (index, line) in document.lines.prefix(6).enumerated() {
+        // Only the top of the page, and only above the customer's block. A "…LLC" three quarters
+        // of the way down an invoice is a liability clause, not the letterhead.
+        let ceiling = document.lines.prefix(12).firstIndex { line in
+            let lowered = line.lowercased()
+            return customerBlockHeadings.contains { lowered.hasPrefix($0) }
+        } ?? document.lines.count
+        for (index, line) in document.lines.prefix(min(6, ceiling)).enumerated() {
             let words = line.lowercased().split(separator: " ").map(String.init)
             guard words.count <= 8, line.count >= 4, line.count <= 60 else { continue }
             guard words.contains(where: { companySuffixes.contains($0) }) else { continue }

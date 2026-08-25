@@ -604,4 +604,47 @@ final class ExtractionFixtureTests: XCTestCase {
             )
         }
     }
+
+    // MARK: - The letterhead is the vendor; "Bill To" is not
+
+    /// The name under `BILL TO:` is the contractor's own company, on their own invoice.
+    ///
+    /// The letterhead guess reads the top of the page for a line carrying a company suffix. On
+    /// this invoice the yard's own name is bare — "CANYON STATE", no Co., no Inc. — while the
+    /// customer's, four lines below it, ends in LLC. Without a stop at the customer block the
+    /// guess walked straight past the letterhead and proposed the user's own company as the
+    /// rental yard they should chase for a confirmation number.
+    func testTheCustomersOwnNameIsNotProposedAsTheRentalCompany() throws {
+        let result = try parse("invoice_letterhead_without_suffix.txt", kind: .vendorInvoice)
+        let vendor = result.suggestions.first { $0.field == .vendorName }
+
+        if case let .text(name)? = vendor?.value {
+            XCTAssertFalse(
+                name.uppercased().contains("RIDGELINE"),
+                "the name under BILL TO is the customer's, not the vendor's"
+            )
+        }
+        // Nothing is the right answer here. A letterhead this app cannot identify is a row the
+        // user fills in, not a row it fills in wrongly.
+        XCTAssertNil(vendor, "no vendor name should be guessed from this page")
+    }
+
+    /// And the stop does not cost anything on paperwork that names the yard properly.
+    func testAProperLetterheadIsStillRead() throws {
+        let result = try parse("invoice_waiver_abbreviation.txt", kind: .vendorInvoice)
+        guard case let .text(name)? = result.suggestions
+            .first(where: { $0.field == .vendorName })?.value
+        else {
+            return XCTFail("the letterhead names the yard and should still be read")
+        }
+        XCTAssertTrue(name.uppercased().contains("CANYON STATE EQUIPMENT"))
+    }
+
+    /// The rest of the invoice is read exactly as it would have been.
+    func testTheStopDoesNotHideAnythingBelowIt() throws {
+        let result = try parse("invoice_letterhead_without_suffix.txt", kind: .vendorInvoice)
+        let fields = Set(result.suggestions.map(\.field))
+        XCTAssertTrue(fields.contains(.invoiceNumber))
+        XCTAssertTrue(fields.contains(.deliveryCharge))
+    }
 }

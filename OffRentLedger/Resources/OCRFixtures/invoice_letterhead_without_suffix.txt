@@ -1,0 +1,23 @@
+CANYON STATE
+4801 W BUCKEYE RD
+PHOENIX, AZ 85043
+(602) 555-0148
+
+BILL TO:
+RIDGELINE CONSTRUCTION LLC
+2210 HAVERFORD DR STE 4
+GILBERT, AZ 85296
+
+INVOICE NO 44907
+Contract No. CS-20933
+Invoice Date 07/14/26
+Billed Thru 07/11/26
+
+Description                             Amount
+CAT 259D3 TRACK LOADER    UNIT # TL-402
+  Rental 06/29 - 07/11 @ Week .......... 985.00
+DELIVERY ............................... 145.00
+
+                      SUBTOTAL         1,130.00
+                      TAX                 93.23
+                      TOTAL DUE        1,223.23
