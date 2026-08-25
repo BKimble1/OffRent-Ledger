@@ -139,6 +139,46 @@ extension XCUIApplication {
         navigationBars.buttons.element(boundBy: 0).tap()
     }
 
+    /// Scrolls until an element is genuinely tappable, then taps it.
+    ///
+    /// XCUITest's own scroll-to-visible stops as soon as any part of the element is on screen.
+    /// On a screen with a pinned bottom bar that is not the same as reachable: the last run left
+    /// "Record a follow-up" with its top four points under the Accept bar and its centre under
+    /// the tab bar, so the synthesised tap selected the Audit tab instead and the sheet never
+    /// opened. `isHittable` is the property that accounts for what is drawn on top.
+    func tapWhenHittable(
+        _ element: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard element.waitForExistence(timeout: 8) else {
+            XCTFail(
+                """
+                element never appeared, so it could not be tapped.
+                Identified elements on screen:
+                \(identifiedElements())
+                """,
+                file: file, line: line
+            )
+            return
+        }
+        for _ in 0..<4 {
+            if element.isHittable {
+                element.tap()
+                return
+            }
+            swipeUp()
+        }
+        XCTFail(
+            """
+            element existed but never became tappable — something is drawn over it.
+            Identified elements on screen:
+            \(identifiedElements())
+            """,
+            file: file, line: line
+        )
+    }
+
     /// Dismisses the keyboard through the app's own Done affordance, if one is up.
     ///
     /// A decimal pad has no return key, which is why `CurrencyField` puts Done in the keyboard

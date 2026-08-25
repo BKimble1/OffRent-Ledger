@@ -52,11 +52,13 @@ final class MismatchUITests: XCTestCase {
         )
 
         // Resolve must be refused while the mismatch is open.
-        app.buttons[A11yUI.Audit.resolveInvoice].tap()
+        app.tapWhenHittable(app.buttons[A11yUI.Audit.resolveInvoice])
         XCTAssertTrue(app.alerts.element.waitForExistence(timeout: 5))
         app.alerts.buttons["OK"].tap()
 
-        app.buttons[A11yUI.Audit.recordFollowUp].tap()
+        // Under the Accept bar and the tab bar at this scroll position, so tapping its centre
+        // hits the tab bar. Scroll it clear first.
+        app.tapWhenHittable(app.buttons[A11yUI.Audit.recordFollowUp])
         app.expect(app.textViews[A11yUI.Audit.followUpReason]).tap()
         app.typeText("Billed one day past the OR-44921 confirmation.")
         app.buttons["Save"].tap()

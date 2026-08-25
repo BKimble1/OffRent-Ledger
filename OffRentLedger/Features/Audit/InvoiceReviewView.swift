@@ -148,6 +148,10 @@ struct InvoiceReviewView: View {
                 )
             }
         }
+        // `.contain` first: without it this identifier is pushed down onto all five DetailRows
+        // and each one loses its own. The last accessibility dump showed exactly that — five
+        // separate elements all called "audit.comparisonTable".
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11yID.Audit.comparisonTable)
     }
 
