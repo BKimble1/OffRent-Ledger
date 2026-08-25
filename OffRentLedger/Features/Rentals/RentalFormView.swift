@@ -22,7 +22,6 @@ struct RentalFormView: View {
     var showsCapture: Bool = true
 
     @Environment(AppDependencies.self) private var dependencies
-    @Environment(\.modelContext) private var context
 
     @Query(sort: \Vendor.name) private var companies: [Vendor]
     @Query(sort: \JobSite.name) private var jobSites: [JobSite]
@@ -101,10 +100,15 @@ struct RentalFormView: View {
         } message: {
             Text((scanError ?? "") + "\n\nYou can still enter everything by hand.")
         }
+        .onAppear {
+            // Straight into the first field on a new rental. The sheet exists to capture an
+            // equipment name, and making somebody tap once before they can type it is a tap for
+            // nothing. Not on the edit path, where the field is already full and raising the
+            // keyboard would hide the rest of what they came to change.
+            guard showsCapture, draft.equipmentName.isEmpty else { return }
+            equipmentIsFocused = true
+        }
     }
-
-    /// Called by the hosting screen once the form is on screen.
-    func focusEquipment() { equipmentIsFocused = true }
 
     // MARK: - Sections
 

@@ -32,7 +32,16 @@ struct TodayView: View {
                     .padding(.top, Space.roomy)
                 } else {
                     summary
-                    TodayMapPanel(items: openItems)
+                }
+
+                // Outside the branch on purpose. The map used to live in the `else`, so a user
+                // with nothing on rent never saw it — and neither did a user whose only rental
+                // had no location, because the panel drew nothing in that case either. Between
+                // the two, the section existed only for somebody who had already discovered it.
+                // It is always here now, and says what it is showing.
+                TodayMapPanel(items: allItems)
+
+                if !openItems.isEmpty {
                     if !upcomingRateChanges.isEmpty { upcomingRateChangesSection }
                     if !actionQueue.isEmpty { actionQueueSection }
                     if !awaitingPickup.isEmpty { awaitingPickupSection }

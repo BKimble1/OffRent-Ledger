@@ -19,6 +19,9 @@ struct JobsitePickerView: View {
 
     @State private var search = ""
     @State private var creating = false
+    /// See the note in `CompanyPickerView`: the nested editor has to finish closing before this
+    /// one may, or SwiftUI leaves the picker up and the rental draft unreachable.
+    @State private var pendingPick: JobSite?
 
     var body: some View {
         NavigationStack {
@@ -88,8 +91,13 @@ struct JobsitePickerView: View {
             }
             .sheet(isPresented: $creating) {
                 JobsiteMapEditor(existing: nil, initialName: search) { created in
-                    pick(created)
+                    pendingPick = created
                 }
+            }
+            .onChange(of: creating) { _, isCreating in
+                guard !isCreating, let created = pendingPick else { return }
+                pendingPick = nil
+                pick(created)
             }
         }
         .accessibilityIdentifier(A11yID.Jobsite.pickerRoot)

@@ -210,6 +210,13 @@ struct CompanyPickerView: View {
 
     @State private var search = ""
     @State private var creating = false
+    /// A company created by the nested editor, held until that editor has actually closed.
+    ///
+    /// Dismissing this picker from inside `onSaved` would be dismissing a sheet while its own
+    /// child sheet is still on screen. SwiftUI does not reliably unwind two presentations in one
+    /// turn of the run loop, and the failure mode is the worst one available here — the editor
+    /// closes, the picker stays, and the rental draft underneath is never reached.
+    @State private var pendingPick: Vendor?
 
     var body: some View {
         NavigationStack {
@@ -258,8 +265,13 @@ struct CompanyPickerView: View {
                 // Saving from here selects the new company and closes *both* sheets, so somebody
                 // who came from a half-filled rental lands back on it with the company set.
                 CompanyEditorView(existing: nil, initialName: search) { created in
-                    pick(created)
+                    pendingPick = created
                 }
+            }
+            .onChange(of: creating) { _, isCreating in
+                guard !isCreating, let created = pendingPick else { return }
+                pendingPick = nil
+                pick(created)
             }
         }
         .accessibilityIdentifier(A11yID.Company.pickerRoot)
