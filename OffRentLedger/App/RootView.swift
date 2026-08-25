@@ -12,6 +12,9 @@ struct RootView: View {
 
     /// Guards the once-per-launch check below. Without it, every `.task` re-entry would
     /// re-present a walkthrough the user has just dismissed.
+    /// What the welcome screen asked for, held until its cover has actually closed.
+    private enum WelcomeAction { case addRental, takeTour }
+    @State private var pendingWelcomeAction: WelcomeAction?
     @State private var hasCheckedWalkthrough = false
 
     var body: some View {
@@ -47,25 +50,43 @@ struct RootView: View {
             sheetContent(for: sheet)
         }
         // The welcome covers the shell rather than replacing it, so dismissing it reveals an app
-        // already loaded rather than mounting one — and "Add your first rental" can open the
-        // sheet on the way out.
+        // already loaded rather than mounting one.
+        //
+        // Its two actions do *not* present anything from inside the closure. Dismissing this
+        // cover and presenting a sheet — or a second cover — in one state update asks SwiftUI to
+        // unwind two presentations in one turn of the run loop, which it does not reliably do;
+        // `CompanyPickerView` learned that the hard way and parks its result the same way. Here
+        // the closure records what was asked for, and `.onChange` acts on it once the cover has
+        // actually gone. Both buttons are the only two things a new user can do, and a dropped
+        // presentation leaves them on an empty Rentals tab having tapped a button that appeared
+        // to do nothing.
         .fullScreenCover(isPresented: .constant(onboarding.shouldShowWelcome)) {
             WelcomeView(
                 onAddRental: {
+                    pendingWelcomeAction = .addRental
                     onboarding.markWelcomed()
                     onboarding.markTourSeen()
-                    router.selectedTab = .rentals
-                    router.presentedSheet = .addRental
                 },
                 onTakeTour: {
+                    pendingWelcomeAction = .takeTour
                     onboarding.markWelcomed()
-                    onboarding.startTour()
                 },
                 onSkip: {
                     onboarding.markWelcomed()
                     onboarding.markTourSeen()
                 }
             )
+        }
+        .onChange(of: onboarding.shouldShowWelcome) { _, showing in
+            guard !showing, let action = pendingWelcomeAction else { return }
+            pendingWelcomeAction = nil
+            switch action {
+            case .addRental:
+                router.selectedTab = .rentals
+                router.presentedSheet = .addRental
+            case .takeTour:
+                onboarding.startTour()
+            }
         }
         // Finish and Skip do the same thing here: record the version and dismiss. `markTourSeen`
         // sets `isShowingTour` to false itself, so the cover closes on the same run loop as the
@@ -149,7 +170,7 @@ struct RootView: View {
         if overrides.resetState { SeedFixtures.wipe(context: context) }
         if overrides.seedWalkthrough || overrides.seedFreeLimit {
             SeedFixtures.seedWalkthrough(context: context, clock: dependencies.clock)
-            try? context.save()
+            PersistentStore.saveDerived(context, describing: "the walkthrough fixtures")
         }
         #endif
     }
@@ -162,7 +183,7 @@ struct RootView: View {
         let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
         guard let items = try? context.fetch(StoreQueries.allItems()) else { return }
         workflow.refreshEstimates(for: items)
-        try? context.save()
+        PersistentStore.saveDerived(context, describing: "the cached estimates")
 
         publishSnapshot(items: items)
         publishIntentIndex(items: items)
@@ -266,6 +287,7 @@ extension ReminderContext {
             confirmationRecordedAt: confirmedAt,
             pickupRecordedAt: pickedUpAt,
             invoiceAttachedAt: invoice?.attachedAt,
+            invoiceDate: invoice?.receivedDate,
             invoiceReviewed: invoiceReviewed,
             disputeWindowDaysOverride: item.agreement?.disputeWindowDaysOverride
         )

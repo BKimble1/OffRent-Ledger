@@ -22,6 +22,7 @@ final class ReminderPlannerTests: XCTestCase {
         confirmationRecordedAt: Date? = nil,
         pickupRecordedAt: Date? = nil,
         invoiceAttachedAt: Date? = nil,
+        invoiceDate: Date? = nil,
         invoiceReviewed: Bool = false,
         disputeWindowDaysOverride: Int? = nil
     ) -> ReminderContext {
@@ -39,6 +40,7 @@ final class ReminderPlannerTests: XCTestCase {
             confirmationRecordedAt: confirmationRecordedAt,
             pickupRecordedAt: pickupRecordedAt,
             invoiceAttachedAt: invoiceAttachedAt,
+            invoiceDate: invoiceDate,
             invoiceReviewed: invoiceReviewed,
             disputeWindowDaysOverride: disputeWindowDaysOverride
         )
@@ -185,6 +187,39 @@ final class ReminderPlannerTests: XCTestCase {
 
         XCTAssertEqual(planned.count, 1)
         // attached 05-08 + 7 days = 05-15, minus 3 days lead = 05-12 at 08:00.
+        XCTAssertEqual(planned[0].fireDate, date(2026, 5, 12, 8))
+    }
+
+    /// Paper arrives late. The window runs from the date on the invoice, not from the evening
+    /// somebody finally photographed it — otherwise the reminder lands after the window has shut.
+    func testTheDisputeWindowRunsFromTheInvoiceDateNotTheDayItWasFiled() {
+        let planned = plan([
+            context(
+                status: .invoiceReview,
+                invoiceAttachedAt: date(2026, 5, 20, 19),
+                invoiceDate: date(2026, 5, 8, 9),
+                disputeWindowDaysOverride: 7
+            )
+        ]).filter { $0.kind == .disputeWindowClosing }
+
+        // Invoice dated 05-08 + 7 days = 05-15, minus 3 days lead = 05-12 at 08:00. Anchored to
+        // the filing date instead it would have been 05-24, nine days after the window shut.
+        XCTAssertEqual(planned.count, 1)
+        XCTAssertEqual(planned[0].fireDate, date(2026, 5, 12, 8))
+    }
+
+    /// Records made before the invoice date was captured must keep behaving exactly as they did.
+    func testWithoutAnInvoiceDateTheWindowStillRunsFromTheFilingDate() {
+        let planned = plan([
+            context(
+                status: .invoiceReview,
+                invoiceAttachedAt: date(2026, 5, 8, 9),
+                invoiceDate: nil,
+                disputeWindowDaysOverride: 7
+            )
+        ]).filter { $0.kind == .disputeWindowClosing }
+
+        XCTAssertEqual(planned.count, 1)
         XCTAssertEqual(planned[0].fireDate, date(2026, 5, 12, 8))
     }
 

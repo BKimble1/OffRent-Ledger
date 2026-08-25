@@ -191,6 +191,12 @@ struct ReminderContext: Sendable, Equatable {
     var confirmationRecordedAt: Date?
     var pickupRecordedAt: Date?
     var invoiceAttachedAt: Date?
+    /// The date printed on the invoice, which is what a vendor's review window runs from.
+    ///
+    /// Not the same thing as `invoiceAttachedAt`. Paper arrives late and gets photographed later
+    /// still; anchoring the window to the moment the user typed it in put the deadline days after
+    /// the real one, which is the exact mistake this app exists to stop somebody making.
+    var invoiceDate: Date?
     var invoiceReviewed: Bool
     var disputeWindowDaysOverride: Int?
 
@@ -203,6 +209,7 @@ struct ReminderContext: Sendable, Equatable {
         confirmationRecordedAt: Date? = nil,
         pickupRecordedAt: Date? = nil,
         invoiceAttachedAt: Date? = nil,
+        invoiceDate: Date? = nil,
         invoiceReviewed: Bool = false,
         disputeWindowDaysOverride: Int? = nil
     ) {
@@ -214,6 +221,7 @@ struct ReminderContext: Sendable, Equatable {
         self.confirmationRecordedAt = confirmationRecordedAt
         self.pickupRecordedAt = pickupRecordedAt
         self.invoiceAttachedAt = invoiceAttachedAt
+        self.invoiceDate = invoiceDate
         self.invoiceReviewed = invoiceReviewed
         self.disputeWindowDaysOverride = disputeWindowDaysOverride
     }
@@ -356,12 +364,16 @@ enum ReminderPlanner {
             )
 
         case .disputeWindowClosing:
-            guard let attached = context.invoiceAttachedAt, !context.invoiceReviewed else {
+            // The invoice's own date wins over the moment it was filed. Falling back to the
+            // filing moment only where no invoice date was captured keeps every older record
+            // behaving as it did.
+            guard let anchor = context.invoiceDate ?? context.invoiceAttachedAt,
+                  !context.invoiceReviewed else {
                 return nil
             }
             let window = context.disputeWindowDaysOverride ?? settings.defaultDisputeWindowDays
             guard window > 0 else { return nil }
-            let closes = calendar.addingDaysPreservingTimeOfDay(window, to: attached)
+            let closes = calendar.addingDaysPreservingTimeOfDay(window, to: anchor)
             let fire = atPreferredHour(
                 calendar.addingDaysPreservingTimeOfDay(-settings.disputeWindowLeadDays, to: closes),
                 settings: settings, calendar: calendar
