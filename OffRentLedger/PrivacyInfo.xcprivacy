@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Required by App Store submission since May 2024. Its absence is not a warning: the upload
+	  is accepted and the review is not.
+
+	  Everything here is a statement of fact about this app, checked against the source by
+	  `check_privacy_manifests` in scripts/verify_repository.py rather than written once and
+	  left to rot.
+	-->
+
+	<!-- The app has no analytics, no advertising identifier, no third-party SDK and no network
+	     client of its own. `check_privacy_posture` fails the build if one appears. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<!-- Nothing leaves the device to us or to anyone else. Rentals, invoices, photographs and
+	     recognised text are stored on the iPhone and in the user's own iCloud backup if they
+	     have one; text recognition is Vision, on device. The only outbound requests the app can
+	     make are to Apple: MapKit place search, one reverse geocode, and StoreKit. None of them
+	     carries a rental, an amount or a document. -->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!-- `UserDefaults.standard` holds the reminder preferences, the appearance choice
+			     and which walkthrough version has been seen. The App Group suite
+			     `group.com.idlery.offrent` carries the widget's summary snapshot and the
+			     Shortcuts index from the app to its own widget extension, and to nothing else. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

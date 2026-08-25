@@ -60,8 +60,6 @@
 	<string>$(OFFRENT_CAMERA_USAGE)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>$(OFFRENT_LOCATION_USAGE)</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>$(OFFRENT_PHOTO_ADD_USAGE)</string>
 	<key>UIBackgroundModes</key>
 	<array/>
 	<key>NSSupportsLiveActivities</key>

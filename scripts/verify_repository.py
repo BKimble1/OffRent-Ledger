@@ -683,18 +683,36 @@ def check_no_hardcoded_prices() -> None:
 def check_permission_strings() -> None:
     check("Every permission the app requests has a purpose string")
     info = (ROOT / "Config" / "OffRentLedger-Info.plist").read_text()
-    required = {
-        "NSCameraUsageDescription": "VNDocumentCameraViewController",
-        "NSLocationWhenInUseUsageDescription": "CLLocationManager",
-        "NSPhotoLibraryAddUsageDescription": None,
-    }
-    for key in required:
-        if key not in info:
-            fail("permissions", f"Info.plist is missing {key}")
-
-    # And the reverse: no purpose string for a capability that is not used, which App Review
-    # treats as a red flag.
     sources = "\n".join(without_comments(p.read_text()) for p in swift_files(APP_SOURCES, WIDGET_SOURCES))
+
+    # Both directions, because App Review reads both.
+    #
+    # A permission the code needs and the plist lacks is a crash the moment the user taps the
+    # button. A permission the plist declares and the code never reaches is a question at review
+    # — and worse, its purpose string describes a feature that does not exist. This app shipped
+    # `NSPhotoLibraryAddUsageDescription` for eight builds promising to "save an evidence photo
+    # back to your library", and nothing in it has ever written to the photo library:
+    # `PhotosPicker` reads out of process and needs no entitlement at all.
+    permissions = {
+        "NSCameraUsageDescription": r"VNDocumentCameraViewController|AVCaptureDevice|UIImagePickerController",
+        "NSLocationWhenInUseUsageDescription": r"CLLocationManager",
+        "NSPhotoLibraryAddUsageDescription": r"UIImageWriteToSavedPhotosAlbum|PHPhotoLibrary|PHAssetCreationRequest",
+        "NSPhotoLibraryUsageDescription": r"PHImageManager|PHAsset\b|ALAssetsLibrary",
+        "NSMicrophoneUsageDescription": r"AVAudioRecorder|AVCaptureDevice\.default\(\.builtInMicrophone",
+        "NSContactsUsageDescription": r"CNContactStore",
+        "NSCalendarsUsageDescription": r"EKEventStore",
+        "NSFaceIDUsageDescription": r"LAContext",
+    }
+    for key, pattern in permissions.items():
+        declared = key in info
+        used = re.search(pattern, sources) is not None
+        if used and not declared:
+            fail("permissions", f"Info.plist is missing {key}, which the code needs — that is a crash")
+        if declared and not used:
+            fail(
+                "permissions",
+                f"Info.plist declares {key}, but nothing in the app reaches an API that needs it",
+            )
     if "NSLocationAlwaysAndWhenInUseUsageDescription" in info:
         fail("permissions", "the app declares always-on location, which it must not use")
     if "startUpdatingLocation" in sources or "startMonitoringSignificantLocationChanges" in sources:
@@ -705,6 +723,102 @@ def check_permission_strings() -> None:
         ).get("UIBackgroundModes", [])
         if modes:
             fail("permissions", f"background modes declared: {modes}")
+
+
+# The required-reason API categories, and the token in Swift source that means the app uses one.
+#
+# Apple's list is longer than this; these are the categories a local, offline, SwiftData app can
+# plausibly reach. A category with no match in the source must not appear in a manifest, and one
+# with a match must.
+REQUIRED_REASON_APIS = {
+    "NSPrivacyAccessedAPICategoryUserDefaults": (
+        r"\bUserDefaults\b",
+        {"CA92.1", "1C8F.1", "AC6B.1", "C56D.1"},
+    ),
+    "NSPrivacyAccessedAPICategoryFileTimestamp": (
+        r"\.creationDateKey|\.contentModificationDateKey|attributesOfItem|\bNSFileCreationDate\b"
+        r"|\bNSFileModificationDate\b|\bgetattrlist\b|\bfstat\b",
+        {"DDA9.1", "C617.1", "3B52.1", "0A2A.1"},
+    ),
+    "NSPrivacyAccessedAPICategoryDiskSpace": (
+        r"volumeAvailableCapacity|volumeTotalCapacity|NSFileSystemFreeSize|systemFreeSize",
+        {"85F4.1", "E174.1", "7D9E.1", "B728.1"},
+    ),
+    "NSPrivacyAccessedAPICategorySystemBootTime": (
+        r"systemUptime|mach_absolute_time|mach_continuous_time",
+        {"35F9.1", "8FFB.1", "3D61.1"},
+    ),
+    "NSPrivacyAccessedAPICategoryActiveKeyboards": (
+        r"activeInputModes",
+        {"3EC4.1", "54BD.1"},
+    ),
+}
+
+
+def check_privacy_manifests() -> None:
+    check("Both privacy manifests exist and describe what the code actually does")
+    # Required for App Store submission since May 2024. Its absence is not a warning — the
+    # upload is accepted and the review is not, which is the most expensive possible way to find
+    # out. An app extension needs its own; the app's does not cover it.
+    #
+    # Checked against the source rather than merely present, so that adding a required-reason API
+    # later fails the build here instead of at review.
+    targets = [
+        (ROOT / "OffRentLedger" / "PrivacyInfo.xcprivacy", [APP_SOURCES, SHARED_SOURCES]),
+        (ROOT / "OffRentLedgerWidget" / "PrivacyInfo.xcprivacy", [WIDGET_SOURCES, SHARED_SOURCES]),
+    ]
+
+    for path, roots in targets:
+        relative = path.relative_to(ROOT)
+        if not path.exists():
+            fail("privacy-manifest", f"{relative} is missing; App Review requires one per target")
+            continue
+        try:
+            manifest = plistlib.loads(path.read_bytes())
+        except Exception as error:  # noqa: BLE001 - the message is the point
+            fail("privacy-manifest", f"{relative} is not a readable plist: {error}")
+            continue
+
+        if manifest.get("NSPrivacyTracking") is not False:
+            fail("privacy-manifest", f"{relative} must declare NSPrivacyTracking false")
+        for key in ("NSPrivacyTrackingDomains", "NSPrivacyCollectedDataTypes", "NSPrivacyAccessedAPITypes"):
+            if key not in manifest:
+                fail("privacy-manifest", f"{relative} is missing {key}")
+
+        # Nothing leaves the device, so a collected-data entry would contradict
+        # `check_privacy_posture` and the shipped privacy policy.
+        if manifest.get("NSPrivacyCollectedDataTypes"):
+            fail(
+                "privacy-manifest",
+                f"{relative} declares collected data, but the app has no network client of its own",
+            )
+
+        declared: dict[str, set[str]] = {}
+        for entry in manifest.get("NSPrivacyAccessedAPITypes", []):
+            declared[entry.get("NSPrivacyAccessedAPIType", "")] = set(
+                entry.get("NSPrivacyAccessedAPITypeReasons", [])
+            )
+
+        source = "\n".join(without_comments(p.read_text()) for p in swift_files(*roots))
+        for category, (pattern, valid_reasons) in REQUIRED_REASON_APIS.items():
+            used = re.search(pattern, source) is not None
+            if used and category not in declared:
+                fail(
+                    "privacy-manifest",
+                    f"{relative} does not declare {category}, but the target's source uses it",
+                )
+            if not used and category in declared:
+                fail(
+                    "privacy-manifest",
+                    f"{relative} declares {category}, which this target's source never reaches",
+                )
+            for reason in declared.get(category, set()):
+                if reason not in valid_reasons:
+                    fail(
+                        "privacy-manifest",
+                        f"{relative} gives {reason!r} for {category}, which is not one of Apple's "
+                        f"reason codes for it ({', '.join(sorted(valid_reasons))})",
+                    )
 
 
 def check_privacy_posture() -> None:
@@ -1525,6 +1639,7 @@ def main() -> int:
         check_storekit_products_match,
         check_no_hardcoded_prices,
         check_permission_strings,
+        check_privacy_manifests,
         check_privacy_posture,
         check_legal_urls_not_claimed_live,
         check_accessibility_identifiers_are_used,

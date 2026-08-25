@@ -52,4 +52,3 @@ OFFRENT_DEVELOPMENT_TEAM = 7GNFT94A9L
 
 OFFRENT_CAMERA_USAGE = OffRent Ledger uses the camera only when you tap a scan or photo button, to scan a rental contract or invoice and to photograph equipment condition, meters and fuel gauges. Scanning and text recognition happen entirely on this iPhone. Nothing is uploaded.
 OFFRENT_LOCATION_USAGE = OffRent Ledger asks for your location only when you tap "Add current location" while recording an off-rent confirmation or a pickup, so the record shows where the equipment was. It is captured once, in the foreground, and is never tracked in the background.
-OFFRENT_PHOTO_ADD_USAGE = OffRent Ledger asks for permission to save to Photos only when you choose to save an evidence photo or an exported document back to your library.
