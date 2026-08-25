@@ -133,6 +133,24 @@ BANNED_PHRASES = [
     "close out the rental",
 ]
 
+# Phrases that are the banned ones with words inserted, which a substring test cannot see.
+#
+# `"You closed this item out."` shipped past the list for eight builds: it means exactly what
+# "closed out" means and shares none of its characters in order. A list of literals always fails
+# this way, so the few worth catching are expressed as patterns.
+BANNED_PATTERNS = [
+    (r"clos(?:e|ed|ing)\b[^.]{0,24}\bout\b", "claims a rental was closed out"),
+    (r"\bend(?:ed|s|ing)?\b\s+(?:your|the|this|any)\s+rental\b", "claims a rental was ended"),
+    (r"\bwe\b[^.]{0,16}\b(?:called|phoned|emailed|contacted|notified)\b", "claims the app contacted someone"),
+]
+
+# The app's most important copy is the copy that *denies* doing these things — "does not notify
+# the rental company or end your rental" is a required disclosure, not a violation. So a match is
+# only a failure when nothing negates it just before, which is the same shape the legal-document
+# check already uses.
+NEGATION_WINDOW = 60
+NEGATIONS = ("not ", "never ", "n't ", "without ", "cannot ", "no one ", "nothing ")
+
 
 def check_banned_phrases() -> None:
     check("No phrase claiming the app contacted a vendor or ended a rental")
@@ -143,6 +161,14 @@ def check_banned_phrases() -> None:
             for phrase in BANNED_PHRASES:
                 if phrase in lowered:
                     fail("banned-phrase", f"{relative} string contains {phrase!r}")
+            for pattern, why in BANNED_PATTERNS:
+                for match in re.finditer(pattern, lowered):
+                    start = max(0, match.start() - NEGATION_WINDOW)
+                    run_up = lowered[start: match.start()]
+                    if any(negation in run_up for negation in NEGATIONS):
+                        continue
+                    excerpt = lowered[match.start(): match.end()]
+                    fail("banned-phrase", f"{relative} string {why}: …{excerpt}…")
 
     # The shipped legal text and the website are user-facing too. "not legally binding" and
     # "not a chain of custody" are denials, so the check looks for the claim without its negation.

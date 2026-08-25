@@ -97,7 +97,13 @@ enum RentalItemStatus: String, CaseIterable, Codable, Sendable {
         case .needsFollowUp:
             "You recorded something to follow up on with the vendor."
         case .resolved:
-            "You closed this item out."
+            // Describes the record, not an act at the yard. Closing a rental out is something a
+            // contractor does with a rental company, and this app never speaks to one; what
+            // happened here is that the user finished reviewing the item and their own record
+            // moved on. The banned-phrase list held the exact wording and missed this by a
+            // single inserted word, which is how a list of literals always fails — so the check
+            // matches the shape now, and skips a sentence that denies it.
+            "You finished with this item in your records."
         case .archived:
             "Filed away. Still fully readable and exportable."
         }

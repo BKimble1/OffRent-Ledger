@@ -490,7 +490,7 @@ struct InvoiceReviewView: View {
                 } footer: {
                     Text("""
                         This is your own note. It goes into the timeline and into the evidence \
-                        packet, and it keeps the rental open until you close it out.
+                        packet, and it keeps the rental open until you resolve it.
                         """)
                 }
             }

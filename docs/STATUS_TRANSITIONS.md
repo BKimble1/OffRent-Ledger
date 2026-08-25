@@ -18,7 +18,7 @@ Source: `StatusTransitionService.allowedTransitions` and `.reopenTargets`.
 | Awaiting Invoice | Invoice Review | Waiting for the vendor's final invoice. |
 | Invoice Review | Needs Follow-Up, Resolved | An invoice is attached and ready for you to review. |
 | Needs Follow-Up | Invoice Review, Resolved | You recorded something to follow up on with the vendor. |
-| Resolved | Archived | You closed this item out. |
+| Resolved | Archived | You finished with this item in your records. |
 | Archived | _terminal_ | Filed away. Still fully readable and exportable. |
 
 ## Reopening
