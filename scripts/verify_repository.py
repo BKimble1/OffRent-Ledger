@@ -126,6 +126,11 @@ BANNED_PHRASES = [
     "legally binding proof",
     "tamper-proof",
     "tamper proof",
+    # Closing a rental out is an act between a contractor and a yard. The app's own record moving
+    # to Resolved is a different thing, and the acceptance confirmation used to blur the two.
+    # Narrow on purpose: "Closed" on its own is a real status and a real section header.
+    "closed out",
+    "close out the rental",
 ]
 
 

@@ -104,9 +104,13 @@ enum InvoiceAcceptance {
 
     /// The line shown after a successful acceptance.
     ///
-    /// "In your records", not "closed out". Closing a rental out is something a yard does, and
-    /// this app does not talk to the yard — §1.1. What actually happened is that the user
+    /// In the user's records, not at the yard. Closing a rental out is an act between a
+    /// contractor and a rental company, and this app does not talk to the rental company — §1.1
+    /// is the reason it exists in the shape it does. What actually happened is that the user
     /// finished reviewing an invoice and their own record moved to Resolved, which is what the
-    /// sentence now says.
+    /// sentence says.
+    ///
+    /// The old wording is in the banned list now. It reached a shipped screen, which is what
+    /// that list is for.
     static let confirmation = "Invoice accepted. This rental is now resolved in your records."
 }
