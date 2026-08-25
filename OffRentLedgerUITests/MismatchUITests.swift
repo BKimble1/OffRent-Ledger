@@ -16,6 +16,10 @@ final class MismatchUITests: XCTestCase {
             "-offrent-force-pro",
             "-offrent-seed-walkthrough",
             "-offrent-fixed-now", XCUIApplication.fixedNow,
+            // Without this the welcome sits in front of the whole scenario. It has been passing
+            // only because an earlier test class runs first and persists the flag into the
+            // simulator's defaults — run this class on its own and it fails on the first tap.
+            "-offrent-skip-onboarding",
         ]
         app.launch()
 
@@ -59,9 +63,9 @@ final class MismatchUITests: XCTestCase {
         // Under the Accept bar and the tab bar at this scroll position, so tapping its centre
         // hits the tab bar. Scroll it clear first.
         app.tapWhenHittable(app.buttons[A11yUI.Audit.recordFollowUp])
-        app.expect(app.textViews[A11yUI.Audit.followUpReason]).tap()
+        app.expect(app.anyElement(A11yUI.Audit.followUpReason)).tap()
         app.typeText("Billed one day past the OR-44921 confirmation.")
-        app.buttons["Save"].tap()
+        app.tapWhenHittable(app.buttons["Save"])
 
         // 15. It is still open after a relaunch.
         app.relaunchKeepingStore()

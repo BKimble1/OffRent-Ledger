@@ -21,6 +21,9 @@ final class CoreWorkflowUITests: XCTestCase {
             "-offrent-disable-animations",
             "-offrent-force-pro",
             "-offrent-fixed-now", XCUIApplication.fixedNow,
+            // See the note in MismatchUITests: a hand-built launch has to ask for this too, or
+            // the scenario depends on which class ran before it.
+            "-offrent-skip-onboarding",
         ]
         app.launch()
 
