@@ -133,40 +133,6 @@ final class CoreWorkflowUITests: XCTestCase {
         app.expect(app.buttons["Done"]).tap()
         XCTAssertTrue(app.expect(app.buttons[A11yUI.ItemDetail.exportEvidence]).exists)
     }
-}
-
-/// Keeps the tapping out of the assertions.
-struct AttachInvoiceRobot {
-    let app: XCUIApplication
-
-    func fill(total: String, rentalSubtotal: String) {
-        app.textFields["currencyField.Invoice total"].tap()
-        app.typeText(total)
-
-        // "Add a line" is below the total field and the decimal pad covers it. Tapping it with
-        // the keyboard up reports success and adds nothing, and the next step then looks for an
-        // Amount field that was never created. Dismissing first is also what a person does, and
-        // it exercises the Done button the decimal pad would otherwise have no way out of.
-        app.dismissKeyboard()
-        app.buttons["Add a line"].tap()
-
-        // A new line is "Other" until somebody says otherwise, and an uncategorised amount
-        // deliberately does not count as rent — which is why the last run compared 1,710 expected
-        // against 0 invoiced and reported the whole subtotal as the variance. The app is right to
-        // refuse to guess; the test has to say what kind of line this is, which is also the thing
-        // it is asserting about.
-        app.expect(app.anyElement(A11yUI.Audit.lineCategory)).tap()
-        app.expect(app.buttons["Rental subtotal"]).tap()
-
-        app.expect(app.textFields["currencyField.Amount"]).tap()
-        app.typeText(rentalSubtotal)
-        app.dismissKeyboard()
-
-        // Addressed by identifier rather than by the label "Save". The sheet's primary action
-        // moved to a bottom bar and reads "Save invoice"; matching on a bare label would also
-        // have matched any other Save that happened to be on screen.
-        app.expect(app.buttons[A11yUI.Audit.saveInvoice]).tap()
-    }
 
     /// The scanner is on the home screen.
     ///
@@ -210,5 +176,39 @@ struct AttachInvoiceRobot {
         // Backing out costs nothing: iOS was never asked, and the button is still there.
         app.expect(app.buttons[A11yUI.Settings.remindersPrimingNotNow]).tap()
         XCTAssertTrue(app.expect(app.buttons[A11yUI.Settings.remindersEnable]).exists)
+    }
+}
+
+/// Keeps the tapping out of the assertions.
+struct AttachInvoiceRobot {
+    let app: XCUIApplication
+
+    func fill(total: String, rentalSubtotal: String) {
+        app.textFields["currencyField.Invoice total"].tap()
+        app.typeText(total)
+
+        // "Add a line" is below the total field and the decimal pad covers it. Tapping it with
+        // the keyboard up reports success and adds nothing, and the next step then looks for an
+        // Amount field that was never created. Dismissing first is also what a person does, and
+        // it exercises the Done button the decimal pad would otherwise have no way out of.
+        app.dismissKeyboard()
+        app.buttons["Add a line"].tap()
+
+        // A new line is "Other" until somebody says otherwise, and an uncategorised amount
+        // deliberately does not count as rent — which is why the last run compared 1,710 expected
+        // against 0 invoiced and reported the whole subtotal as the variance. The app is right to
+        // refuse to guess; the test has to say what kind of line this is, which is also the thing
+        // it is asserting about.
+        app.expect(app.anyElement(A11yUI.Audit.lineCategory)).tap()
+        app.expect(app.buttons["Rental subtotal"]).tap()
+
+        app.expect(app.textFields["currencyField.Amount"]).tap()
+        app.typeText(rentalSubtotal)
+        app.dismissKeyboard()
+
+        // Addressed by identifier rather than by the label "Save". The sheet's primary action
+        // moved to a bottom bar and reads "Save invoice"; matching on a bare label would also
+        // have matched any other Save that happened to be on screen.
+        app.expect(app.buttons[A11yUI.Audit.saveInvoice]).tap()
     }
 }

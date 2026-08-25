@@ -30,6 +30,9 @@ APP_SOURCES = ROOT / "OffRentLedger"
 SHARED_SOURCES = ROOT / "OffRentShared"
 WIDGET_SOURCES = ROOT / "OffRentLedgerWidget"
 DOMAIN = APP_SOURCES / "Domain"
+UNIT_TESTS = ROOT / "OffRentLedgerTests"
+UI_TESTS = ROOT / "OffRentLedgerUITests"
+DOMAIN_TESTS = ROOT / "Tests"
 TESTS = [ROOT / "OffRentLedgerTests", ROOT / "OffRentLedgerUITests", ROOT / "Tests"]
 
 failures: list[str] = []
@@ -396,6 +399,36 @@ def check_saves_are_not_silent() -> None:
                 f"{relative}:{line} discards a save failure; "
                 "use PersistentStore.save or PersistentStore.saveDerived",
             )
+
+
+def check_tests_live_inside_a_test_case() -> None:
+    check("Every test function is somewhere a runner will find it")
+    # A `func test…()` in a helper struct compiles, reports nothing, and never runs. It happened:
+    # three UI tests were appended to the end of a file whose last type was a robot helper rather
+    # than the XCTestCase above it, CI went green, and the count stayed where it was. Green with
+    # the test absent is worse than red.
+    opener = re.compile(r"^(?:final\s+)?(class|struct|enum|extension)\s+(\w+)(.*)$")
+    test_func = re.compile(r"^\s+func\s+(test\w*)\s*\(")
+    for path in swift_files(UNIT_TESTS, UI_TESTS, DOMAIN_TESTS):
+        relative = path.relative_to(ROOT).as_posix()
+        enclosing = None
+        is_case = False
+        for number, line in enumerate(path.read_text().splitlines(), start=1):
+            match = opener.match(line)
+            if match:
+                enclosing = match.group(2)
+                # An XCTestCase, or an extension of something named like one. Swift Testing's
+                # `@Test` methods are matched separately below and need no suite type.
+                is_case = "XCTestCase" in line or (
+                    match.group(1) == "extension" and enclosing.endswith("Tests")
+                )
+                continue
+            if test_func.match(line) and not is_case:
+                fail(
+                    "orphan-test",
+                    f"{relative}:{number} declares {test_func.match(line).group(1)} inside "
+                    f"{enclosing or 'no type'}, which is not an XCTestCase — it will never run",
+                )
 
 
 def check_status_assignment_is_confined() -> None:
@@ -1801,6 +1834,7 @@ def main() -> int:
         check_app_icon,
         check_ocr_fixtures_exist,
         check_saves_are_not_silent,
+        check_tests_live_inside_a_test_case,
         check_call_sites_resolve,
         check_every_ui_suite_actually_runs,
         check_github_workflows,
