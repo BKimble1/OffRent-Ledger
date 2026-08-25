@@ -20,6 +20,15 @@ enum Formatters {
 
 /// The widget reads the App Group snapshot directly rather than linking the app's service layer.
 enum SnapshotReader {
+    /// True when the app has rentals to show and the subscription that shows them has lapsed.
+    ///
+    /// Read separately from the snapshot because the app deliberately removes the snapshot in
+    /// that case: a withheld widget holds no counts and no figure to render by mistake.
+    static func isWithheld() -> Bool {
+        UserDefaults(suiteName: SharedIdentifiers.appGroupIdentifier)?
+            .bool(forKey: SharedIdentifiers.snapshotWithheldDefaultsKey) ?? false
+    }
+
     static func read() -> RentalSummarySnapshot? {
         guard let defaults = UserDefaults(suiteName: SharedIdentifiers.appGroupIdentifier),
               let data = defaults.data(forKey: SharedIdentifiers.snapshotDefaultsKey)

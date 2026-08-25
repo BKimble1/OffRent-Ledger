@@ -9,6 +9,10 @@ OffRent Ledger keeps everything you enter on your iPhone. There is no account, n
 analytics. We do not collect your rentals, your documents, your photos or your location, because
 there is nowhere for them to go.
 
+Three features draw on Apple's own services and nothing else does: the maps, searching for a
+jobsite address, and buying a subscription. What that involves is set out under
+**What goes to Apple** below.
+
 ## What we collect
 
 **Nothing.** Idlery Services LLC receives no data from this app.
@@ -52,9 +56,31 @@ Declining does not block anything.
 scheduled locally on your iPhone. The app receives no push notifications and has no server that
 could send one.
 
+## What goes to Apple
+
+The app has no server of its own, but three of its features are built on Apple frameworks that
+talk to Apple. Idlery Services LLC never sees any of it; Apple's Privacy Policy governs it.
+
+- **Maps.** Whenever a map is on screen — the card on Today, the full-screen rental map, and the
+  jobsite picker — Apple's Maps service supplies the map imagery, the same way it does in Apple's
+  own Maps app.
+- **Searching for a jobsite.** When you type an address or a place into the jobsite picker, that
+  text is sent to Apple's place search, along with the area the map is currently showing so the
+  results are near what you are looking at. Your device's own location is *not* used for this,
+  and no rental, amount, company or document is ever attached to a search.
+- **Naming a dropped pin.** When you place a pin by hand, the app asks Apple for the nearest
+  address to that one coordinate, so it can suggest a name rather than leaving you looking at
+  numbers. It happens once, for that pin, and only when you drop one.
+- **Subscriptions.** Handled entirely by Apple through StoreKit — see **Purchases** below.
+
+Reading your documents is *not* on this list. Text recognition runs on your iPhone using Apple's
+Vision framework, and where your iPhone supports it the on-device language model runs there too.
+No page, photograph or line of recognised text is ever uploaded to anyone, including us.
+
 ## What we do not do
 
-- No data leaves your device for us.
+- No data leaves your device for us. The three Apple services above are the only outbound
+  requests the app can make, and none of them carries a rental, an amount or a document.
 - No advertising, no ad networks, no ad identifiers.
 - No analytics or telemetry, first-party or third-party.
 - No crash reporting SDK.

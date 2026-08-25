@@ -5,7 +5,15 @@ import WidgetKit
 /// Publishes the widget's summary snapshot.
 protocol SnapshotPublishing: Sendable {
     func publish(_ snapshot: RentalSummarySnapshot)
+    /// No rentals to show, or no App Group. The widget shows its "nothing here yet" state.
     func clear()
+    /// There *are* rentals, and the subscription that shows them has lapsed.
+    ///
+    /// Distinct from `clear()` on purpose. Before this, a free user's widget was cleared and
+    /// therefore read exactly like an empty one: "No rentals yet" over a phone with four
+    /// machines on rent. The widget is sold as a Pro feature, so its unpaid state has to say
+    /// that rather than misreport the user's own data back to them.
+    func withhold()
 }
 
 /// Writes the snapshot to the App Group and asks WidgetKit to reload.
@@ -29,12 +37,23 @@ struct AppGroupSnapshotPublisher: SnapshotPublishing {
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(snapshot) else { return }
         defaults.set(data, forKey: SharedIdentifiers.snapshotDefaultsKey)
+        defaults.removeObject(forKey: SharedIdentifiers.snapshotWithheldDefaultsKey)
         WidgetCenter.shared.reloadTimelines(ofKind: SharedIdentifiers.widgetKind)
     }
 
     func clear() {
         guard let defaults = UserDefaults(suiteName: SharedIdentifiers.appGroupIdentifier) else { return }
         defaults.removeObject(forKey: SharedIdentifiers.snapshotDefaultsKey)
+        defaults.removeObject(forKey: SharedIdentifiers.snapshotWithheldDefaultsKey)
+        WidgetCenter.shared.reloadTimelines(ofKind: SharedIdentifiers.widgetKind)
+    }
+
+    func withhold() {
+        guard let defaults = UserDefaults(suiteName: SharedIdentifiers.appGroupIdentifier) else { return }
+        // The snapshot goes, and only a flag stays. Nothing the entitlement was protecting is
+        // left in the App Group for the widget to render by mistake.
+        defaults.removeObject(forKey: SharedIdentifiers.snapshotDefaultsKey)
+        defaults.set(true, forKey: SharedIdentifiers.snapshotWithheldDefaultsKey)
         WidgetCenter.shared.reloadTimelines(ofKind: SharedIdentifiers.widgetKind)
     }
 }
@@ -61,15 +80,25 @@ final class InMemorySnapshotPublisher: SnapshotPublishing, @unchecked Sendable {
     private let lock = NSLock()
     private(set) var published: RentalSummarySnapshot?
     private(set) var publishCount = 0
+    /// True after `withhold()`, so a test can tell "nothing to show" from "not entitled".
+    private(set) var isWithheld = false
 
     func publish(_ snapshot: RentalSummarySnapshot) {
         lock.lock(); defer { lock.unlock() }
         published = snapshot
         publishCount += 1
+        isWithheld = false
     }
 
     func clear() {
         lock.lock(); defer { lock.unlock() }
         published = nil
+        isWithheld = false
+    }
+
+    func withhold() {
+        lock.lock(); defer { lock.unlock() }
+        published = nil
+        isWithheld = true
     }
 }

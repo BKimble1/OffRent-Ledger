@@ -29,8 +29,14 @@ struct OffRentSummaryWidget: Widget {
 struct SummaryEntry: TimelineEntry {
     let date: Date
     let snapshot: RentalSummarySnapshot?
-    /// True when the app has never published, which is also what a free user's widget shows.
+    /// True when the app has never published anything.
     let isPlaceholder: Bool
+    /// True when there *are* rentals and the subscription that shows them has lapsed.
+    ///
+    /// Kept apart from `isPlaceholder`, which it used to be folded into. A free user's widget
+    /// read "No rentals yet" on a phone with four machines on rent — the app misreporting the
+    /// user's own records back to them, on the one surface sold as the reason to subscribe.
+    var requiresPro: Bool = false
 }
 
 struct SummaryProvider: TimelineProvider {
@@ -41,18 +47,27 @@ struct SummaryProvider: TimelineProvider {
 
     func getSnapshot(in context: Context, completion: @escaping (SummaryEntry) -> Void) {
         let snapshot = SnapshotReader.read()
+        let withheld = snapshot == nil && SnapshotReader.isWithheld()
         completion(
             SummaryEntry(
                 date: Date(),
+                // The gallery preview always shows the real thing. A withheld widget in the
+                // picker would be a subscription prompt where a preview of the feature belongs.
                 snapshot: snapshot ?? (context.isPreview ? .placeholder(now: Date()) : nil),
-                isPlaceholder: snapshot == nil
+                isPlaceholder: snapshot == nil,
+                requiresPro: withheld && !context.isPreview
             )
         )
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SummaryEntry>) -> Void) {
         let snapshot = SnapshotReader.read()
-        let entry = SummaryEntry(date: Date(), snapshot: snapshot, isPlaceholder: snapshot == nil)
+        let entry = SummaryEntry(
+            date: Date(),
+            snapshot: snapshot,
+            isPlaceholder: snapshot == nil,
+            requiresPro: snapshot == nil && SnapshotReader.isWithheld()
+        )
 
         // Refreshed hourly. The figure only changes when a billing day rolls over, so anything
         // more frequent spends the widget's refresh budget to redraw the same number.
@@ -81,6 +96,8 @@ struct SummaryWidgetView: View {
                 case .accessoryRectangular: rectangularAccessory(snapshot)
                 default: content(snapshot)
                 }
+            } else if entry.requiresPro {
+                proState
             } else {
                 emptyState
             }
@@ -252,6 +269,28 @@ struct SummaryWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .widgetURL(DeepLink.today.url)
         .accessibilityLabel("\(SharedBranding.displayName). Open the app to start tracking a rental.")
+    }
+
+    /// What a free user's widget says. Never a count, never a figure — the point is that those
+    /// are the thing behind the subscription — but never a lie about having no rentals either.
+    private var proState: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: "lock")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+            Text(SharedBranding.displayName)
+                .font(.caption)
+                .fontWeight(.medium)
+            Text("The widget is part of Pro. Your rentals are still here — tap to see them.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .widgetURL(DeepLink.today.url)
+        .accessibilityLabel(
+            "\(SharedBranding.displayName). The widget is part of Pro. Your rentals are still "
+            + "in the app. Tap to open it."
+        )
     }
 
     private func accessibilityDescription(_ snapshot: RentalSummarySnapshot) -> String {

@@ -17,6 +17,13 @@ enum SharedIdentifiers {
     /// a widget from the previous app version may still be alive and decoding the old shape.
     static let snapshotDefaultsKey = "com.idlery.offrent.summarySnapshot.v1"
 
+    /// Set when the app has a snapshot to give but the entitlement to see it has lapsed.
+    ///
+    /// A separate key rather than a field on the snapshot, so a withheld state carries no
+    /// counts and no figure at all — the widget cannot leak what it was not allowed to show,
+    /// even by accident.
+    static let snapshotWithheldDefaultsKey = "com.idlery.offrent.summarySnapshot.withheld.v1"
+
     static let widgetKind = "OffRentLedgerSummaryWidget"
 
     /// The Control Centre / Action Button control.

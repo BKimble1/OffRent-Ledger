@@ -46,6 +46,7 @@
     <p class="doc__meta">OffRent Ledger · Idlery Services LLC · Effective date: on first App Store release. Version 1.0.</p>
 <h2>The short version</h2>
 <p>OffRent Ledger keeps everything you enter on your iPhone. There is no account, no server and no analytics. We do not collect your rentals, your documents, your photos or your location, because there is nowhere for them to go.</p>
+<p>Three features draw on Apple&#x27;s own services and nothing else does: the maps, searching for a jobsite address, and buying a subscription. What that involves is set out under <strong>What goes to Apple</strong> below.</p>
 <h2>What we collect</h2>
 <p><strong>Nothing.</strong> Idlery Services LLC receives no data from this app.</p>
 <p>The app has no login, no user account, no backend service, no analytics SDK, no advertising SDK, no attribution SDK, no third-party crash reporter and no tracking of any kind. It does not use the Advertising Identifier, and it does not track you across apps or websites.</p>
@@ -62,9 +63,18 @@
 <p><strong>Photos</strong> — the app uses the system photo picker, which lets you choose specific images without granting access to your library. If you ask the app to save a file back to Photos, iOS asks for add-only permission at that moment.</p>
 <p><strong>Location</strong> — requested only when you tap &quot;Add current location&quot; while recording an off-rent confirmation or a pickup. It takes one reading, in the foreground, at approximately 100-metre accuracy, and stores it with that single record. The app does not monitor your location in the background, does not keep any route or location history, and does not request always-on access. Declining does not block anything.</p>
 <p><strong>Notifications</strong> — requested only after you turn on a reminder in Settings. Reminders are scheduled locally on your iPhone. The app receives no push notifications and has no server that could send one.</p>
+<h2>What goes to Apple</h2>
+<p>The app has no server of its own, but three of its features are built on Apple frameworks that talk to Apple. Idlery Services LLC never sees any of it; Apple&#x27;s Privacy Policy governs it.</p>
+<ul>
+<li><strong>Maps.</strong> Whenever a map is on screen — the card on Today, the full-screen rental map, and the jobsite picker — Apple&#x27;s Maps service supplies the map imagery, the same way it does in Apple&#x27;s own Maps app.</li>
+<li><strong>Searching for a jobsite.</strong> When you type an address or a place into the jobsite picker, that text is sent to Apple&#x27;s place search, along with the area the map is currently showing so the results are near what you are looking at. Your device&#x27;s own location is *not* used for this, and no rental, amount, company or document is ever attached to a search.</li>
+<li><strong>Naming a dropped pin.</strong> When you place a pin by hand, the app asks Apple for the nearest address to that one coordinate, so it can suggest a name rather than leaving you looking at numbers. It happens once, for that pin, and only when you drop one.</li>
+<li><strong>Subscriptions.</strong> Handled entirely by Apple through StoreKit — see <strong>Purchases</strong> below.</li>
+</ul>
+<p>Reading your documents is *not* on this list. Text recognition runs on your iPhone using Apple&#x27;s Vision framework, and where your iPhone supports it the on-device language model runs there too. No page, photograph or line of recognised text is ever uploaded to anyone, including us.</p>
 <h2>What we do not do</h2>
 <ul>
-<li>No data leaves your device for us.</li>
+<li>No data leaves your device for us. The three Apple services above are the only outbound requests the app can make, and none of them carries a rental, an amount or a document.</li>
 <li>No advertising, no ad networks, no ad identifiers.</li>
 <li>No analytics or telemetry, first-party or third-party.</li>
 <li>No crash reporting SDK.</li>

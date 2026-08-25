@@ -171,10 +171,12 @@ struct RootView: View {
 
     private func publishSnapshot(items: [RentalItem]) {
         let entitlement = dependencies.effectiveEntitlement
-        // The widget is a Pro feature, so a free user's snapshot is cleared rather than published
-        // — the widget then shows its "Pro" placeholder instead of stale real numbers.
+        // The widget is a Pro feature, so a free user's snapshot is withheld rather than
+        // published. `withhold`, not `clear`: clearing produced a widget that read "No rentals
+        // yet" on a phone with four machines on rent, which is the app misreporting the user's
+        // own data back to them rather than saying the feature is behind a subscription.
         guard EntitlementPolicy.isAllowed(.widget, entitlement: entitlement) else {
-            dependencies.snapshotPublisher.clear()
+            dependencies.snapshotPublisher.withhold()
             return
         }
         var inputs: [SnapshotItemInput] = []
