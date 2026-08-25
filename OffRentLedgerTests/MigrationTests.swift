@@ -3,8 +3,9 @@ import SwiftData
 import Testing
 @testable import OffRentLedger
 
-/// Schema V2 and V3 — job sites that know where they are, companies that know who to ring, and
-/// agreements that carry the contractor's own PO number.
+/// Schema V2, V3 and V4 — job sites that know where they are, companies that know who to ring,
+/// agreements that carry the contractor's own PO number, and events that carry the meter reading
+/// and fuel level observed when they happened.
 ///
 /// The check that matters is not that a new store works; it is that every added attribute is
 /// genuinely optional everywhere, so a record created before this version existed is still a
@@ -18,17 +19,18 @@ struct MigrationTests {
 
     @Test func theContainerOpensOnTheCurrentSchema() throws {
         let container = try ModelContainerFactory.make(inMemory: true)
-        #expect(container.schema.version == Schema.Version(3, 0, 0))
+        #expect(container.schema.version == Schema.Version(4, 0, 0))
     }
 
     /// Every shipped version must still be described, and there must be a stage joining each
-    /// consecutive pair. A phone that skipped a build walks V1 → V2 → V3 in order; a missing
+    /// consecutive pair. A phone that skipped a build walks V1 → V2 → V3 → V4 in order; a missing
     /// stage is a store that cannot be opened at all.
     @Test func theMigrationPlanStillDescribesEveryVersionItMightMigrateFrom() {
         let versions = OffRentMigrationPlan.schemas.map { $0.versionIdentifier }
         #expect(versions.contains(Schema.Version(1, 0, 0)), "V1 describes stores already on phones")
         #expect(versions.contains(Schema.Version(2, 0, 0)), "V2 shipped as build 7")
-        #expect(versions.contains(Schema.Version(3, 0, 0)))
+        #expect(versions.contains(Schema.Version(3, 0, 0)), "V3 shipped as build 8")
+        #expect(versions.contains(Schema.Version(4, 0, 0)))
         #expect(OffRentMigrationPlan.stages.count == versions.count - 1)
     }
 
@@ -176,5 +178,73 @@ struct MigrationTests {
         #expect(decoded.name == "Ridgeline Phase 2")
         #expect(decoded.placeName == nil)
         #expect(decoded.coordinate == nil)
+    }
+
+    // MARK: - V4
+
+    /// The meter reading and fuel level the user typed at off-rent now have somewhere to live.
+    /// Before this they were collected, validated and dropped, and the evidence packet's meter
+    /// fields could never be filled.
+    @Test func theOffRentMeterAndFuelSurviveASave() throws {
+        let context = try makeContext()
+        let now = Date(timeIntervalSince1970: 1_778_000_000)
+        let event = RentalEvent(
+            type: .vendorConfirmationRecorded,
+            timestamp: now,
+            confirmationNumber: "OR-88214",
+            meterReading: Decimal(string: "412.6", locale: Locale(identifier: "en_US_POSIX")),
+            fuelLevel: .threeQuarters,
+            createdAt: now
+        )
+        context.insert(event)
+        try context.save()
+
+        let stored = try context.fetch(FetchDescriptor<RentalEvent>())
+        #expect(stored.count == 1)
+        #expect(stored.first?.meterReading == Decimal(string: "412.6", locale: Locale(identifier: "en_US_POSIX")))
+        #expect(stored.first?.fuelLevel == .threeQuarters)
+    }
+
+    /// An event recorded before either column existed is still a valid event.
+    @Test func anEventWithNoMeterOrFuelIsStillAnEvent() throws {
+        let context = try makeContext()
+        let now = Date(timeIntervalSince1970: 1_778_000_000)
+        let event = RentalEvent(type: .created, timestamp: now, createdAt: now)
+        context.insert(event)
+        try context.save()
+
+        let stored = try context.fetch(FetchDescriptor<RentalEvent>())
+        #expect(stored.first?.meterReading == nil)
+        #expect(stored.first?.fuelLevel == nil)
+    }
+
+    /// A raw fuel string the app no longer understands reads back as "not recorded" rather than
+    /// crashing or inventing a level.
+    @Test func anUnknownFuelStringReadsBackAsNothing() throws {
+        let context = try makeContext()
+        let now = Date(timeIntervalSince1970: 1_778_000_000)
+        let event = RentalEvent(type: .pickupRecorded, timestamp: now, createdAt: now)
+        event.fuelLevelRaw = "brimming"
+        context.insert(event)
+        try context.save()
+
+        #expect(try context.fetch(FetchDescriptor<RentalEvent>()).first?.fuelLevel == nil)
+    }
+
+    /// A backup written before events carried a meter reading still imports.
+    @Test func aBackupWrittenBeforeMeterReadingsStillDecodes() throws {
+        let legacy = """
+            {
+              "id": "1B4C9A22-4F5E-4B21-9A8D-2E7C0B5D4411",
+              "itemID": "9F3D2C11-7A6B-4C55-8E10-3D2B1A0F9E88",
+              "type": "pickupRecorded",
+              "timestamp": 741484800,
+              "createdAt": 741484800
+            }
+            """
+        let decoded = try JSONDecoder().decode(RentalEventRecord.self, from: Data(legacy.utf8))
+        #expect(decoded.type == .pickupRecorded)
+        #expect(decoded.meterReading == nil)
+        #expect(decoded.fuelLevel == nil)
     }
 }

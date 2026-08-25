@@ -253,6 +253,7 @@ struct ExportService {
                     detail: record.detail, contactMethod: record.contactMethod,
                     vendorRepresentative: record.vendorRepresentative,
                     confirmationNumber: record.confirmationNumber,
+                    meterReading: record.meterReading, fuelLevel: record.fuelLevel,
                     location: record.locationSnapshot, createdAt: record.createdAt, item: item
                 )
             )

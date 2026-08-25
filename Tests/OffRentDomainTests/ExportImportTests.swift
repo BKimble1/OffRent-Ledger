@@ -383,6 +383,52 @@ final class BackupArchiveTests: XCTestCase {
             )
         }
     }
+
+    /// The meter reading and the fuel level survive a backup and come back the same.
+    ///
+    /// They are the two observations an hourly-billed dispute turns on, and until schema V4 the
+    /// app collected both and stored neither.
+    func testAnEventCarriesTheMeterAndFuelThroughABackup() throws {
+        let posix = Locale(identifier: "en_US_POSIX")
+        let record = RentalEventRecord(
+            id: UUID(uuidString: "1B4C9A22-4F5E-4B21-9A8D-2E7C0B5D4411")!,
+            itemID: UUID(uuidString: "9F3D2C11-7A6B-4C55-8E10-3D2B1A0F9E88")!,
+            type: .vendorConfirmationRecorded,
+            timestamp: Date(timeIntervalSince1970: 1_778_000_000),
+            detail: nil,
+            contactMethod: .phone,
+            vendorRepresentative: "Marisol",
+            confirmationNumber: "OR-88214",
+            meterReading: Decimal(string: "412.6", locale: posix),
+            fuelLevel: .threeQuarters,
+            locationSnapshot: nil,
+            createdAt: Date(timeIntervalSince1970: 1_778_000_000)
+        )
+
+        let encoded = try JSONEncoder().encode(record)
+        let decoded = try JSONDecoder().decode(RentalEventRecord.self, from: encoded)
+
+        XCTAssertEqual(decoded, record)
+        XCTAssertEqual(decoded.meterReading, Decimal(string: "412.6", locale: posix))
+        XCTAssertEqual(decoded.fuelLevel, .threeQuarters)
+    }
+
+    /// A backup file written before those two columns existed still restores.
+    func testABackupWrittenBeforeMeterReadingsStillDecodes() throws {
+        let legacy = """
+            {
+              "id": "1B4C9A22-4F5E-4B21-9A8D-2E7C0B5D4411",
+              "itemID": "9F3D2C11-7A6B-4C55-8E10-3D2B1A0F9E88",
+              "type": "pickupRecorded",
+              "timestamp": 741484800,
+              "createdAt": 741484800
+            }
+            """
+        let decoded = try JSONDecoder().decode(RentalEventRecord.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded.type, .pickupRecorded)
+        XCTAssertNil(decoded.meterReading)
+        XCTAssertNil(decoded.fuelLevel)
+    }
 }
 
 final class EvidencePacketTests: XCTestCase {

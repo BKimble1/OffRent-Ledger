@@ -379,20 +379,17 @@ def check_domain_is_portable() -> None:
 
 def check_status_assignment_is_confined() -> None:
     check("Only RentalWorkflowService assigns rental status")
-    allowed = {
-        "OffRentLedger/Persistence/RentalWorkflowService.swift",
-        # The property's own declaration and initialiser, in every schema version.
-        "OffRentLedger/Persistence/SchemaV1.swift",
-        "OffRentLedger/Persistence/SchemaV2.swift",
-        "OffRentLedger/Persistence/SchemaV3.swift",
-    }
+    allowed = {"OffRentLedger/Persistence/RentalWorkflowService.swift"}
+    # The property's own declaration and initialiser, in every schema version there is. Matched
+    # by shape rather than listed, so adding SchemaV5 does not silently fail this check.
+    schema_file = re.compile(r"^OffRentLedger/Persistence/SchemaV\d+\.swift$")
     # `=` and not `==`: a predicate comparing the column is a read, not an assignment. And the
     # discrepancy model's own status is deliberately named `discrepancyStatusRaw` so that this
     # pattern means one thing only.
     pattern = re.compile(r"\.statusRaw\s*=(?!=)")
     for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
         relative = path.relative_to(ROOT).as_posix()
-        if relative in allowed:
+        if relative in allowed or schema_file.match(relative):
             continue
         source = without_comments(path.read_text())
         for match in pattern.finditer(source):
@@ -812,6 +809,66 @@ def check_planned_urls_are_gated() -> None:
                     f"{path.relative_to(ROOT)}:{index + 1} reaches a planned URL without "
                     "checking AppConfiguration.legalURLsAreLive first",
                 )
+
+
+def check_text_colours_meet_contrast() -> None:
+    check("Every colour used as text clears 4.5:1 on every surface it sits on")
+    # WCAG 1.4.3, which is also what an App Review accessibility pass measures. 4.5:1 for body
+    # text; a *fill* only needs 3:1, which is why `AccentColor` and `AccentTextColor` are
+    # different values rather than one compromise.
+    #
+    # The accent shipped for eight builds as the label colour of every secondary button in the
+    # app — Accept, Question, Record a follow-up, Reopen — at 3.14:1 on the page. That is not a
+    # close call, and nothing here would have caught it.
+    import ast
+
+    source = (ROOT / "scripts" / "generate_assets.py").read_text()
+    tree = ast.parse(source)
+    palette: dict[str, tuple] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Dict):
+            continue
+        for key, value in zip(node.keys, node.values):
+            if not isinstance(key, ast.Constant) or not isinstance(key.value, str):
+                continue
+            try:
+                palette[key.value] = ast.literal_eval(value)
+            except ValueError:
+                continue
+
+    def channel(value: float) -> float:
+        return value / 12.92 if value <= 0.03928 else ((value + 0.055) / 1.055) ** 2.4
+
+    def luminance(rgb) -> float:
+        red, green, blue = (channel(component) for component in rgb)
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+
+    def contrast(a, b) -> float:
+        first, second = luminance(a), luminance(b)
+        high, low = max(first, second), min(first, second)
+        return (high + 0.05) / (low + 0.05)
+
+    surfaces = ["SurfaceBackground", "SurfaceRaised", "SurfaceSunken"]
+    missing = [name for name in surfaces if name not in palette]
+    if missing:
+        fail("contrast", f"generate_assets.py no longer defines {', '.join(missing)}")
+        return
+
+    # Only the tokens the app uses as text. A fill is measured against a different bar.
+    for name in [key for key in palette if key.endswith("TextColor")] + ["TextPrimary", "TextSecondary"]:
+        if name not in palette:
+            continue
+        for index, mode in enumerate(("light", "dark")):
+            colour = palette[name][index]
+            for surface in surfaces:
+                background = palette[surface][index]
+                ratio = contrast(colour, background)
+                if ratio < 4.5:
+                    fail(
+                        "contrast",
+                        f"{name} on {surface} in {mode} mode is {ratio:.2f}:1, "
+                        "below the 4.5:1 that body text requires",
+                    )
 
 
 def check_privacy_manifests() -> None:
@@ -1699,6 +1756,7 @@ def main() -> int:
         check_no_hardcoded_prices,
         check_permission_strings,
         check_planned_urls_are_gated,
+        check_text_colours_meet_contrast,
         check_privacy_manifests,
         check_privacy_posture,
         check_legal_urls_not_claimed_live,

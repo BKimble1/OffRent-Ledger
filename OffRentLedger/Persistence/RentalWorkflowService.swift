@@ -144,6 +144,8 @@ struct RentalWorkflowService {
         var contactMethod = method
         var vendorRepresentative = representative
         var confirmationNumber: String?
+        var meterReading: Decimal?
+        var fuelLevel: FuelLevel?
         var timestamp = clock.now
         var body = detail
 
@@ -153,6 +155,8 @@ struct RentalWorkflowService {
             contactMethod = evidence.contactMethod
             vendorRepresentative = evidence.vendorRepresentative
             confirmationNumber = evidence.trimmedConfirmationNumber
+            meterReading = evidence.meterReading
+            fuelLevel = evidence.fuelLevel
             timestamp = evidence.confirmedAt
             if confirmationNumber == nil, evidence.acknowledgedNoConfirmationNumber {
                 body = [body, "User recorded that the vendor gave no confirmation number."]
@@ -160,6 +164,8 @@ struct RentalWorkflowService {
             }
         }
         if case let .recordPickup(evidence) = intent {
+            meterReading = evidence.finalMeterReading
+            fuelLevel = evidence.finalFuelLevel
             timestamp = evidence.pickedUpAt
             if let observer = evidence.observedBy, !observer.isEmpty {
                 body = [body, "Pickup observed by \(observer)."].compactMap { $0 }.joined(separator: "\n")
@@ -179,6 +185,8 @@ struct RentalWorkflowService {
             contactMethod: contactMethod,
             vendorRepresentative: vendorRepresentative,
             confirmationNumber: confirmationNumber,
+            meterReading: meterReading,
+            fuelLevel: fuelLevel,
             location: location,
             createdAt: clock.now,
             item: item

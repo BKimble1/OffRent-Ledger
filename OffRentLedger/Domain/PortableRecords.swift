@@ -119,6 +119,9 @@ struct RentalEventRecord: Codable, Sendable, Equatable, Identifiable {
     var contactMethod: VendorContactMethod?
     var vendorRepresentative: String?
     var confirmationNumber: String?
+    /// Both optional, and both decode as absent from an archive written before they existed.
+    var meterReading: Decimal?
+    var fuelLevel: FuelLevel?
     var locationSnapshot: LocationSnapshotRecord?
     var createdAt: Date
 }

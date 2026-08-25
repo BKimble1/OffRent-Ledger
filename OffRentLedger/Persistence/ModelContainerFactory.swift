@@ -18,7 +18,7 @@ enum ModelContainerFactory {
     }
 
     static func make(inMemory: Bool = false) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: OffRentSchemaV3.self)
+        let schema = Schema(versionedSchema: OffRentSchemaV4.self)
         let configuration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: inMemory,

@@ -5,24 +5,25 @@ import SwiftData
 ///
 /// V1 shipped to TestFlight. V2 adds three optional attributes to `JobSiteModel` — a place name
 /// and a coordinate. V3 adds three more: a contact name and a mailing address on `VendorModel`,
-/// and a purchase-order number on `RentalAgreementModel`. Every one of them is optional, which
-/// is precisely the shape SwiftData can migrate on its own. The stages are declared anyway
+/// and a purchase-order number on `RentalAgreementModel`. V4 adds two to `RentalEventModel`: the
+/// meter reading and fuel level observed when the event happened. Every one of them is optional,
+/// which is precisely the shape SwiftData can migrate on its own. The stages are declared anyway
 /// rather than left to the implicit path, so each upgrade is written down where a person can
 /// read it.
 ///
-/// A phone that skipped a build migrates V1 → V2 → V3 in order; SwiftData walks the stages.
+/// A phone that skipped a build migrates V1 → V2 → V3 → V4 in order; SwiftData walks the stages.
 /// That is why no earlier version is ever edited or deleted: each one is the description of a
 /// store still sitting on somebody's phone, and without it there is nothing to migrate *from*.
 ///
-/// When SchemaV4 arrives:
-///   1. Copy `SchemaV3.swift` to `SchemaV4.swift` and change it there.
-///   2. Move the `typealias`es to V4.
-///   3. Append V4 to `schemas` and a `MigrationStage` to `stages`.
+/// When SchemaV5 arrives:
+///   1. Copy `SchemaV4.swift` to `SchemaV5.swift` and change it there.
+///   2. Move the `typealias`es to V5.
+///   3. Append V5 to `schemas` and a `MigrationStage` to `stages`.
 ///   4. Add a round-trip test to `OffRentLedgerTests/MigrationTests`.
 enum OffRentMigrationPlan: SchemaMigrationPlan {
 
     static var schemas: [any VersionedSchema.Type] {
-        [OffRentSchemaV1.self, OffRentSchemaV2.self, OffRentSchemaV3.self]
+        [OffRentSchemaV1.self, OffRentSchemaV2.self, OffRentSchemaV3.self, OffRentSchemaV4.self]
     }
 
     static var stages: [MigrationStage] {
@@ -33,6 +34,7 @@ enum OffRentMigrationPlan: SchemaMigrationPlan {
             // history is the one failure this app cannot come back from.
             .lightweight(fromVersion: OffRentSchemaV1.self, toVersion: OffRentSchemaV2.self),
             .lightweight(fromVersion: OffRentSchemaV2.self, toVersion: OffRentSchemaV3.self),
+            .lightweight(fromVersion: OffRentSchemaV3.self, toVersion: OffRentSchemaV4.self),
         ]
     }
 }

@@ -1,13 +1,19 @@
 import Foundation
 import SwiftData
 
-/// Version 3 of the persisted schema: companies carry a contact and an address, and an
-/// agreement carries a PO or reference number.
+/// Version 4 of the persisted schema: an event can carry the meter reading and fuel level that
+/// were observed at the moment it happened.
 ///
-/// Three more optional attributes than V2, on two models, and nothing else — which is what keeps
-/// the migration lightweight. V1 and V2 stay beside it, frozen and unused by app code, because a
-/// `VersionedSchema` describes a store that exists on somebody's phone and editing it in place
-/// would leave that store undescribed.
+/// The off-rent and pickup sheets have always asked for both. Until now the answers went into a
+/// value type, were validated, and were then dropped on the floor: nothing on `RentalEventModel`
+/// could hold them, so the evidence packet's "Meter at off-rent" and "Final meter" fields could
+/// never be filled. On a machine billed by the hour that is the single number an invoice dispute
+/// turns on, so it is now a column.
+///
+/// Two more optional attributes than V3, on one model, and nothing else — which is what keeps
+/// the migration lightweight. V1, V2 and V3 stay beside it, frozen and unused by app code,
+/// because a `VersionedSchema` describes a store that exists on somebody's phone and editing it
+/// in place would leave that store undescribed.
 ///
 /// Two rules shape these types:
 ///
@@ -18,9 +24,9 @@ import SwiftData
 /// 2. **Enums are stored as their raw strings.** A stored enum case that is later renamed takes
 ///    the store with it; a raw string is inspectable, migratable and survives a typo in a way an
 ///    opaque encoding does not.
-enum OffRentSchemaV3: VersionedSchema {
+enum OffRentSchemaV4: VersionedSchema {
 
-    static var versionIdentifier: Schema.Version { Schema.Version(3, 0, 0) }
+    static var versionIdentifier: Schema.Version { Schema.Version(4, 0, 0) }
 
     static var models: [any PersistentModel.Type] {
         [
@@ -380,6 +386,15 @@ enum OffRentSchemaV3: VersionedSchema {
         var vendorRepresentative: String?
         var confirmationNumber: String?
 
+        /// What the machine's meter read when this happened, in the item's own `meterUnit`.
+        ///
+        /// Kept on the event rather than the item because the point of it is the pair: the
+        /// reading at off-rent and the reading at pickup are two different numbers on two
+        /// different days, and the gap between them is the argument.
+        var meterReading: Decimal?
+        /// Stored as its raw string, per rule 2 above.
+        var fuelLevelRaw: String?
+
         // A single, optional, one-time coordinate. There is no array here and never will be:
         // a list of coordinates is a route, and this app does not keep one.
         var locationLatitude: Double?
@@ -398,6 +413,8 @@ enum OffRentSchemaV3: VersionedSchema {
             contactMethod: VendorContactMethod? = nil,
             vendorRepresentative: String? = nil,
             confirmationNumber: String? = nil,
+            meterReading: Decimal? = nil,
+            fuelLevel: FuelLevel? = nil,
             location: LocationSnapshotRecord? = nil,
             createdAt: Date,
             item: RentalItemModel? = nil
@@ -409,6 +426,8 @@ enum OffRentSchemaV3: VersionedSchema {
             self.contactMethodRaw = contactMethod?.rawValue
             self.vendorRepresentative = vendorRepresentative
             self.confirmationNumber = confirmationNumber
+            self.meterReading = meterReading
+            self.fuelLevelRaw = fuelLevel?.rawValue
             self.locationLatitude = location?.latitude
             self.locationLongitude = location?.longitude
             self.locationAccuracyMetres = location?.horizontalAccuracyMetres
@@ -418,6 +437,10 @@ enum OffRentSchemaV3: VersionedSchema {
         }
 
         var type: RentalEventType { RentalEventType(rawValue: typeRaw) ?? .created }
+
+        var fuelLevel: FuelLevel? {
+            fuelLevelRaw.flatMap(FuelLevel.init(rawValue:))
+        }
 
         var contactMethod: VendorContactMethod? {
             contactMethodRaw.flatMap(VendorContactMethod.init(rawValue:))
@@ -695,3 +718,15 @@ enum OffRentSchemaV3: VersionedSchema {
         var status: DiscrepancyStatus { DiscrepancyStatus(rawValue: discrepancyStatusRaw) ?? .open }
     }
 }
+
+// Short names for the rest of the app. The aliases point at the newest schema, so a new version
+// is a change to this block rather than to several hundred call sites.
+typealias Vendor = OffRentSchemaV4.VendorModel
+typealias JobSite = OffRentSchemaV4.JobSiteModel
+typealias RentalAgreement = OffRentSchemaV4.RentalAgreementModel
+typealias RentalItem = OffRentSchemaV4.RentalItemModel
+typealias RentalEvent = OffRentSchemaV4.RentalEventModel
+typealias EvidenceAsset = OffRentSchemaV4.EvidenceAssetModel
+typealias VendorInvoice = OffRentSchemaV4.VendorInvoiceModel
+typealias InvoiceLine = OffRentSchemaV4.InvoiceLineModel
+typealias Discrepancy = OffRentSchemaV4.DiscrepancyModel

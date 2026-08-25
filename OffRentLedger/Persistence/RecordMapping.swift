@@ -77,7 +77,9 @@ extension RentalEvent {
         return RentalEventRecord(
             id: id, itemID: itemID, type: type, timestamp: timestamp, detail: detail,
             contactMethod: contactMethod, vendorRepresentative: vendorRepresentative,
-            confirmationNumber: confirmationNumber, locationSnapshot: location,
+            confirmationNumber: confirmationNumber,
+            meterReading: meterReading, fuelLevel: fuelLevel,
+            locationSnapshot: location,
             createdAt: createdAt
         )
     }

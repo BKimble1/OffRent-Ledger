@@ -122,7 +122,7 @@ struct EvidenceExportSheet: View {
                 if let failure {
                     Section {
                         Label(failure, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(Palette.attention)
+                            .foregroundStyle(Palette.attentionText)
                     }
                 }
             }
@@ -193,13 +193,20 @@ struct EvidenceExportSheet: View {
                 confirmedAt: event.timestamp,
                 notes: event.detail,
                 userAffirmedContact: true,
-                acknowledgedNoConfirmationNumber: event.confirmationNumber == nil
+                acknowledgedNoConfirmationNumber: event.confirmationNumber == nil,
+                meterReading: event.meterReading,
+                fuelLevel: event.fuelLevel
             )
         }
 
         var pickup: PickupEvidence?
         if let event = pickupEvent {
-            pickup = PickupEvidence(pickedUpAt: event.timestamp, notes: event.detail)
+            pickup = PickupEvidence(
+                pickedUpAt: event.timestamp,
+                finalMeterReading: event.meterReading,
+                finalFuelLevel: event.fuelLevel,
+                notes: event.detail
+            )
         }
 
         let allAssets: [EvidenceAsset] = item.assets ?? []
@@ -271,7 +278,11 @@ struct EvidenceExportSheet: View {
 
             RentalWorkflowService(context: context, clock: dependencies.clock)
                 .append(event: .evidenceExported, to: item, detail: "Evidence packet generated.")
-            try? context.save()
+            // The packet itself is already on disk, so this only fails to record that it was
+            // made. Say so rather than leaving the timeline quietly short of an entry.
+            if let problem = PersistentStore.save(context, describing: "This export") {
+                failure = problem
+            }
         } catch {
             failure = "The packet could not be generated. \(error.localizedDescription)"
         }
