@@ -1,0 +1,173 @@
+# OffRent Ledger — what App Store Connect actually has.
+#
+# Uploading and *appearing in TestFlight* are two different events. `altool` reporting
+# "UPLOAD SUCCEEDED" means Apple accepted the bytes; the build then processes, and processing can
+# end in VALID, INVALID or FAILED. Nothing in the upload log tells you which, and the machine that
+# builds this repository has no App Store Connect credentials of its own to ask with — they live
+# in repository secrets, which only a workflow can read.
+#
+# So this is that workflow: read-only, manual, and it prints the state of the most recent builds.
+# It submits nothing, assigns nothing to testers, and changes nothing.
+#
+# It reuses the same three secrets as testflight.yml. No new credential, and the same aliases.
+
+name: TestFlight status
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'How many recent builds to report. Default 5.'
+        required: false
+        type: string
+
+env:
+  BUNDLE_ID: com.idlery.offrent
+
+jobs:
+  status:
+    name: Ask App Store Connect
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the credentials are present
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY || secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -e
+          missing=""
+          [ -n "$KEY_ID" ] || missing="$missing ASC_KEY_ID"
+          [ -n "$ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
+          [ -n "$PRIVATE_KEY" ] || missing="$missing ASC_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "Missing repository secrets:$missing"
+            exit 1
+          fi
+          echo "All three App Store Connect secrets are set."
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --quiet pyjwt cryptography requests \
+            || python3 -m pip install --quiet --break-system-packages pyjwt cryptography requests
+
+      - name: Install the App Store Connect key
+        env:
+          PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY || secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -e
+          mkdir -p "$RUNNER_TEMP/asc"
+          printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/asc/key.p8"
+          chmod 600 "$RUNNER_TEMP/asc/key.p8"
+
+      - name: Report the builds
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID || secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          python3 - <<'PY'
+          import os, sys, time
+          import jwt, requests
+
+          key_id = os.environ["KEY_ID"].strip()
+          issuer = os.environ["ISSUER_ID"].strip()
+          bundle = os.environ["BUNDLE_ID"].strip()
+          limit = int(os.environ.get("LIMIT") or 5)
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "asc", "key.p8")) as handle:
+              private_key = handle.read()
+
+          # Twenty minutes is Apple's maximum for this audience.
+          token = jwt.encode(
+              {"iss": issuer, "iat": int(time.time()), "exp": int(time.time()) + 1200,
+               "aud": "appstoreconnect-v1"},
+              private_key,
+              algorithm="ES256",
+              headers={"kid": key_id, "typ": "JWT"},
+          )
+          session = requests.Session()
+          session.headers["Authorization"] = f"Bearer {token}"
+          base = "https://api.appstoreconnect.apple.com/v1"
+
+          def get(path, **params):
+              response = session.get(f"{base}/{path}", params=params, timeout=30)
+              if response.status_code != 200:
+                  # The body names the problem — a wrong issuer, an expired key, a key without
+                  # the role. None of it contains the key itself.
+                  print(f"HTTP {response.status_code} on {path}: {response.text[:600]}")
+                  sys.exit(1)
+              return response.json()
+
+          apps = get("apps", **{"filter[bundleId]": bundle}).get("data", [])
+          if not apps:
+              print(f"No app in App Store Connect with bundle id {bundle}.")
+              print("The upload may have gone to a different team, or the app record is missing.")
+              sys.exit(1)
+
+          app = apps[0]
+          app_id = app["id"]
+          print(f"App: {app['attributes'].get('name')}  ({bundle}, id {app_id})")
+          print()
+
+          builds = get(
+              "builds",
+              **{
+                  "filter[app]": app_id,
+                  "sort": "-version",
+                  "limit": str(limit),
+                  "include": "buildBetaDetail,preReleaseVersion",
+              },
+          )
+          included = {(item["type"], item["id"]): item for item in builds.get("included", [])}
+
+          rows = builds.get("data", [])
+          if not rows:
+              print("App Store Connect has no builds for this app at all.")
+              sys.exit(1)
+
+          print(f"{'build':>6}  {'version':>8}  {'processing':<12} {'internal':<16} "
+                f"{'external':<22} uploaded")
+          print("-" * 96)
+          for build in rows:
+              attributes = build["attributes"]
+              number = attributes.get("version") or "?"
+              state = attributes.get("processingState") or "?"
+              uploaded = (attributes.get("uploadedDate") or "")[:19].replace("T", " ")
+              expired = attributes.get("expired")
+
+              relationships = build.get("relationships", {})
+              detail_ref = (relationships.get("buildBetaDetail") or {}).get("data")
+              detail = included.get(("buildBetaDetails", detail_ref["id"])) if detail_ref else None
+              internal = external = "—"
+              if detail:
+                  internal = detail["attributes"].get("internalBuildState") or "—"
+                  external = detail["attributes"].get("externalBuildState") or "—"
+
+              version_ref = (relationships.get("preReleaseVersion") or {}).get("data")
+              version = included.get(("preReleaseVersions", version_ref["id"])) if version_ref else None
+              marketing = version["attributes"].get("version") if version else "?"
+
+              flag = "  EXPIRED" if expired else ""
+              print(f"{number:>6}  {marketing:>8}  {state:<12} {internal:<16} "
+                    f"{external:<22} {uploaded}{flag}")
+
+          print()
+          newest = rows[0]["attributes"]
+          state = newest.get("processingState")
+          print(f"Newest build {newest.get('version')}: processingState = {state}")
+          if state == "VALID":
+              print("Processed. It is installable by any tester in a group it has been assigned to.")
+              print("Assigning it to a group is done in App Store Connect; no workflow here does it.")
+          elif state == "PROCESSING":
+              print("Still processing. Re-run this workflow in a few minutes.")
+          else:
+              # INVALID and FAILED both mean nobody can install it, which is worth an obvious
+              # failure rather than a line in a log somebody has to notice.
+              print("Apple did not accept this build. Open it in App Store Connect for the reason.")
+              sys.exit(1)
+          PY
