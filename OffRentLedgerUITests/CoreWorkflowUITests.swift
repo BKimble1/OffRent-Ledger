@@ -39,7 +39,11 @@ final class CoreWorkflowUITests: XCTestCase {
         app.textFields[A11yUI.AddRental.dailyRate].tap()
         app.typeText("410.00")
 
-        app.buttons[A11yUI.AddRental.save].tap()
+        // The decimal pad is still up and Save is pinned at the bottom. This passed three runs
+        // and failed the fourth, which is what a control the keyboard is sometimes over looks
+        // like. Dismissing first is also what a person does.
+        app.dismissKeyboard()
+        app.tapWhenHittable(app.buttons[A11yUI.AddRental.save])
 
         XCTAssertTrue(app.staticTexts["Mini Excavator"].waitForExistence(timeout: 8))
 

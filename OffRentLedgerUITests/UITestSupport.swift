@@ -162,16 +162,30 @@ extension XCUIApplication {
             )
             return
         }
-        for _ in 0..<4 {
-            if element.isHittable {
+        // `isHittable` alone is not enough, which the last run proved: "Record a follow-up" sat
+        // at y 779–823 on an 874-point screen, with the tab bar starting at 795, so its centre
+        // was inside the tab bar — and `isHittable` still returned true. The tap went to the
+        // already-selected Audit tab, which does nothing visible, so the app looked unchanged
+        // and the sheet never opened.
+        //
+        // So position is checked as well as hittability: the control has to be clear of the
+        // bottom of the screen, where the tab bar and whatever bar a screen pins above it live,
+        // and clear of the top, where the navigation bar is.
+        let clearOfBottom = frame.height * 0.82
+        let clearOfTop = frame.height * 0.15
+        for _ in 0..<6 {
+            let box = element.frame
+            let tooLow = box.maxY > clearOfBottom
+            let tooHigh = box.minY < clearOfTop
+            if !tooLow, !tooHigh, element.isHittable {
                 element.tap()
                 return
             }
-            swipeUp()
+            if tooLow { swipeUp() } else { swipeDown() }
         }
         XCTFail(
             """
-            element existed but never became tappable — something is drawn over it.
+            element existed but never came clear of the bars at the edges of the screen.
             Identified elements on screen:
             \(identifiedElements())
             """,
