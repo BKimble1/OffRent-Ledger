@@ -190,6 +190,12 @@ struct ContactVendorActions: View {
     ///
     /// `tel`, `mailto` and `http` need no `LSApplicationQueriesSchemes` entry — that requirement
     /// covers custom schemes belonging to other apps, not the system ones.
+    /// `@MainActor` explicitly. `View` isolates its `body` requirement, not the whole type, so
+    /// a private helper on a view is nonisolated by default — and `UIApplication.shared` is
+    /// main-actor-isolated. Under `SWIFT_STRICT_CONCURRENCY = complete` that is a warning in
+    /// Swift 5 mode and an error in Swift 6, and this file is only ever called from `body`,
+    /// which is already on the main actor.
+    @MainActor
     private func canHandOff(_ url: URL) -> Bool {
         UIApplication.shared.canOpenURL(url)
     }
