@@ -14,7 +14,8 @@ extension XCUIApplication {
 
     static func launched(
         seed: Seed = .walkthrough,
-        entitlement: Entitlement = .pro
+        entitlement: Entitlement = .pro,
+        stubbingThePhotoPicker: Bool = false
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
@@ -29,6 +30,7 @@ extension XCUIApplication {
         ]
         app.launchArguments += seed.arguments
         app.launchArguments += entitlement.arguments
+        if stubbingThePhotoPicker { app.launchArguments += ["-offrent-stub-photo-picker"] }
         app.launch()
         return app
     }
@@ -198,6 +200,24 @@ extension XCUIApplication {
     /// A full `debugDescription` of a busy screen runs to several hundred lines of unnamed
     /// containers; these are the lines that decide whether a test is looking for the right thing.
     func identifiedElements() -> String {
+        // `debugDescription` resolves a snapshot, and a snapshot is exactly what is unavailable
+        // when the app will not go idle — so the diagnostic meant to explain a timeout was
+        // taking 197 seconds and then timing out itself, leaving the failure summary's "what
+        // was on screen" section empty. That happened on all four attachment tests at once and
+        // told me nothing about any of them.
+        //
+        // XCUITest surfaces that as a raised Objective-C exception rather than a Swift error, so
+        // there is nothing to `try`. What there is, is a bounded question: ask for one cheap
+        // query first, and if even that cannot be answered, say so instead of hanging.
+        guard windows.firstMatch.exists else {
+            return """
+                (no snapshot — the app did not reach the idle state XCUITest needs before it can
+                read the accessibility hierarchy. Something on screen is keeping it busy: an
+                animation that never ends, or an out-of-process view service such as the system
+                photo picker. Every query on such a screen times out, including ones about
+                elements that are plainly there.)
+                """
+        }
         let lines = debugDescription
             .split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }

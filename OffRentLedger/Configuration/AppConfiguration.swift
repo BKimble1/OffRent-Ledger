@@ -108,6 +108,17 @@ enum LaunchArgument {
     static let forceFreeEntitlement = "-offrent-force-free"
     static let disableAnimations = "-offrent-disable-animations"
     static let stubTextRecogniser = "-offrent-stub-ocr"
+    /// Renders a plain button where the system photo picker goes.
+    ///
+    /// `PhotosPicker` is backed by an out-of-process picker service. Its presence keeps the app
+    /// from reaching the idle state XCUITest requires before it can snapshot the accessibility
+    /// hierarchy, so *every* query made while that screen is up times out — not the picker's
+    /// query, every query. Four attachment tests failed that way, each after roughly 197
+    /// seconds, on the first screen in the suite's history to contain one.
+    ///
+    /// Same shape as `-offrent-stub-ocr`: DEBUG-only, and it replaces a system service the
+    /// simulator cannot drive anyway.
+    static let stubPhotoPicker = "-offrent-stub-photo-picker"
     /// ISO-8601 instant to freeze the clock at, as `-offrent-fixed-now <value>`.
     static let fixedNow = "-offrent-fixed-now"
     /// Start from a clean first run, so the welcome screen appears.

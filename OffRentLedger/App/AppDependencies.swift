@@ -132,6 +132,7 @@ final class AppDependencies {
         var forcedEntitlement: EntitlementState?
         var disableAnimations = false
         var stubTextRecogniser = false
+        var stubPhotoPicker = false
         var fixedNow: Date?
 
     }
@@ -154,6 +155,7 @@ final class AppDependencies {
         overrides.seedAttachment = has(LaunchArgument.seedAttachmentFixture)
         overrides.disableAnimations = has(LaunchArgument.disableAnimations)
         overrides.stubTextRecogniser = has(LaunchArgument.stubTextRecogniser)
+        overrides.stubPhotoPicker = has(LaunchArgument.stubPhotoPicker)
 
         if has(LaunchArgument.forceProEntitlement) {
             overrides.forcedEntitlement = .pro(reason: .active)

@@ -21,7 +21,11 @@ final class AttachmentEditingUITests: XCTestCase {
     /// the field is the thing every test here needs next, and waiting on a container whose
     /// element *type* is SwiftUI's choice is how this suite has lost afternoons before.
     private func openTheAttachment() -> XCUIApplication {
-        let app = XCUIApplication.launched(seed: .attachment)
+        // The photo picker stands aside for this suite. It is an out-of-process service that
+        // keeps the app from going idle, and while it is on screen XCUITest cannot snapshot the
+        // hierarchy at all — every query times out, including ones about rows that are there.
+        // Nothing about the editor under test needs it.
+        let app = XCUIApplication.launched(seed: .attachment, stubbingThePhotoPicker: true)
         app.tab(A11yUI.Tab.rentals).tap()
         app.openRental(named: "Skid Steer Loader")
         app.revealAndTap(app.buttons[A11yUI.ItemDetail.manageAttachments])

@@ -420,10 +420,24 @@ struct EvidenceManagerView: View {
     var body: some View {
         List {
             Section {
-                PhotosPicker(selection: $photoItems, matching: .images) {
+                // The real picker, unless a UI test asked for it to stand aside.
+                //
+                // `PhotosPicker` is backed by an out-of-process picker service, and its presence
+                // stops the app reaching the idle state XCUITest waits for before snapshotting
+                // the accessibility hierarchy. Every query made while this screen is up then
+                // times out — not the picker's query, every query, including ones about rows
+                // that are plainly on screen. Nothing on the device behaves this way; it is the
+                // test harness and the picker service disagreeing about when the app is settled.
+                if AppDependencies.testOverrides().stubPhotoPicker {
                     Label("Add photos", systemImage: "photo.on.rectangle")
+                        .foregroundStyle(.secondary)
+                        .minimumTapTarget()
+                } else {
+                    PhotosPicker(selection: $photoItems, matching: .images) {
+                        Label("Add photos", systemImage: "photo.on.rectangle")
+                    }
+                    .minimumTapTarget()
                 }
-                .minimumTapTarget()
 
                 if DocumentScannerView.isSupported {
                     Button {
