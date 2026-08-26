@@ -24,7 +24,7 @@ final class AttachmentEditingUITests: XCTestCase {
         let app = XCUIApplication.launched(seed: .attachment)
         app.tab(A11yUI.Tab.rentals).tap()
         app.openRental(named: "Skid Steer Loader")
-        app.revealAndTap(app.buttons["Add or manage attachments"])
+        app.revealAndTap(app.buttons[A11yUI.ItemDetail.manageAttachments])
         app.revealAndTap(app.expect(app.buttons[A11yUI.Attachment.openRow]))
         app.expect(app.textFields[A11yUI.Attachment.name])
         return app

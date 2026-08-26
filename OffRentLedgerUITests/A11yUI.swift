@@ -113,6 +113,7 @@ enum A11yUI {
         static let recordPickup = "itemDetail.recordPickup"
         static let attachInvoice = "itemDetail.attachInvoice"
         static let exportEvidence = "itemDetail.exportEvidence"
+        static let manageAttachments = "itemDetail.manageAttachments"
         static let reopen = "itemDetail.reopen"
         static let disclosure = "itemDetail.disclosure"
     }

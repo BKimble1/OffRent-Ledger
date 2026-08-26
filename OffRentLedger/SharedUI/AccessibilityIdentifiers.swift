@@ -144,6 +144,7 @@ enum A11yID {
         static let resolve = "itemDetail.resolve"
         static let reopen = "itemDetail.reopen"
         static let exportEvidence = "itemDetail.exportEvidence"
+        static let manageAttachments = "itemDetail.manageAttachments"
         static let timeline = "itemDetail.timeline"
         static let disclosure = "itemDetail.disclosure"
     }

@@ -586,6 +586,7 @@ struct RentalItemDetailView: View {
         Section("Photos and documents") {
             EvidenceGrid(assets: item.assets ?? [], fileStore: dependencies.fileStore)
             NavigationLink("Add or manage attachments") { EvidenceManagerView(itemID: item.id) }
+                .accessibilityIdentifier(A11yID.ItemDetail.manageAttachments)
         }
     }
 
