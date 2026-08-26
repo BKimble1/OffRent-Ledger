@@ -445,21 +445,37 @@ only. Unverified transactions are ignored. Offline, the last verified entitlemen
 
 ## 10. Known-unverified gates
 
-Nothing in this repository proves any of the following. They are human/device gates.
+**What CI now proves.** This section used to list Xcode compilation, the simulator, UI test
+execution, archiving and TestFlight as unverifiable, because when it was written there was no
+macOS anywhere in the loop. There is now. `.github/workflows/verify.yml` compiles the app and
+the widget for both an iPhone and an iPad simulator, runs the app-target unit suite and the UI
+suite on each, and fails on a warning it is told to treat as an error; `testflight.yml` archives,
+signs with an App Store Connect API key and uploads. Builds have reached TestFlight and been
+confirmed `VALID` by App Store Connect. Those are no longer gates.
 
-**Cannot be verified in this environment at all** (no macOS, no Xcode, no device):
-Xcode compilation of the app/widget/test targets · simulator run · UI test execution ·
-archive/signing · live document camera · photo & PDF import · OCR on real contracts ·
-notification delivery · deep links from notifications · location prompts · widget refresh ·
-PDF sharing · StoreKit Sandbox purchase · restore · cancellation behaviour · TestFlight ·
-app icon during purchase · light/dark on hardware · performance measurements.
+Nothing in this repository proves any of the following. They remain human/device gates.
 
-**Cannot be verified without external accounts:** bundle-ID availability · App Store Connect
-record · production subscription configuration · legal URL liveness · trademark clearance.
+**Needs real hardware** (a simulator cannot do these, whatever CI runs):
+live document camera · OCR against real photographed contracts · notification delivery and the
+tap that follows it · location prompts and real coordinates · widget and Lock Screen rendering
+and refresh on a Home Screen · Control Centre control · sharing a PDF out through the share
+sheet · the app icon during the purchase flow · light/dark and Dynamic Type on a real panel ·
+VoiceOver traversal · performance with a real-sized store · migration against a store that
+already has a user's rentals in it.
+
+**Needs an Apple account and a real transaction:** StoreKit **Sandbox** purchase · restore
+against a real Apple Account · cancellation, expiry, billing retry and refund behaviour ·
+production subscription configuration in App Store Connect.
+
+**Needs external decisions:** legal URL liveness · trademark clearance · App Store screenshots.
+
+The local StoreKit configuration is a simulator fixture and says nothing about any of the
+purchase gates. It is attached to the scheme's Test and Run actions only — `verify_repository.py`
+fails the build if it ever reaches Archive or Profile, because a shipped binary built that way
+transacts against a JSON file rather than the App Store.
 
 See `RELEASE_CHECKLIST.md` for the ordered list a human must work through, and `TEST_MATRIX.md`
 for the precise distinction between "written", "executed", and "passed".
-
 ---
 
 ## 11. Open external questions
