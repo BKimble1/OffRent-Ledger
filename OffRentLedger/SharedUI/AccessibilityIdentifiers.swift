@@ -168,6 +168,7 @@ enum A11yID {
         static let root = "contactVendor.root"
         static let disclosure = "contactVendor.disclosure"
         static let call = "contactVendor.call"
+        static let phoneNumber = "contactVendor.phoneNumber"
         static let email = "contactVendor.email"
         static let openLink = "contactVendor.openLink"
         static let logAttempt = "contactVendor.logAttempt"

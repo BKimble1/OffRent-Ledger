@@ -278,7 +278,10 @@ struct DiagnosticsReport {
     static var current: DiagnosticsReport {
         DiagnosticsReport(rows: [
             Row(label: AppConfiguration.displayName, value: AppConfiguration.versionAndBuild),
-            Row(label: "iOS", value: UIDevice.current.systemVersion),
+            // `systemName` rather than the literal "iOS": the same binary runs on an iPad,
+            // and a support email that says iOS 18.4 when the sender is on iPadOS sends whoever
+            // reads it looking at the wrong platform.
+            Row(label: UIDevice.current.systemName, value: UIDevice.current.systemVersion),
             Row(label: "Device", value: hardwareIdentifier),
         ])
     }

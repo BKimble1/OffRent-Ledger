@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 /// The Contact Vendor state's actions.
 ///
@@ -28,7 +29,7 @@ struct ContactVendorActions: View {
         // Plain rows: this sits inside an inset-grouped `Section` on the detail screen, so the
         // list draws the surface, the separators and the tap highlight.
         Group {
-            if let phone = vendor?.phone, let url = telURL(phone) {
+            if let phone = vendor?.phone, let url = telURL(phone), canHandOff(url) {
                 Button {
                     openURL(url)
                     // Opening the dialler is recorded as an *attempt*, because that is all the
@@ -41,6 +42,24 @@ struct ContactVendorActions: View {
                     Label("Call \(vendor?.name ?? "the rental company")", systemImage: "phone")
                 }
                 .accessibilityIdentifier(A11yID.ContactVendor.call)
+            } else if let phone = vendor?.phone {
+                // An iPad has no Phone app, so `tel:` goes nowhere on one.
+                //
+                // The old row tapped, did nothing, and then wrote "Opened the dialler from
+                // OffRent Ledger" into the timeline — a false line, on the one screen whose
+                // entire job is to be an accurate record of what was tried. A record the user
+                // cannot trust is worse than no record.
+                //
+                // So the number itself is shown, and selectable, because that is the thing they
+                // actually need; and "Record a contact attempt" below stays the honest way to
+                // log the call they make from the phone in their pocket.
+                LabeledContent {
+                    Text(phone)
+                        .textSelection(.enabled)
+                } label: {
+                    Label("Rental company phone", systemImage: "phone")
+                }
+                .accessibilityIdentifier(A11yID.ContactVendor.phoneNumber)
             }
 
             if let email = vendor?.email, let url = mailtoURL(email) {
@@ -162,6 +181,17 @@ struct ContactVendorActions: View {
         let digits = phone.filter { $0.isNumber || $0 == "+" }
         guard !digits.isEmpty else { return nil }
         return URL(string: "tel://\(digits)")
+    }
+
+    /// Whether this device can hand a URL off to anything at all.
+    ///
+    /// `openURL` on its own is silent about refusal, and the actions here write a timeline entry
+    /// immediately after calling it. On an iPad that made the entry a lie. This asks first.
+    ///
+    /// `tel`, `mailto` and `http` need no `LSApplicationQueriesSchemes` entry — that requirement
+    /// covers custom schemes belonging to other apps, not the system ones.
+    private func canHandOff(_ url: URL) -> Bool {
+        UIApplication.shared.canOpenURL(url)
     }
 
     private func mailtoURL(_ email: String) -> URL? {
