@@ -311,10 +311,26 @@ extension XCUIApplication {
                 return
             }
 
-            // On screen, uncovered, and still not hittable: something is animating. Waiting is
-            // right; swiping would move a correctly placed control away and then have to chase
-            // it, which is how this loop used to exhaust its tries.
+            // On screen, uncovered, and still not hittable. Wait once — something may be
+            // animating — and if it is still saying no, tap the middle of it by coordinate.
+            //
+            // `isHittable` is not the authority here and this file already says so: it returns
+            // *true* for a control whose centre is inside the tab bar, which is the failure this
+            // helper was written after. It is equally capable of returning false for a control
+            // that is plainly on screen and plainly not covered, and eight seconds of asking it
+            // the same question is how the export button burned three rounds of CI.
+            //
+            // The geometry above has already established the thing this cares about: the element
+            // is inside the window and no bar overlaps it. A tap at its centre is then exactly
+            // what a person's finger would do, and a coordinate tap does not consult
+            // `isHittable` or try to scroll first.
             _ = element.waitForExistence(timeout: 1)
+            if element.isHittable {
+                element.tap()
+                return
+            }
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            return
         }
 
         XCTFail(

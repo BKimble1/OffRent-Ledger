@@ -99,7 +99,7 @@ jobs:
           # Summarise on failure too. Without this a failed build ends with pages of clang
           # invocations and the `error:` lines are thousands of lines up, out of view — which is
           # exactly what happened on the first two runs of the Codemagic version.
-          bash scripts/ci/summarize_test_log.sh xcodebuild.log
+          bash scripts/ci/summarize_test_log.sh xcodebuild.log | tee -a ci-summary.txt
           exit $STATUS
 
       - name: Unit tests
@@ -119,7 +119,7 @@ jobs:
             -resultBundlePath OffRentLedgerTests.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             | tee xcodebuild-tests.log || STATUS=$?
-          bash scripts/ci/summarize_test_log.sh xcodebuild-tests.log
+          bash scripts/ci/summarize_test_log.sh xcodebuild-tests.log | tee -a ci-summary.txt
           exit $STATUS
 
       # The app's first actual launch. Separate from the unit tests so that a UI failure is
@@ -149,7 +149,7 @@ jobs:
             -resultBundlePath OffRentLedgerUITests.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             | tee xcodebuild-uitests.log || STATUS=$?
-          bash scripts/ci/summarize_test_log.sh xcodebuild-uitests.log
+          bash scripts/ci/summarize_test_log.sh xcodebuild-uitests.log | tee -a ci-summary.txt
           exit $STATUS
 
       - name: Upload logs and results
@@ -163,6 +163,20 @@ jobs:
             OffRentLedgerUITests.xcresult
           retention-days: 14
           if-no-files-found: ignore
+
+      # Last, on purpose.
+      #
+      # The summary is printed by the step that produced it, which puts it behind an artifact
+      # upload of fifteen hundred files — so reading a failure meant paging back through several
+      # megabytes of "Uploaded bytes" to reach the four lines that say what broke. Four
+      # diagnoses in a row were spent on that. Repeating it here costs nothing and puts the
+      # answer in the last twenty lines of the log, where anything looking at a failed run will
+      # find it first.
+      - name: Failure summary, repeated at the end of the log
+        if: failure()
+        run: |
+          echo "================ FAILURE SUMMARY (repeated) ================"
+          cat ci-summary.txt 2>/dev/null || echo "(no summary was produced)"
 
   # iPad is a separate job rather than another step, for two reasons. It runs at the same time as
   # the iPhone suite instead of adding a quarter of an hour to a job that is already long, and a
@@ -201,7 +215,7 @@ jobs:
             -destination "generic/platform=iOS Simulator" \
             CODE_SIGNING_ALLOWED=NO \
             | tee xcodebuild-ipad.log || STATUS=$?
-          bash scripts/ci/summarize_test_log.sh xcodebuild-ipad.log
+          bash scripts/ci/summarize_test_log.sh xcodebuild-ipad.log | tee -a ci-summary.txt
           exit $STATUS
 
       # The layout suite plus the whole core workflow. The layout suite proves the window, the
@@ -227,7 +241,7 @@ jobs:
             -resultBundlePath OffRentLedgerIPadUITests.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             | tee xcodebuild-ipad-uitests.log || STATUS=$?
-          bash scripts/ci/summarize_test_log.sh xcodebuild-ipad-uitests.log
+          bash scripts/ci/summarize_test_log.sh xcodebuild-ipad-uitests.log | tee -a ci-summary.txt
           exit $STATUS
 
       - name: Upload logs and results
@@ -240,3 +254,17 @@ jobs:
             OffRentLedgerIPadUITests.xcresult
           retention-days: 14
           if-no-files-found: ignore
+
+      # Last, on purpose.
+      #
+      # The summary is printed by the step that produced it, which puts it behind an artifact
+      # upload of fifteen hundred files — so reading a failure meant paging back through several
+      # megabytes of "Uploaded bytes" to reach the four lines that say what broke. Four
+      # diagnoses in a row were spent on that. Repeating it here costs nothing and puts the
+      # answer in the last twenty lines of the log, where anything looking at a failed run will
+      # find it first.
+      - name: Failure summary, repeated at the end of the log
+        if: failure()
+        run: |
+          echo "================ FAILURE SUMMARY (repeated) ================"
+          cat ci-summary.txt 2>/dev/null || echo "(no summary was produced)"
