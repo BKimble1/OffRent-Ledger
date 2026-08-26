@@ -8,6 +8,52 @@ final class EntitlementUITests: XCTestCase {
 
     override func setUp() { continueAfterFailure = false }
 
+    /// The + menu still works after the free-limit alert has been shown once.
+    ///
+    /// It did not. `RentalsView` had an `.alert` on the same modifier chain as the two `.sheet`s
+    /// behind New rental company and New jobsite, and in this app those fight: once the alert
+    /// has been shown and dismissed, setting a sheet's flag does nothing at all. So a free-tier
+    /// user who hit the open-rental limit — which is the *whole point* of the free tier, and
+    /// therefore something every free user does — lost both of the other things that menu makes,
+    /// for the rest of the session, with no message and nothing to retry.
+    ///
+    /// The order matters and is the entire test: raise the alert first, then open a sheet.
+    /// Either half on its own passes against the broken build.
+    func testTheAddMenuStillWorksAfterTheFreeLimitAlertHasBeenShown() {
+        let app = XCUIApplication.launched(seed: .freeLimit, entitlement: .free)
+
+        app.tab(A11yUI.Tab.rentals).tap()
+
+        // Raise it, and dismiss it. This is the step that used to poison the two sheets.
+        app.openNewRental()
+        let alert = app.alerts.element
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "a second open rental must be refused")
+        alert.buttons["Not now"].tap()
+        XCTAssertTrue(
+            alert.waitForNonExistence(timeout: 5),
+            "the alert did not go away, so what follows would not be testing anything"
+        )
+
+        // Now the part that silently died.
+        app.openNewCompanyFromMenu()
+        XCTAssertTrue(
+            app.anyElement(A11yUI.Company.root).waitForExistence(timeout: 8),
+            """
+            New rental company did nothing after the limit alert. The alert and the sheet were \
+            on one modifier chain, and the sheet is the one that loses.
+            """
+        )
+        app.tapWhenHittable(app.buttons[A11yUI.Company.cancel])
+
+        // And the other one on the same chain, because they failed together and should be
+        // proved together.
+        app.openNewJobsiteFromMenu()
+        XCTAssertTrue(
+            app.anyElement(A11yUI.Jobsite.root).waitForExistence(timeout: 8),
+            "New jobsite did nothing after the limit alert, for the same reason"
+        )
+    }
+
     /// 4. The free limit blocks a second open rental and the paywall explains both ways out.
     func testFreeLimitBlocksASecondOpenRental() {
         let app = XCUIApplication.launched(seed: .freeLimit, entitlement: .free)

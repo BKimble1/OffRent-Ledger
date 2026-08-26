@@ -11,6 +11,45 @@ final class CoreWorkflowUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// The evidence packet is generated, and it can be read before it is sent.
+    ///
+    /// The packet shipped rendering blank for several builds: every line drawn with a dynamic
+    /// colour that resolves to white in dark mode, onto a page with no background of its own.
+    /// Nothing in the app ever displayed the document it had made, so nothing could have shown
+    /// it.
+    ///
+    /// This does not claim to see the pixels — `EvidencePDFTests` rasterises a page and reads
+    /// them back, which is the assertion that pins the colour. What this covers is the path:
+    /// that Generate produces a file, that Preview and Share are drawn only because one exists
+    /// on disk, and that opening the preview lands somewhere with a working Share on it.
+    func testTheEvidencePacketGeneratesAndCanBeRead() {
+        let app = XCUIApplication.launched()
+
+        app.tab(A11yUI.Tab.rentals).tap()
+        app.openRental(named: "Skid Steer Loader")
+        app.revealAndTap(app.buttons[A11yUI.ItemDetail.exportEvidence])
+        app.expect(app.anyElement(A11yUI.EvidenceExport.root))
+
+        app.revealAndTap(app.buttons[A11yUI.EvidenceExport.generate])
+
+        // Preview and Share are drawn only when a file exists at the generated path, so their
+        // arrival is the evidence that the render returned rather than threw. Twenty seconds
+        // because the document is rasterised twice — once to count its pages so the footers can
+        // say "of 4", once to draw it.
+        let preview = app.expect(app.buttons[A11yUI.EvidenceExport.previewOpen], timeout: 20)
+        XCTAssertTrue(
+            app.buttons[A11yUI.EvidenceExport.share].exists,
+            "the packet generated but there is no way to send it"
+        )
+
+        app.tapInContent(preview)
+        app.expect(app.anyElement(A11yUI.EvidenceExport.preview), timeout: 10)
+        XCTAssertTrue(
+            app.buttons[A11yUI.EvidenceExport.previewShare].waitForExistence(timeout: 5),
+            "the preview opened with no way to share what is on it"
+        )
+    }
+
     /// 1. Create a rental by hand and confirm it survives a relaunch.
     ///
     /// Uses the on-disk store deliberately: an in-memory store cannot demonstrate persistence,

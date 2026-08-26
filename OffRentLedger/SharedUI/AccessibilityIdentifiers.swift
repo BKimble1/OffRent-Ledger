@@ -153,7 +153,6 @@ enum A11yID {
         static let generate = "evidenceExport.generate"
         static let preview = "evidenceExport.preview"
         static let previewOpen = "evidenceExport.previewOpen"
-        static let previewClose = "evidenceExport.previewClose"
         static let previewShare = "evidenceExport.previewShare"
         static let share = "evidenceExport.share"
     }

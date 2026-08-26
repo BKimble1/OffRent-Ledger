@@ -119,6 +119,11 @@ enum A11yUI {
 
     enum EvidenceExport {
         static let root = "evidenceExport.root"
+        static let generate = "evidenceExport.generate"
+        static let preview = "evidenceExport.preview"
+        static let previewOpen = "evidenceExport.previewOpen"
+        static let previewShare = "evidenceExport.previewShare"
+        static let share = "evidenceExport.share"
     }
 
     enum Confirmation {

@@ -19,28 +19,27 @@ struct EvidencePDFPreview: View {
 
     let url: URL
 
-    @Environment(\.dismiss) private var dismiss
-
+    /// Pushed, not presented.
+    ///
+    /// The export sheet already owns a `NavigationStack`, so this is one screen deeper on the
+    /// same stack rather than a sheet inside a sheet. That avoids stacking two presentations —
+    /// which this app has a poor record with — gives a back button instead of a second Done,
+    /// and on an iPad keeps the whole thing inside one form sheet rather than opening a smaller
+    /// one on top of it.
     var body: some View {
-        NavigationStack {
-            PDFDocumentView(url: url)
-                .ignoresSafeArea(edges: .bottom)
-                .navigationTitle("Evidence packet")
-                .navigationBarTitleDisplayMode(.inline)
-                .accessibilityIdentifier(A11yID.EvidenceExport.preview)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") { dismiss() }
-                            .accessibilityIdentifier(A11yID.EvidenceExport.previewClose)
+        PDFDocumentView(url: url)
+            .ignoresSafeArea(edges: .bottom)
+            .navigationTitle("Evidence packet")
+            .navigationBarTitleDisplayMode(.inline)
+            .accessibilityIdentifier(A11yID.EvidenceExport.preview)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    ShareLink(item: url) {
+                        Label("Share", systemImage: "square.and.arrow.up")
                     }
-                    ToolbarItem(placement: .primaryAction) {
-                        ShareLink(item: url) {
-                            Label("Share", systemImage: "square.and.arrow.up")
-                        }
-                        .accessibilityIdentifier(A11yID.EvidenceExport.previewShare)
-                    }
+                    .accessibilityIdentifier(A11yID.EvidenceExport.previewShare)
                 }
-        }
+            }
     }
 }
 
