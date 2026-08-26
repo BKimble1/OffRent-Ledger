@@ -59,7 +59,7 @@ final class AttachmentEditingUITests: XCTestCase {
         app.typeText("Hairline crack visible on the left ram.")
         app.dismissKeyboard()
 
-        app.revealAndTap(app.buttons[A11yUI.Attachment.save])
+        app.tapWhenHittable(app.expect(app.buttons[A11yUI.Attachment.save]))
 
         // Back on the attachments list, then into the editor a second time. Reading the field
         // back on the same screen would only prove the `@State` still holds what was typed,
@@ -83,13 +83,13 @@ final class AttachmentEditingUITests: XCTestCase {
         replace(app.textFields[A11yUI.Attachment.name], in: app, with: "")
         app.dismissKeyboard()
 
-        let save = app.reveal(app.buttons[A11yUI.Attachment.save])
+        let save = app.expect(app.buttons[A11yUI.Attachment.save])
         XCTAssertFalse(
             save.isEnabled,
             "a blank name against a photograph in an evidence packet is worse than a generated one"
         )
         XCTAssertTrue(
-            app.reveal(app.staticTexts[A11yUI.Attachment.missingRequirement]).exists,
+            app.expect(app.staticTexts[A11yUI.Attachment.missingRequirement]).exists,
             "and the screen has to say why the button is off"
         )
     }
@@ -100,7 +100,7 @@ final class AttachmentEditingUITests: XCTestCase {
         app.revealAndTap(app.expect(app.buttons[A11yUI.Attachment.delete]))
         // The confirmation is the point. This deletes the photograph from the phone as well as
         // the record, and it used to be an invisible swipe with nothing asking.
-        app.expect(app.buttons[A11yUI.Attachment.confirmDelete]).tap()
+        app.expect(app.buttons[A11yUI.Attachment.confirmDelete].firstMatch).tap()
 
         XCTAssertFalse(
             app.anyElement(A11yUI.Attachment.openRow).waitForExistence(timeout: 5),
