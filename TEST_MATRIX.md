@@ -27,7 +27,7 @@ Run with `swift test` against the root `Package.swift`, which compiles
 `OffRentLedger/Domain` and `OffRentShared` — **the same files the Xcode app target compiles**,
 not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SWIFT_VERSION`.
 
-**421 tests. 421 passed. 0 failed.** Last run 2026-08-26 against commit `654b2be`.
+**421 tests. 421 passed. 0 failed.** Last run 2026-08-26 against commit `1b7a54a`.
 
 | Suite | Tests | Result | What it covers |
 |---|---:|---|---|
@@ -196,144 +196,61 @@ been run again since.
 
 ## C. Executed on the simulator — the UI suite
 
-The suite ran for the first time on 2026-08-24 and reached green on commit `b3057d1`
-(GitHub Actions run `32797297734`). Before that it had never launched the app at all, and the
-eleven runs it took to get there are recorded in the commit history from `c9240b0` to `b3057d1`.
+**52 test methods across 11 suites.** The iPhone job runs 48 of them; the iPad job runs 13
+(`IPadLayoutUITests` plus `CoreWorkflowUITests`, which runs on both). `LayoutObstructionUITests`
+is declared as a second class inside `MapAndEditingUITests.swift`, so a count by file misses it.
 
-It found two real defects that no unit test could have: an invoice with a live mismatch on
-screen could be accepted without a word, and a control whose centre sat inside the tab bar
-reported `isHittable == true` while a tap on it did nothing.
-
-**Rewritten in this change.** The suites below reflect the flows as they now are — a plus that
-is a menu, a company that is a record rather than four text fields, a walkthrough that ends.
-
-| Suite | Tests | Status | Covers |
+| Suite | Tests | Runs on | Covers |
 |---|---:|---|---|
-| `CoreWorkflowUITests` | 2 | ✅ green at `b3057d1`, rewritten | Manual creation + relaunch, now through the company picker; full workflow to resolution with zero variance |
-| `MismatchUITests` | 2 | ✅ green at `b3057d1`, rewritten | Extra-day mismatch survives relaunch; **scan review never saves without confirmation** |
-| `EntitlementUITests` | 3 | ✅ green at `b3057d1`, rewritten | Free limit, Pro unlock, entitlement loss |
-| `AccessibilityUITests` | 4 | ✅ green at `b3057d1` | Tabs labelled, estimate spoken as an estimate, disclosure readable, status spoken |
-| `OnboardingUITests` | 5 | ✅ **5 passed** at `78a8a39` | **§12.16.** The whole walkthrough on Next and Finish alone; it dismisses itself; Back is absent on page one rather than dead; it is not shown twice; **and it created no rental, no company and no jobsite** |
-| `ReusableRecordsUITests` | 5 | ✅ **5 passed** at `b671f4f` | **§12.1–3.** The plus offers all three; a company made from Rentals is selectable in a draft; one made *inside* a draft returns to it selected with the draft intact; a disabled Save names the missing field; the jobsite editor is a map |
-| `MapAndEditingUITests` | 7 | ⚠️ 3 passed, 4 failed at `b671f4f`; all four traced to the three defects below | **§12.6–9, §12.15.** Today keeps the map with no rentals and with unplaced ones; the card opens full screen and X closes it; the legend opens; search finds the user's own machine; a rental with no coordinate says `No location set`; an edit survives a relaunch; the editor reaches company and jobsite |
-| `LayoutObstructionUITests` | 3 | ✅ **3 passed** at `b671f4f` | **§12.17.** The save bar stays above the keyboard on the longest form; Today scrolls clear of the tab bar; the map's close button and search field clear the status bar and the home indicator |
-| `InvoiceAcceptanceUITests` | 3 | ⚠️ 3 failed at `b671f4f`, all on defect 1 below | **§12.13–14.** A valid invoice is accepted from Audit, the counts move, and it is still accepted after a relaunch; an empty one is disabled with a specific reason and an `Edit invoice` route that opens the form; no comparison row runs past the right edge |
+| `CoreWorkflowUITests` | 9 | both | Manual creation and relaunch through the company picker; the full workflow to resolution with zero variance; the evidence packet sheet |
+| `MapAndEditingUITests` | 7 | iPhone | Today keeps its map with no rentals and with unplaced ones; full screen and close; the legend; search finds the user's own machine; an edit survives a relaunch |
+| `EntitlementUITests` | 5 | iPhone | Free limit, Pro unlock, entitlement loss |
+| `OnboardingUITests` | 5 | iPhone | The walkthrough on Next and Finish alone; it dismisses itself; it is not shown twice; **it creates no rental, company or jobsite** |
+| `ReusableRecordsUITests` | 5 | iPhone | The plus offers all three; a company made inside a draft returns to it selected with the draft intact; a disabled Save names the missing field |
+| `AccessibilityUITests` | 4 | iPhone | Tabs labelled, the estimate spoken as an estimate, disclosure readable, status spoken |
+| `InvoiceAcceptanceUITests` | 4 | iPhone | A valid invoice is accepted and survives a relaunch; an empty one is disabled with a reason and a route that opens the form |
+| `IPadLayoutUITests` | 4 | iPad | The readable-width column, rotation, and the layout at iPad metrics |
+| `AttachmentEditingUITests` | 4 | iPhone | **Never passed. See below.** |
+| `LayoutObstructionUITests` | 3 | iPhone | The save bar stays above the keyboard on the longest form; Today scrolls clear of the tab bar |
+| `MismatchUITests` | 2 | iPhone | An extra-day mismatch survives a relaunch; **scan review never saves without confirmation** |
 
-**35 UI test methods.** The four suites added for this change had never run at all until
-`cec8638` — the workflow names its UI suites explicitly with `-only-testing:`, and the new ones
-were not on the list. CI reported "Executed 17 tests" and looked exactly like a pass.
+### What is red, and why it is recorded rather than removed
 
-`verify_repository.py` now fails if a `XCTestCase` subclass in the UI target is not named in
-that step, and if the step names one that does not exist. Both directions were proved by breaking
-them.
+**`AttachmentEditingUITests` — 4 tests, never green.** Written for this change and failed on every
+one of the four runs it has had. Last run (`33004572538`, `1b7a54a`): three timed out at
+`waitForExistence` with "Failed to get matching snapshots: Timed out while evaluating UI query",
+and the fourth reported *"element was found and then went away before it could be tapped, which
+means the screen rebuilt underneath it"* — the message added in `1b7a54a` for exactly this case.
 
-### What run 32810021653 (`b671f4f`) actually found
+Read together, those say the rental screen is rebuilding continuously while an attachment whose
+file is missing is on it, which is what the fixture deliberately creates. Whether that is a real
+re-render loop in the app or an artefact of a record with no bytes behind it **is not resolved**,
+and it is the first thing to settle when this is picked up. What is known: the same screens are
+exercised by the other 44 iPhone tests without a fixture attachment and they pass.
 
-35 executed, 1 skipped, **13 failures — and every one of the thirteen came from three defects**,
-none of which was in the feature the failing test was named after. The accessibility-tree dump
-each failure prints is what made them separable; without it the same thirteen read as thirteen
-unrelated timeouts.
+The behaviour these four tests were written for is covered at the level that decides what the
+store holds — `AttachmentEditingTests`, 5 tests, green — but nothing currently drives the editor's
+buttons.
 
-1. **`rentals.root` was not in the tree at all.** `RentalsView` put it on its `List` and then put
-   `rentals.search` on the `.searchable` below it. `.accessibilityIdentifier` sets one property
-   on one element, so the second call replaced the first: the dump shows
-   `CollectionView, identifier: 'rentals.search'` and no `rentals.root` anywhere. Eleven tests
-   waited eight seconds for it and reported "the rentals list never appeared" while the rentals
-   list was plainly on screen. The `.searchable` field needs no identifier — XCUITest addresses
-   it as `app.searchFields` — so the duplicate is gone, and
-   `check_one_identifier_per_modifier_chain` now fails the build on a second identifier in one
-   modifier chain.
+**`PhotosPicker` is covered by no test.** `-offrent-stub-photo-picker` replaces it in this suite
+because an out-of-process picker service keeps the app from reaching the idle state XCUITest
+needs. It was not covered before that flag existed either. Saying otherwise would be worse than
+the gap.
 
-2. **A stack that names itself renames its children.** An accessibility modifier on a plain
-   `VStack`/`HStack`/`ZStack` is pushed down onto everything inside it. The operations map's
-   result list carried `map.searchResults`, so the row inside it lost `map.searchResult` — the
-   dump shows the row present, correct and renamed:
-   `Button, identifier: 'map.searchResults', label: 'Rental, Skid Steer Loader, Active, at
-   Ridgeline Phase 2, No location set'`. The detail card was about to do the same to `Open`,
-   `Edit` and `Add a location`. `.accessibilityElement(children: .contain)` before the identifier
-   is the fix — the same one the welcome screen had already needed — and
-   `check_container_identifiers_do_not_shadow_children` now requires it. `List`, `Form`,
-   `ScrollView` and `Group` are exempt on evidence, not assumption: CI dumps show their children
-   keeping their own identifiers.
+**`CoreWorkflowUITests` flaked twice, on different tests and different jobs.**
+`testTheEvidencePacketSheetOpensFromARental` failed on run `32998916617` (iPhone) and
+`testManuallyCreatedRentalSurvivesRelaunch` on run `33004572538` (iPad), both after passing on the
+runs before, and with nothing in either commit touching the screens involved. Neither has been
+re-run to confirm. This is flakiness in the suite, not in the app, and it is worth fixing before
+it trains anybody to ignore a red run.
 
-3. **A `Form` row below the fold is not in the accessibility tree at all.** Not off screen —
-   absent, because the row has never been built. `expect` on `addRental.dailyRate` therefore
-   failed on existence eight seconds before `tapInContent` could have scrolled to it. The dump
-   proves the rest of the form was there and Save was enabled. `reveal(_:)` scrolls until the
-   element exists; `revealAndTap` then hands off to `tapInContent`.
+### The build that shipped as TestFlight 21
 
-Two test-side defects came out of the same reading. A rentals row is one combined accessibility
-element whose label is the whole row, so `staticTexts["Mini Excavator"]` is not what a row looks
-like — and `XCTAssertFalse(app.staticTexts["Skid Steer Loader 75HP Closed Cab"].exists)` in
-`MismatchUITests` was therefore passing whether or not the scan had written a rental. Both now go
-through `rentalIsListed(_:)`, which matches a label prefix across buttons and static texts.
-
-### Run 32818776967 (`fd4b5d5`): green
-
-`** TEST SUCCEEDED **`. 35 UI tests executed, **0 failures**, 1 skipped — and the skip is the
-honest kind: `testScanReviewNeverSavesWithoutConfirmation` calls `XCTSkipUnless` because there is
-no document camera on a simulator, and the log records the reason. What that test would have
-covered at the parser is pinned in the domain suite instead.
-
-| Suite | Tests | Result |
-|---|---:|---|
-| `CoreWorkflowUITests` | 2 | ✅ |
-| `MismatchUITests` | 2 | ✅ 1 passed, 1 skipped (no camera) |
-| `EntitlementUITests` | 4 | ✅ |
-| `AccessibilityUITests` | 4 | ✅ |
-| `OnboardingUITests` | 5 | ✅ |
-| `ReusableRecordsUITests` | 5 | ✅ |
-| `MapAndEditingUITests` | 7 | ✅ |
-| `LayoutObstructionUITests` | 3 | ✅ |
-| `InvoiceAcceptanceUITests` | 3 | ✅ |
-
-Everything before it green too: 48 invariants, 323 domain tests, generated artefacts, a simulator
-build of app and widget, and the unit tests. **Build 8 was archived and uploaded from this exact
-commit** — TestFlight run 32821423420, `UPLOAD SUCCEEDED with no errors`, delivery UUID
-`5d3c3df5-5760-46e1-b1bb-4f099da7ce92`.
-
-### Run 32815452222 (`1f06d56`): 13 failures down to 3
-
-Everything before the UI step was green — 48 invariants, 323 domain tests, generated artefacts, a
-simulator build of app and widget, and the unit tests. The three that remained were three more
-defects, and again the app was right about two of them.
-
-1. **`editRental.root` renamed the Save button.** The same broadcast as before, in a shape the
-   first check could not see: the identifier sat on a `Group` wrapping the form *and* its
-   `safeAreaInset`, and an accessibility modifier applied over an inset is pushed into the
-   inset's contents. The dump reads `Button, identifier: 'editRental.root', label: 'Save
-   changes'` — the button was on screen, enabled, and renamed by its own ancestor.
-   `AddRentalView` had the identifier before its inset all along and was fine; `EditRentalView`
-   matches it now, and `check_identifiers_are_set_before_insets` fails the build on the shape.
-   Gated on the root expression, because `NavigationStack` over an inset is *not* affected —
-   `map.openRecord`, `map.editRecord` and `map.addLocation` all resolved inside one in this very
-   run.
-
-2. **A `Form` row that has scrolled off is as absent as one that never scrolled on.** `reveal`
-   fixed the daily-rate field by scrolling down to it — and left the form there, so the next
-   line's `.value` read on the equipment name threw a snapshot error rather than returning nil.
-   `reveal` takes a direction now, and that assertion says which way to look.
-
-3. **`-offrent-reset-state` reset nothing.** It was a permission to seed, not a wipe, so on the
-   on-disk store every scenario inherited the last one's data. Latent until
-   `InvoiceAcceptanceUITests` began passing: it drives the fixture rental to Resolved and leaves
-   it there, and `MismatchUITests` then opened that rental and found `Reopen` where `Mark as
-   done` should have been. See R22.
-
-**What the UI suite still cannot cover, and why:**
-
-| §12 gate | Why not automated |
-|---|---|
-| 5 — a manually dropped pin when search has no result | Dropping a pin means tapping a coordinate on a live `MKMapView`, and the "search has no result" half needs the network to be reachable but unhelpful. It is a device pass in `RELEASE_CHECKLIST.md`. |
-| 10–11 — a real agreement and a real invoice through the camera | Covered deterministically at the parser, which is the layer that can be wrong. The camera is a device pass. |
-| 19 — simulator launch | Covered by the UI suite existing at all: it launches and drives the app. Compilation alone is never treated as proof. |
-
-To execute, on a Mac:
-
-```
-xcodebuild test -project OffRentLedger.xcodeproj -scheme OffRentLedger \
-  -destination 'platform=iOS Simulator,name=iPhone 16'
-```
+`1b7a54a` changes **only** files under `OffRentLedgerUITests/` — `git diff 04b16a8..1b7a54a` over
+`OffRentLedger`, `OffRentLedgerWidget`, `OffRentShared` and `Config` is empty. The app binary is
+therefore the one verified on run `32998916617` at `04b16a8`: 62 invariants, 421 domain tests, 88
+app-target unit tests, simulator builds of the app and the widget for both idioms, the entire
+iPad UI suite green, and 44 of 48 iPhone UI tests. What is red above is test code.
 
 ---
 
