@@ -1635,6 +1635,48 @@ def check_ocr_fixtures_exist() -> None:
         fail("fixtures", "OCRFixtures/README.md must state that the fixtures are synthetic")
 
 
+def check_nothing_dismisses_and_presents_in_one_turn() -> None:
+    """`dismiss()` and a new presentation in the same run loop, and the second one is dropped.
+
+    Three screens in this app have been caught by it now. SwiftUI is being asked to unwind one
+    presentation and begin another before the first has committed, and it keeps the dismissal.
+    Nothing warns, nothing logs; the sheet closes and the thing that was supposed to open never
+    does, which from the outside is indistinguishable from a button that half worked.
+
+    - `EvidenceExportSheet` — the export sheet closed and the paywall never came.
+    - `CompanyPickerView` — parks its result and acts on it after the cover has gone.
+    - `AttachInvoiceSheet` — Save filed the invoice and then landed the user back on the rental
+      instead of the review screen for the invoice they had just filed.
+
+    The fix each time is the same: hand the work to the next turn with `Task { @MainActor in
+    await Task.yield() ... }`. A yield rather than a sleep, so there is no interval to tune and
+    nothing to go flaky on a slower device.
+    """
+    check("Nothing dismisses a screen and presents another in the same turn")
+    presenting = re.compile(
+        r"(router\.presentedSheet\s*=\s*\.|router\.handle\(|"
+        r"showing[A-Z]\w*\s*=\s*true|presenting[A-Z]\w*\s*=\s*true)"
+    )
+    for path in swift_files(APP_SOURCES):
+        lines = without_comments(path.read_text()).splitlines()
+        for number, line in enumerate(lines):
+            if not re.search(r"(?<!\.)\bdismiss\(\)", line):
+                continue
+            window = lines[number + 1 : number + 7]
+            # A hop to the next turn is the fix, so anything that defers is fine.
+            if any(re.search(r"Task\s*\{|DispatchQueue|\.yield\(\)", entry) for entry in window):
+                continue
+            for offset, entry in enumerate(window, start=1):
+                if presenting.search(entry):
+                    fail(
+                        "dismiss-then-present",
+                        f"{path.relative_to(ROOT).as_posix()}:{number + 1} calls dismiss() and "
+                        f"then presents on line {number + 1 + offset} in the same turn; the "
+                        "presentation will be dropped. Defer it with Task { await Task.yield() }",
+                    )
+                    break
+
+
 def check_memberwise_initialisers_are_reachable() -> None:
     """A struct with a private stored property has a private memberwise initialiser.
 
@@ -2116,6 +2158,7 @@ def main() -> int:
         check_the_pdf_does_not_use_dynamic_colours,
         check_no_alert_shares_a_chain_with_a_sheet,
         check_memberwise_initialisers_are_reachable,
+        check_nothing_dismisses_and_presents_in_one_turn,
         check_call_sites_resolve,
         check_every_ui_suite_actually_runs,
         check_github_workflows,

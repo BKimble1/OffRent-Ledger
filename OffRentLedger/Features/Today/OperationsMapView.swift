@@ -515,8 +515,18 @@ struct OperationsMapView: View {
     private func open(_ record: MapRecord) {
         // Close first, then route. Pushing onto a tab's stack while a full-screen cover is up
         // leaves the user looking at the map with the rental invisibly behind it.
+        //
+        // But not in the same turn. Dismissing a cover and routing in one run loop asks SwiftUI
+        // to unwind one presentation and start another before the first has committed, and the
+        // route is what it drops — so tapping a rental on the map closed the map and opened
+        // nothing. The yield puts the route on the next turn, once the dismissal is done.
+        let router = self.router
+        let id = record.id
         dismiss()
-        router.handle(.rentalItem(id: record.id))
+        Task { @MainActor in
+            await Task.yield()
+            router.handle(.rentalItem(id: id))
+        }
     }
 
     /// Closes the map and pushes the editor, rather than presenting a sheet inside a
@@ -524,9 +534,16 @@ struct OperationsMapView: View {
     /// own Save pops it, but a swipe-down lands on a map the user thought they had left — and
     /// the rental's own screen is where an edit belongs anyway.
     private func edit(_ record: MapRecord) {
+        // Same one-turn hazard as `open`, and the same fix. Both pushes go after the yield, in
+        // order, so the editor lands on top of the rental rather than on an empty stack.
+        let router = self.router
+        let id = record.id
         dismiss()
-        router.handle(.rentalItem(id: record.id))
-        router.rentalsPath.append(RentalDestination.editItem(id: record.id))
+        Task { @MainActor in
+            await Task.yield()
+            router.handle(.rentalItem(id: id))
+            router.rentalsPath.append(RentalDestination.editItem(id: id))
+        }
     }
 
     // MARK: - Derived

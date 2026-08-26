@@ -536,7 +536,30 @@ struct AttachInvoiceSheet: View {
 
         dismiss()
         guard isNew else { return }
-        router.presentedSheet = nil
-        router.handle(.invoiceReview(invoiceID: invoice.id))
+
+        // One turn later, not in the same one.
+        //
+        // Dismissing this sheet and routing somewhere in a single run loop asks SwiftUI to
+        // unwind one presentation and start another before the first has committed, and the
+        // second is the one it drops. `EvidenceExportSheet` carries the same note for the same
+        // reason, and `CompanyPickerView` parks its result rather than acting on it for a third.
+        //
+        // Here the cost was the end of the invoice workflow: attach an invoice, tap Save, and
+        // the sheet closes onto the rental you were already looking at instead of the review
+        // screen for the invoice you just filed. Nothing is lost and nothing says anything —
+        // it simply looks like Save did half its job.
+        // The router and the id, not the whole view: `save()` is not itself main-actor
+        // isolated, and capturing a SwiftUI view that holds `@Query` results in an escaping
+        // task is a concurrency diagnostic waiting to be turned into an error by a language
+        // mode bump. Two values are all this needs.
+        let router = self.router
+        let invoiceID = invoice.id
+        Task { @MainActor in
+            // A yield rather than a delay: it runs once the dismissal has been committed, with
+            // nothing arbitrary to tune and nothing to go flaky on a slower device.
+            await Task.yield()
+            router.presentedSheet = nil
+            router.handle(.invoiceReview(invoiceID: invoiceID))
+        }
     }
 }
