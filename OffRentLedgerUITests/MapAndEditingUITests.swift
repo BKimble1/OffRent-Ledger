@@ -253,7 +253,11 @@ final class LayoutObstructionUITests: XCTestCase {
         for _ in 0..<4 { root.swipeUp() }
 
         // The tab bar is the floor. Anything the user is meant to read has to end above it.
-        let tabBar = app.tabBars.element
+        // `firstMatch`: an iPad reports the tab bar's contents twice, and reading `frame` on an
+        // ambiguous element throws rather than returning one. This suite runs on iPhone today,
+        // where the two are the same thing — the difference only bites whoever adds it to the
+        // iPad job, which is exactly when a trap like this is most expensive to find.
+        let tabBar = app.tabBars.firstMatch
         guard tabBar.exists else { return }
         let map = app.anyElement(A11yUI.Today.map)
         if map.exists, map.frame.height > 0 {

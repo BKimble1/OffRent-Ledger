@@ -234,8 +234,30 @@ extension XCUIApplication {
             )
             return
         }
-        let clearOfBottom = frame.height * 0.82
-        let clearOfTop = frame.height * 0.15
+        // The bars are where the platform put them, not where an iPhone puts them.
+        //
+        // These fractions describe a phone: status bar above, tab bar and home indicator below.
+        // iPadOS 18 draws the tab bar at the *top* of the window instead, so on an iPad the
+        // bottom band reserved space against nothing while the top band was measured against a
+        // bar that is genuinely there. `itemDetail.exportEvidence` sat at y 962 of an
+        // 1180-point window with nothing underneath it at all, was swiped at six times, and was
+        // then reported as unreachable.
+        //
+        // An iPhone run is unchanged. Its tab bar is in the bottom half of the window, so the
+        // branch below is not taken and the two fractions are the ones that have been green for
+        // weeks.
+        var clearOfTop = frame.height * 0.15
+        var clearOfBottom = frame.height * 0.82
+        // `firstMatch`, not `element`: an iPad reports the tab bar's contents twice, and reading
+        // `frame` on an ambiguous element throws the same "multiple matching elements" this file
+        // already had to fix once for `tab`.
+        let bar = tabBars.firstMatch
+        if bar.exists, bar.frame.midY < frame.midY {
+            clearOfTop = max(bar.frame.maxY, frame.height * 0.06)
+            // Still a band rather than the whole window: a pinned Save or Accept bar lives at
+            // the bottom on every device, tab bar or no tab bar.
+            clearOfBottom = frame.height * 0.90
+        }
         for _ in 0..<6 {
             let box = element.frame
             let tooLow = box.maxY > clearOfBottom
@@ -334,8 +356,8 @@ extension XCUIApplication {
             keyboards.buttons["Done"],
             keyboards.buttons["Hide keyboard"],
         ]
-        for candidate in candidates where candidate.exists {
-            candidate.tap()
+        for candidate in candidates where candidate.exists && candidate.isHittable {
+            tapWithoutScrolling(candidate)
             if keyboards.count == 0 { return }
         }
 
@@ -343,8 +365,8 @@ extension XCUIApplication {
         // is tried rather than assuming "return".
         for label in ["Return", "return", "Next", "next", "Done", "Search", "Go"] {
             let key = keyboards.buttons[label]
-            if key.exists {
-                key.tap()
+            if key.exists, key.isHittable {
+                tapWithoutScrolling(key)
                 if keyboards.count == 0 { return }
             }
         }
@@ -352,6 +374,20 @@ extension XCUIApplication {
         // Last resort: the form scrolls the keyboard away. `scrollDismissesKeyboard` is on the
         // rental form for exactly this reason, and it is the gesture a person would use.
         swipeDown()
+    }
+
+    /// Taps an element at its centre without asking the accessibility layer to scroll it in first.
+    ///
+    /// `XCUIElement.tap()` scrolls to visible before tapping. On an iPad the software keyboard's
+    /// accessibility frames can sit below the bottom of the window — a Return key reported at
+    /// y 1251 in an 1180-point window — and that scroll fails the whole test with
+    /// `kAXErrorCannotComplete performing AXAction kAXScrollToVisibleAction`. It took out both
+    /// of the tests that got as far as typing on the first iPad run that reached that point.
+    ///
+    /// A coordinate tap has no scroll step. It is deliberately narrow: keyboard keys and the
+    /// bars above them, never app content, where the scroll is the useful half of `tap()`.
+    private func tapWithoutScrolling(_ element: XCUIElement) {
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     /// Turns a toggle on and proves it took.
@@ -365,7 +401,17 @@ extension XCUIApplication {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        guard toggle.waitForExistence(timeout: 8) else {
+        // A short wait, then `reveal`. A `Toggle` in a `Form` is built lazily, so a row below
+        // the fold does not exist to be waited for — and on an iPad the confirmation sheet is a
+        // 650-point form sheet where the affirmation is exactly that. Waiting eight seconds for
+        // a row that had never been built is what "toggle did not appear" meant there.
+        //
+        // On an iPhone the row is already on screen, `waitForExistence` returns at once, and
+        // `reveal` is never reached.
+        if !toggle.waitForExistence(timeout: 3) {
+            reveal(toggle, file: file, line: line)
+        }
+        guard toggle.exists else {
             XCTFail(
                 "toggle did not appear.\nIdentified elements on screen:\n\(identifiedElements())",
                 file: file, line: line
