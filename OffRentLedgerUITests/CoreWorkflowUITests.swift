@@ -30,25 +30,33 @@ final class CoreWorkflowUITests: XCTestCase {
         app.revealAndTap(app.buttons[A11yUI.ItemDetail.exportEvidence])
         app.expect(app.anyElement(A11yUI.EvidenceExport.root))
 
-        app.revealAndTap(app.buttons[A11yUI.EvidenceExport.generate])
+        app.revealAndTap(app.anyElement(A11yUI.EvidenceExport.generate))
 
-        // Preview and Share are drawn only when a file exists at the generated path, so their
-        // arrival is the evidence that the render returned rather than threw. Twenty seconds
-        // because the document is rasterised twice — once to count its pages so the footers can
-        // say "of 4", once to draw it.
-        // If generating failed, the screen says so. Reading that beats waiting twenty seconds
-        // for a control that was never going to arrive and then reporting only its absence.
+        // Wait for whichever of the two outcomes actually arrives.
+        //
+        // Looking for the failure message first and then waiting for Preview does not work:
+        // generating takes a few seconds, so the failure check runs before there is anything to
+        // find, passes, and the run then spends twenty seconds waiting for a control that a
+        // stated error has already ruled out — reporting the absence and never the reason.
+        // Racing the two reports whichever happened.
+        //
+        // `anyElement` throughout, not `buttons`. Whether a row in a `Form` is exposed as a
+        // button or as the cell around it is the platform's decision rather than the app's, and
+        // it differs between an iPhone and an iPad — the note already written on `anyElement`.
+        let preview = app.anyElement(A11yUI.EvidenceExport.previewOpen)
         let stated = app.anyElement(A11yUI.Failure.evidenceExport)
-        if stated.waitForExistence(timeout: 3) {
-            XCTFail("generating the packet failed: \(stated.label)")
+        let deadline = Date().addingTimeInterval(30)
+        while !preview.exists && !stated.exists && Date() < deadline {}
+
+        if stated.exists {
+            XCTFail("generating the packet failed, and the screen said: \(stated.label)")
             return
         }
-
-        // `anyElement`, not `buttons`. Whether a `NavigationLink` in a `Form` is exposed as a
-        // button or as the cell around it is the platform's decision rather than the app's, and
-        // it differs between an iPhone and an iPad — which is the note already written on
-        // `anyElement` itself.
-        let preview = app.expect(app.anyElement(A11yUI.EvidenceExport.previewOpen), timeout: 20)
+        XCTAssertTrue(
+            preview.exists,
+            "generating produced neither a file nor a stated failure. On screen: "
+                + app.identifiedElements()
+        )
         XCTAssertTrue(
             app.anyElement(A11yUI.EvidenceExport.share).exists,
             "the packet generated but there is no way to send it"
