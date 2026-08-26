@@ -74,17 +74,44 @@ extension XCUIApplication {
         }
     }
 
-    /// A tab-bar button, wherever the platform decided to put the tab bar.
+    /// A tab-bar button, resolved to exactly one element.
     ///
-    /// iPadOS 18 draws the tab bar as a floating control at the top of the window rather than a
-    /// bar along the bottom, and it is not always reported under `tabBars`. The title is the
-    /// app's either way, so a button carrying it is the tab. The bar is still tried first, so an
-    /// iPhone run resolves exactly as it did before.
+    /// iPadOS 18 draws the tab bar as a floating control at the top of the window, and XCUITest
+    /// reports more than one element for a single tab. The subscript form does not care: `exists`
+    /// is true for a query with two matches, and the failure lands on the *tap* instead —
+    /// "Failed to tap \"Rentals\" Button: Find single matching element. Multiple matching
+    /// elements found". That is every tab tap in the suite, and it took out all ten tests on the
+    /// first iPad run, six of them in suites that had been green on iPhone for weeks.
+    ///
+    /// `element(boundBy:)` and `firstMatch` resolve to one element by construction, which is the
+    /// whole fix. Preferring the one that is on screen is the other half: the second
+    /// representation is present in the tree and not hittable, and tapping it does nothing at
+    /// all — the failure mode this suite has already paid for twice.
+    ///
+    /// Matching identifier *or* label is what the subscript did. A `.tabItem` built from a
+    /// `Label` carries its title in both, and the suite addresses tabs by title.
     func tab(_ identifier: String) -> XCUIElement {
-        let inTabBar = tabBars.buttons[identifier]
-        if inTabBar.exists { return inTabBar }
-        let anywhere = buttons[identifier]
-        return anywhere.exists ? anywhere : inTabBar
+        let named = NSPredicate(format: "identifier == %@ OR label == %@", identifier, identifier)
+        if let inTabBar = firstOnScreen(tabBars.buttons.matching(named)) { return inTabBar }
+        if let anywhere = firstOnScreen(buttons.matching(named)) { return anywhere }
+        // Nothing has rendered yet. Hand back what the previous version returned, so a caller
+        // that waits on it gets the old behaviour and the old failure message.
+        return tabBars.buttons[identifier]
+    }
+
+    /// The first element of a query that is actually on screen, or the first that exists at all.
+    ///
+    /// Returns nil rather than an empty element so the caller can try somewhere else, and never
+    /// returns the query itself — a query with two matches throws on `tap()`, which is the bug
+    /// this exists to avoid.
+    private func firstOnScreen(_ query: XCUIElementQuery) -> XCUIElement? {
+        let count = query.count
+        guard count > 0 else { return nil }
+        for index in 0..<count {
+            let candidate = query.element(boundBy: index)
+            if candidate.exists, candidate.isHittable { return candidate }
+        }
+        return query.firstMatch
     }
 
     /// An element addressed by its identifier, whatever type UIKit chose to back it with.
@@ -145,8 +172,14 @@ extension XCUIApplication {
 
     /// Pops one screen off the current navigation stack.
     func back() {
-        let backButton = navigationBars.buttons["BackButton"]
-        if backButton.exists { backButton.tap(); return }
+        // `firstOnScreen`, not the subscript, for the same reason as `tab`: an iPad can have
+        // more than one navigation bar in the tree at once — a sheet's and the one behind it —
+        // and a subscript that matches both throws on the tap rather than on the lookup.
+        let named = NSPredicate(format: "identifier == %@ OR label == %@", "BackButton", "BackButton")
+        if let backButton = firstOnScreen(navigationBars.buttons.matching(named)) {
+            backButton.tap()
+            return
+        }
         navigationBars.buttons.element(boundBy: 0).tap()
     }
 
@@ -378,13 +411,23 @@ extension XCUIApplication {
     /// `button` or a `menuItem` depending on the presentation. Every form is tried rather than
     /// one being guessed at, because guessing wrong here is a timeout that names nothing.
     func menuItem(_ identifier: String, titled title: String) -> XCUIElement {
-        for candidate in [
-            buttons[identifier],
-            menuItems[identifier],
-            buttons[title],
-            menuItems[title],
+        // Every lookup resolves to a single element. A `Menu` on an iPad opens in a popover and
+        // the tree can carry both the popover's copy and the source button, which makes a bare
+        // subscript ambiguous — and an ambiguous element fails on `tap()`, several steps after
+        // the place that would explain it.
+        let byIdentifier = NSPredicate(format: "identifier == %@", identifier)
+        let byTitle = NSPredicate(format: "identifier == %@ OR label == %@", title, title)
+        // Typed explicitly: the last entry is non-optional and the rest are not, and an array
+        // literal that has to reconcile the two is a needless thing to make the compiler guess.
+        let candidates: [XCUIElement?] = [
+            firstOnScreen(buttons.matching(byIdentifier)),
+            firstOnScreen(menuItems.matching(byIdentifier)),
+            firstOnScreen(buttons.matching(byTitle)),
+            firstOnScreen(menuItems.matching(byTitle)),
             descendants(matching: .any).matching(identifier: identifier).firstMatch,
-        ] where candidate.exists {
+        ]
+        for candidate in candidates {
+            guard let candidate, candidate.exists else { continue }
             return candidate
         }
         // Nothing exists yet. Return the most likely one so `expect` can wait on it and report
