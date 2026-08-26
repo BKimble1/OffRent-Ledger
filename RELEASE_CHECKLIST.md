@@ -244,6 +244,15 @@ After a successful signed archive, the app is **TestFlight-ready**.
 - [ ] Age rating, category (Business or Productivity), keywords, subtitle.
 - [ ] Screenshots for every required size. Show real screens, not mock-ups, and do not show a
       figure without its "Estimate" qualifier.
+      The 6.9-inch set is built and waiting for its captures: six templates at 1290 x 2796 in
+      `marketing/AppStore/`, each with a **blank** screen opening, plus
+      `OffRent-AppStore-Template-Placement-Guide.md` giving the exact bounds, radius, rotation,
+      pivot, scale and crop rule for every one of the seven openings.
+      Produce the six app captures with `bash scripts/capture_appstore_screenshots.sh`; the
+      seventh — a real iOS Home Screen with the medium OffRent Summary widget on it — is taken by
+      hand, and `marketing/screenshots/README.md` is the procedure for both.
+      Nothing in the gallery is drawn, and nothing may be: the estimate qualifier survives because
+      the figure inside the phone is the app's own.
 - [ ] App Review notes: state plainly that the app does not contact rental companies, that its
       figures are estimates, and how to reach the paywall (Settings › Subscription › See Pro).
 - [ ] Provide a demo account: not applicable — there are no accounts. Say so in the notes.
@@ -260,7 +269,18 @@ After a successful signed archive, the app is **TestFlight-ready**.
       the default rendering is reasonable; adding variants is polish.
 - [ ] Check the icon on a real device at Home Screen size — thin strokes (the clock hands, the
       tread outline) are the first thing to suffer at 60pt, and no simulator screenshot settles it.
-- [ ] Marketing screenshots and any App Store promotional artwork.
+- [x] App Store screenshot templates: six 1290 x 2796 masters (SVG and PNG), a contact sheet, a
+      placement guide and a capture guide, packaged by
+      `python3 scripts/package_appstore_templates.py` into `dist/OffRent-AppStore-Templates.zip`.
+      Regenerate with `scripts/generate_appstore_templates.py`, check with
+      `scripts/validate_appstore_templates.py` — which fails on anything painted into a screen
+      opening, on a missing or extra opening, on copy outside the safe margins, and on any pixel
+      with a cool cast.
+- [ ] The captures themselves. Six from the simulator, one Home Screen widget capture by hand.
+      **Needs a Mac.** See `marketing/screenshots/README.md`.
+- [ ] Finished composites, exported to `marketing/AppStore/composites/` so the blank masters stay
+      reusable. Do not overwrite the templates with them.
+- [ ] Any other App Store promotional artwork.
 
 ---
 

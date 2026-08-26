@@ -280,6 +280,51 @@ struct StubTextRecognizer: DocumentTextRecognizing {
             """
     )
 
+    /// The contract the App Store capture scans.
+    ///
+    /// Kept in sync with `OffRentLedger/Resources/OCRFixtures/contract_appstore_excavator.txt` by
+    /// `OffRentLedgerTests/FixtureParityTests`, exactly as the skid-steer one is.
+    ///
+    /// It is the *same machine* as `AppStoreCaptureFixture.miniExcavator` — Summit Rental Co.,
+    /// EX-118, $425.00 a day, out on 5 May. The whole point of a six-frame gallery is that it is
+    /// six frames of one product, and a scan review quoting a different yard and a different rate
+    /// from the dashboard two frames earlier undoes that in the one place a reader is looking
+    /// closely at the numbers.
+    ///
+    /// The layout is deliberately identical to the skid-steer fixture's, label for label. That
+    /// file is the one every parser test is written against, so a copy of it with different
+    /// values exercises the same rules and cannot quietly depend on a parsing path nothing else
+    /// covers.
+    static let appStoreExcavatorContract = StubTextRecognizer(
+        rawText: """
+            SUMMIT RENTAL CO.
+            1180 Bexley Yard Road
+            Fairhaven, TX 76109
+            (972) 555-0142
+
+            RENTAL AGREEMENT NO: SR-58204
+
+            CUSTOMER: Halloway Sitework
+            JOB / PO: PO-4471
+
+            EQUIPMENT: Mini Excavator 6000 LB Rubber Track
+            UNIT #: EX-118
+            SERIAL NUMBER: 5KX2290741
+
+            DATE OUT: 05/05/2026
+            ESTIMATED RETURN: 05/19/2026
+
+            DAILY RATE: $425.00
+            7 DAY RATE: $1,450.00
+            4 WEEK RATE: $3,600.00
+
+            INCLUDED HOURS: 8 hrs/day, 40 hrs/week. Excess hours billed at 1/8 of day rate.
+            DELIVERY AND PICKUP QUOTED SEPARATELY.
+
+            Renter is responsible for fuel, daily walkaround, and reporting damage.
+            """
+    )
+
     /// A document with nothing about an equipment rental on it.
     ///
     /// The negative test: OCR reads it perfectly, and the extractor must find nothing, because

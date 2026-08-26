@@ -30,6 +30,7 @@ def main() -> int:
     svgs = sorted(SRC.glob("OffRent-AppStore-Template-??-*.svg"))
     guide = SRC / "OffRent-AppStore-Template-Placement-Guide.md"
     sheet = SRC / "OffRent-AppStore-Contact-Sheet.png"
+    capture = ROOT / "marketing" / "screenshots" / "README.md"
 
     if len(pngs) != 6 or len(svgs) != 6 or not guide.exists():
         print(f"incomplete: {len(pngs)} PNGs, {len(svgs)} SVGs, guide={guide.exists()}")
@@ -47,6 +48,16 @@ def main() -> int:
             archive.write(path, f"{FOLDER}/masters/{path.name}")
         archive.write(guide, f"{FOLDER}/{guide.name}")
         archive.write(sheet, f"{FOLDER}/preview/{sheet.name}")
+
+        # The capture guide travels with the templates.
+        #
+        # These are holes, not pictures — and the person opening this ZIP is the person who has to
+        # fill them. Shipping the placement geometry without the procedure that produces the
+        # screenshots to place is half a deliverable: it says where a capture goes and nothing
+        # about the fixture, the frozen clock or the launch arguments that make one capture match
+        # the next.
+        if capture.exists():
+            archive.write(capture, f"{FOLDER}/How-to-capture-the-screenshots.md")
 
         # Inter, so the masters open with the type they were designed in rather than reflowing
         # into a fallback. SIL Open Font License, and the licence travels with the fonts.

@@ -85,9 +85,7 @@ final class AppDependencies {
         return AppDependencies(
             clock: clock,
             fileStore: AppFileStore.applicationSupport(),
-            textRecognizer: overrides.stubTextRecogniser
-                ? StubTextRecognizer.skidSteerContract
-                : VisionTextRecognizer(),
+            textRecognizer: Self.recognizer(for: overrides),
             // Off under test. A model's output is not deterministic, and a UI test that depends
             // on one is a UI test that fails on a Tuesday.
             documentIntelligence: overrides.stubTextRecogniser
@@ -99,6 +97,22 @@ final class AppDependencies {
             snapshotPublisher: AppGroupSnapshotPublisher(),
             subscriptions: StoreKitSubscriptionService(clock: clock)
         )
+    }
+
+    /// The recogniser a launch asked for.
+    ///
+    /// Two stubs rather than one. The skid-steer contract is what the UI suite asserts against
+    /// and must not move; the App Store capture needs a scan whose company, unit number and day
+    /// rate are the ones on the *other five* screenshots, because a gallery where frame 5 reads
+    /// `SS-2214 · $285.00` and frame 1 reads `EX-118 · $425.00` is six pictures of two different
+    /// products. Both are committed OCR fixtures and both are checked for drift by
+    /// `FixtureParityTests`.
+    private static func recognizer(for overrides: TestOverrides) -> any DocumentTextRecognizing {
+        guard overrides.stubTextRecogniser else { return VisionTextRecognizer() }
+        #if DEBUG
+        if overrides.seedAppStore { return StubTextRecognizer.appStoreExcavatorContract }
+        #endif
+        return StubTextRecognizer.skidSteerContract
     }
 
     /// In-memory everything. Previews and unit tests.
@@ -128,6 +142,8 @@ final class AppDependencies {
         var resetState = false
         var seedWalkthrough = false
         var seedFreeLimit = false
+        var seedAppStore = false
+        var openScanReview = false
         var forcedEntitlement: EntitlementState?
         var disableAnimations = false
         var stubTextRecogniser = false
@@ -150,6 +166,8 @@ final class AppDependencies {
         overrides.resetState = has(LaunchArgument.resetState)
         overrides.seedWalkthrough = has(LaunchArgument.seedWalkthroughFixture)
         overrides.seedFreeLimit = has(LaunchArgument.seedFreeLimitFixture)
+        overrides.seedAppStore = has(LaunchArgument.seedAppStoreFixture)
+        overrides.openScanReview = has(LaunchArgument.openScanReview)
         overrides.disableAnimations = has(LaunchArgument.disableAnimations)
         overrides.stubTextRecogniser = has(LaunchArgument.stubTextRecogniser)
 

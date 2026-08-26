@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1290" height="2796" viewBox="0 0 1290 2796" role="img" aria-label="OffRent Ledger App Store template 2">
+  <title>OffRent Ledger — App Store template 2 — widget-glance</title>
+  <defs>
+    <!--
+      The device shadow is drawn, not filtered.
+
+      `feDropShadow` is silently ignored by cairosvg: a probe of a 50%-opacity drop shadow over a
+      known background came back with the background luminance unchanged at every sample point.
+      So the shadows in every previous version of these templates never rendered at all — which
+      is exactly why the devices looked flat, and why turning the opacity down would not have
+      helped. `feGaussianBlur` + `feOffset` renders, but with a hard edge where the falloff
+      should be.
+
+      Two radial gradients per device instead: a tight contact pool under the bottom edge and a
+      wide ambient one behind. Both render exactly, and both survive an editor that drops filters
+      on import — which Canva does.
+    -->
+    <radialGradient id="deviceShadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2E2A22" stop-opacity="1"/>
+      <stop offset="55%" stop-color="#2E2A22" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#2E2A22" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="warmGlow" cx="50%" cy="16%" r="76%">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.80"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F6F1E8"/>
+      <stop offset="52%" stop-color="#F6F1E8"/>
+      <stop offset="100%" stop-color="#E9E5DC"/>
+    </linearGradient>
+    <linearGradient id="topLift" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF8" stop-opacity="0.55"/>
+      <stop offset="46%" stop-color="#FFFDF8" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#FFFDF8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="divisionFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9E5DC"/>
+      <stop offset="100%" stop-color="#E9E5DC" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="neutralLift" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.055"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="graphiteFade" x1="0" y1="0" x2="0.28" y2="1">
+      <stop offset="0%" stop-color="#171A1F"/>
+      <stop offset="100%" stop-color="#252A31"/>
+    </linearGradient>
+    <linearGradient id="graphiteRise" x1="0" y1="0" x2="0.22" y2="1">
+      <stop offset="0%" stop-color="#252A31"/>
+      <stop offset="62%" stop-color="#171A1F"/>
+      <stop offset="100%" stop-color="#171A1F"/>
+    </linearGradient>
+    <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E9E5DC"/>
+      <stop offset="100%" stop-color="#F6F1E8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1290" height="2796" fill="url(#graphiteRise)"/>
+  <ellipse cx="258" cy="2349" rx="955" ry="727" fill="url(#neutralLift)"/>
+  <g class="motif-progression"><rect x="920.0" y="260.0" width="26.0" height="40.0" rx="13.0" fill="#867F72"/><rect x="968.0" y="238.0" width="26.0" height="62.0" rx="13.0" fill="#867F72"/><rect x="1016.0" y="216.0" width="26.0" height="84.0" rx="13.0" fill="#867F72"/><rect x="1064.0" y="194.0" width="26.0" height="106.0" rx="13.0" fill="#867F72"/><rect x="1112.0" y="172.0" width="26.0" height="128.0" rx="13.0" fill="#FF8A1F"/><rect x="1160.0" y="150.0" width="26.0" height="150.0" rx="13.0" fill="#FF8A1F"/></g>
+  <g class="device-shadow"><ellipse cx="1018.2" cy="1681.8" rx="455.8" ry="686.8" fill="url(#deviceShadow)" opacity="0.09"/><ellipse cx="1018.2" cy="2194.5" rx="274.6" ry="49.1" fill="url(#deviceShadow)" opacity="0.10"/></g>
+  <g class="device">
+    <rect x="726.00" y="946.00" width="584.32" height="1226.41"
+          rx="82.06" fill="#0E1116"/>
+    <rect x="727.50" y="947.50"
+          width="581.32" height="1223.41"
+          rx="80.56" fill="none" stroke="#4C4840" stroke-width="3"/>
+    <rect class="screen-area" id="screen-1" x="743.16" y="963.16"
+          width="550.00" height="1192.09"
+          rx="64.90" fill="#4A4A48"/>
+    <rect x="938.22" y="977.17" width="159.89" height="46.89"
+          rx="23.45" fill="#0B0E12"/>
+  </g>
+  <g class="device-shadow"><ellipse cx="410.5" cy="2091.3" rx="596.6" ry="899.1" fill="url(#deviceShadow)" opacity="0.09"/><ellipse cx="410.5" cy="2762.4" rx="359.5" ry="64.2" fill="url(#deviceShadow)" opacity="0.10"/></g>
+  <g class="device">
+    <rect x="28.00" y="1128.00" width="764.93" height="1605.49"
+          rx="107.42" fill="#0E1116"/>
+    <rect x="29.50" y="1129.50"
+          width="761.93" height="1602.49"
+          rx="105.92" fill="none" stroke="#4C4840" stroke-width="3"/>
+    <rect class="screen-area" id="screen-2" x="50.46" y="1150.46"
+          width="720.00" height="1560.56"
+          rx="84.96" fill="#4A4A48"/>
+    <rect x="305.81" y="1168.80" width="209.30" height="61.39"
+          rx="30.69" fill="#0B0E12"/>
+  </g>
+  <text x="104.0" y="430.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#F6F1E8" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Rental cost</tspan><tspan x="104.0" dy="118.7">at a glance.</tspan></text>
+  <text x="104.0" y="697.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#DAD4C7" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">See the running total without</tspan><tspan x="104.0" dy="70.7">opening the app.</tspan></text>
+  <g class="disclosure-badge">
+    <rect x="104.0" y="813.7" width="315.4" height="80.0" rx="40.0" fill="none" stroke="#FF8A1F" stroke-width="2.5"/>
+    <text x="134.0" y="864.7" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="600" font-size="46" fill="#FF8A1F" letter-spacing="0.92" xml:space="preserve">Pro feature</text>
+  </g>
+</svg>

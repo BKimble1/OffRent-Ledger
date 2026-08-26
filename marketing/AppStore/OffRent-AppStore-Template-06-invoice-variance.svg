@@ -46,6 +46,11 @@
       <stop offset="0%" stop-color="#171A1F"/>
       <stop offset="100%" stop-color="#252A31"/>
     </linearGradient>
+    <linearGradient id="graphiteRise" x1="0" y1="0" x2="0.22" y2="1">
+      <stop offset="0%" stop-color="#252A31"/>
+      <stop offset="62%" stop-color="#171A1F"/>
+      <stop offset="100%" stop-color="#171A1F"/>
+    </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#E9E5DC"/>
       <stop offset="100%" stop-color="#F6F1E8"/>
@@ -54,27 +59,27 @@
   <rect width="1290" height="2796" fill="url(#graphiteFade)"/>
   <ellipse cx="955" cy="363" rx="851" ry="615" fill="url(#neutralLift)"/>
   <g class="motif-variance">
-    <rect x="104.0" y="1000.0" width="558.0" height="46.0" rx="23.0" fill="#867F72"/>
-    <rect x="104.0" y="1076.0" width="827.3" height="46.0" rx="23.0" fill="#867F72"/>
-    <rect x="662.0" y="1076.0" width="269.4" height="46.0"
+    <rect x="104.0" y="830.0" width="558.0" height="46.0" rx="23.0" fill="#867F72"/>
+    <rect x="104.0" y="906.0" width="827.3" height="46.0" rx="23.0" fill="#867F72"/>
+    <rect x="662.0" y="906.0" width="269.4" height="46.0"
           rx="23.0" fill="#FF8A1F"/>
-    <line x1="662.0" y1="977.0" x2="662.0"
-          y2="1145.0" stroke="#FF8A1F" stroke-width="4"
+    <line x1="662.0" y1="807.0" x2="662.0"
+          y2="975.0" stroke="#FF8A1F" stroke-width="4"
           stroke-dasharray="14 12" stroke-linecap="round"/>
   </g>
-  <g class="device-shadow"><ellipse cx="487.0" cy="2201.6" rx="592.5" ry="892.8" fill="url(#deviceShadow)" opacity="0.09"/><ellipse cx="487.0" cy="2868.0" rx="357.0" ry="63.8" fill="url(#deviceShadow)" opacity="0.10"/></g>
+  <g class="device-shadow"><ellipse cx="585.0" cy="2194.0" rx="720.9" ry="1086.4" fill="url(#deviceShadow)" opacity="0.09"/><ellipse cx="585.0" cy="3004.9" rx="434.4" ry="77.6" fill="url(#deviceShadow)" opacity="0.10"/></g>
   <g class="device">
-    <rect x="107.19" y="1245.00" width="759.62" height="1594.34"
-          rx="106.68" fill="#0E1116"/>
-    <rect x="108.69" y="1246.50"
-          width="756.62" height="1591.34"
-          rx="105.18" fill="none" stroke="#4C4840" stroke-width="3"/>
-    <rect class="screen-area" x="129.50" y="1267.31"
-          width="715.00" height="1549.72"
-          rx="84.37" fill="#4A4A48"/>
-    <rect x="383.07" y="1285.52" width="207.85" height="60.96"
-          rx="30.48" fill="#0B0E12"/>
+    <rect x="122.86" y="1030.00" width="924.29" height="1939.96"
+          rx="129.80" fill="#0E1116"/>
+    <rect x="124.36" y="1031.50"
+          width="921.29" height="1936.96"
+          rx="128.30" fill="none" stroke="#4C4840" stroke-width="3"/>
+    <rect class="screen-area" id="screen-1" x="150.00" y="1057.14"
+          width="870.00" height="1885.67"
+          rx="102.66" fill="#4A4A48"/>
+    <rect x="458.55" y="1079.30" width="252.91" height="74.18"
+          rx="37.09" fill="#0B0E12"/>
   </g>
-  <text x="104.0" y="440.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#F6F1E8" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Spot possible billing</tspan><tspan x="104.0" dy="118.7">differences.</tspan></text>
-  <text x="104.0" y="707.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#DAD4C7" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Compare expected cost with</tspan><tspan x="104.0" dy="70.7">the vendor invoice.</tspan></text>
+  <text x="104.0" y="420.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#F6F1E8" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Spot possible billing</tspan><tspan x="104.0" dy="118.7">differences.</tspan></text>
+  <text x="104.0" y="687.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#DAD4C7" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Compare the invoice with the</tspan><tspan x="104.0" dy="70.7">terms you confirmed.</tspan></text>
 </svg>

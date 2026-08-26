@@ -103,6 +103,10 @@ enum LaunchArgument {
     static let resetState = "-offrent-reset-state"
     static let seedWalkthroughFixture = "-offrent-seed-walkthrough"
     static let seedFreeLimitFixture = "-offrent-seed-free-limit"
+    /// The App Store capture fixture: four machines, two rental companies, three jobsites and one
+    /// invoice a day out, pinned to a fixed instant so the same figures come out every time.
+    /// Pair it with `-offrent-fixed-now 2026-05-09T15:00:00Z`; see `AppStoreCaptureFixture`.
+    static let seedAppStoreFixture = "-offrent-seed-appstore"
     static let forceProEntitlement = "-offrent-force-pro"
     static let forceFreeEntitlement = "-offrent-force-free"
     static let disableAnimations = "-offrent-disable-animations"
@@ -113,6 +117,14 @@ enum LaunchArgument {
     static let resetOnboarding = "-offrent-reset-onboarding"
     /// Start as a returning user, so the welcome screen does not sit in front of every test.
     static let skipOnboarding = "-offrent-skip-onboarding"
+    /// Open Scan Review over the rental form with whatever the recogniser returns.
+    ///
+    /// Only useful with `-offrent-stub-ocr`, and it exists because `VNDocumentCameraViewController`
+    /// reports itself unsupported on every simulator: the app correctly draws no scan button
+    /// there, so the review screen — one of the six the App Store gallery is built from — cannot
+    /// otherwise be reached without a camera. It opens the real screen, over the real pipeline,
+    /// with the real parser; the only thing it substitutes for is the lens.
+    static let openScanReview = "-offrent-open-scan-review"
 }
 
 /// The user's appearance choice.

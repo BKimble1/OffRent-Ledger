@@ -46,6 +46,11 @@
       <stop offset="0%" stop-color="#171A1F"/>
       <stop offset="100%" stop-color="#252A31"/>
     </linearGradient>
+    <linearGradient id="graphiteRise" x1="0" y1="0" x2="0.22" y2="1">
+      <stop offset="0%" stop-color="#252A31"/>
+      <stop offset="62%" stop-color="#171A1F"/>
+      <stop offset="100%" stop-color="#171A1F"/>
+    </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#E9E5DC"/>
       <stop offset="100%" stop-color="#F6F1E8"/>
@@ -55,26 +60,26 @@
   <rect width="1290" height="2796" fill="url(#warmGlow)"/>
   <ellipse cx="645" cy="2852" rx="1109" ry="839" fill="#E9E5DC" opacity="0.55"/>
   <g class="motif-meter">
-    <circle cx="1108.0" cy="252.0" r="78.0" fill="none" stroke="#DFD9CC" stroke-width="16.0"/>
-    <path d="M 1108.00 174.00 A 78.0 78.0 0 1 1 1051.14 305.39"
+    <circle cx="1108.0" cy="226.0" r="78.0" fill="none" stroke="#DFD9CC" stroke-width="16.0"/>
+    <path d="M 1108.00 148.00 A 78.0 78.0 0 1 1 1051.14 279.39"
           fill="none" stroke="#FF8A1F" stroke-width="16.0" stroke-linecap="round"/>
-    <line x1="1108.0" y1="252.0" x2="1073.88" y2="284.04"
+    <line x1="1108.0" y1="226.0" x2="1073.88" y2="258.04"
           stroke="#171A1F" stroke-width="9.9" stroke-linecap="round"/>
-    <circle cx="1108.0" cy="252.0" r="8.3" fill="#171A1F"/>
+    <circle cx="1108.0" cy="226.0" r="8.3" fill="#171A1F"/>
   </g>
-  <g class="device-shadow"><ellipse cx="645.0" cy="2030.6" rx="646.4" ry="974.0" fill="url(#deviceShadow)" opacity="0.09"/><ellipse cx="645.0" cy="2757.6" rx="389.5" ry="69.6" fill="url(#deviceShadow)" opacity="0.10"/></g>
+  <g class="device-shadow"><ellipse cx="645.0" cy="1967.2" rx="704.4" ry="1061.4" fill="url(#deviceShadow)" opacity="0.09"/><ellipse cx="645.0" cy="2759.5" rx="424.4" ry="75.8" fill="url(#deviceShadow)" opacity="0.10"/></g>
   <g class="device">
-    <rect x="230.66" y="987.00" width="828.67" height="1739.28"
-          rx="116.38" fill="#1E1D1B"/>
-    <rect x="232.16" y="988.50"
-          width="825.67" height="1736.28"
-          rx="114.88" fill="none" stroke="#52504A" stroke-width="3"/>
-    <rect class="screen-area" x="255.00" y="1011.34"
-          width="780.00" height="1690.60"
-          rx="92.04" fill="#D8D2C7"/>
-    <rect x="531.63" y="1031.20" width="226.75" height="66.50"
-          rx="33.25" fill="#0B0E12"/>
+    <rect x="193.48" y="830.00" width="903.04" height="1895.37"
+          rx="126.82" fill="#1E1D1B"/>
+    <rect x="194.98" y="831.50"
+          width="900.04" height="1892.37"
+          rx="125.32" fill="none" stroke="#52504A" stroke-width="3"/>
+    <rect class="screen-area" id="screen-1" x="220.00" y="856.52"
+          width="850.00" height="1842.33"
+          rx="100.30" fill="#D8D2C7"/>
+    <rect x="521.45" y="878.17" width="247.09" height="72.47"
+          rx="36.24" fill="#0B0E12"/>
   </g>
-  <text x="645.0" y="470.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="middle" letter-spacing="-2.46" xml:space="preserve"><tspan x="645.0" dy="0.0">Stop the rental clock</tspan><tspan x="645.0" dy="118.7">with proof.</tspan></text>
-  <text x="645.0" y="737.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#413E38" text-anchor="middle" letter-spacing="-0.21" xml:space="preserve"><tspan x="645.0" dy="0.0">Track costs, confirmations, pickup,</tspan><tspan x="645.0" dy="70.7">and final charges.</tspan></text>
+  <text x="645.0" y="452.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="middle" letter-spacing="-2.46" xml:space="preserve"><tspan x="645.0" dy="0.0">Stop the rental clock</tspan><tspan x="645.0" dy="118.7">with proof.</tspan></text>
+  <text x="645.0" y="719.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#413E38" text-anchor="middle" letter-spacing="-0.21" xml:space="preserve"><tspan x="645.0" dy="0.0">Running cost, urgent calls, and</tspan><tspan x="645.0" dy="70.7">every jobsite in one place.</tspan></text>
 </svg>

@@ -175,6 +175,12 @@ struct RootView: View {
             SeedFixtures.seedWalkthrough(context: context, clock: dependencies.clock)
             PersistentStore.saveDerived(context, describing: "the walkthrough fixtures")
         }
+        // The App Store capture fixture. It saves itself, because it also wipes first — running
+        // it twice has to leave the same store as running it once, and a capture script that is
+        // re-run after a bad screenshot is the normal case rather than the exception.
+        if overrides.seedAppStore {
+            SeedFixtures.seedAppStore(context: context, clock: dependencies.clock)
+        }
         #endif
     }
 

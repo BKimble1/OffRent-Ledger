@@ -119,6 +119,26 @@ struct RentalFormView: View {
             // it falls back to the PDF importer rather than doing nothing and looking broken.
             guard startScanning, showsCapture, !hasAutoStartedScan else { return }
             hasAutoStartedScan = true
+            #if DEBUG
+            // The App Store capture's way in, and nothing else's.
+            //
+            // `VNDocumentCameraViewController.isSupported` is false on every simulator, and the
+            // only other routes into this screen are the photo picker and the file importer —
+            // two system UIs that cannot be driven reliably from a test. So the screenshot of
+            // Scan Review, one of the six the gallery is built from, was unreachable without a
+            // physical device and a printed contract.
+            //
+            // This runs the *real* pipeline: the same view model, the same recogniser protocol,
+            // the same parser, the same review screen. The recogniser behind it is the stub
+            // selected by `-offrent-stub-ocr`, which ignores the page data it is handed — so an
+            // empty page list is honest rather than a placeholder, and the page strip correctly
+            // draws nothing because no page was photographed. Debug only, like every other hook,
+            // and `verify_repository.py` fails the build if this branch escapes its `#if`.
+            if AppDependencies.testOverrides().openScanReview {
+                startScan { $0.recognise(imageData: [], source: .documentCamera) }
+                return
+            }
+            #endif
             if DocumentScannerView.isSupported {
                 showingCamera = true
             } else {

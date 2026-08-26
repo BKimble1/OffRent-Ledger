@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1290" height="2796" viewBox="0 0 1290 2796" role="img" aria-label="OffRent Ledger App Store template 2">
-  <title>OffRent Ledger — App Store template 2 — active-costs</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="1290" height="2796" viewBox="0 0 1290 2796" role="img" aria-label="OffRent Ledger App Store template 3">
+  <title>OffRent Ledger — App Store template 3 — off-rent-proof</title>
   <defs>
     <!--
       The device shadow is drawn, not filtered.
@@ -46,28 +46,40 @@
       <stop offset="0%" stop-color="#171A1F"/>
       <stop offset="100%" stop-color="#252A31"/>
     </linearGradient>
+    <linearGradient id="graphiteRise" x1="0" y1="0" x2="0.22" y2="1">
+      <stop offset="0%" stop-color="#252A31"/>
+      <stop offset="62%" stop-color="#171A1F"/>
+      <stop offset="100%" stop-color="#171A1F"/>
+    </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#E9E5DC"/>
       <stop offset="100%" stop-color="#F6F1E8"/>
     </linearGradient>
   </defs>
-  <rect width="1290" height="2796" fill="#DED7C8"/>
-  <rect width="1290" height="2796" fill="url(#topLift)"/>
-  <rect x="0" y="1118" width="1290" height="1678" fill="#D7CEBD" opacity="0.50"/>
-  <g class="motif-progression"><rect x="104.0" y="1144.0" width="26.0" height="54.0" rx="13.0" fill="#BFB7A6"/><rect x="152.0" y="1114.0" width="26.0" height="84.0" rx="13.0" fill="#BFB7A6"/><rect x="200.0" y="1084.0" width="26.0" height="114.0" rx="13.0" fill="#BFB7A6"/><rect x="248.0" y="1054.0" width="26.0" height="144.0" rx="13.0" fill="#BFB7A6"/><rect x="296.0" y="1024.0" width="26.0" height="174.0" rx="13.0" fill="#BFB7A6"/><rect x="344.0" y="994.0" width="26.0" height="204.0" rx="13.0" fill="#BFB7A6"/><rect x="392.0" y="964.0" width="26.0" height="234.0" rx="13.0" fill="#BFB7A6"/><rect x="440.0" y="934.0" width="26.0" height="264.0" rx="13.0" fill="#FF8A1F"/><rect x="488.0" y="904.0" width="26.0" height="294.0" rx="13.0" fill="#FF8A1F"/></g>
-  <g class="device-shadow"><ellipse cx="863.0" cy="2182.5" rx="580.1" ry="874.1" fill="url(#deviceShadow)" opacity="0.09"/><ellipse cx="863.0" cy="2835.0" rx="349.5" ry="62.4" fill="url(#deviceShadow)" opacity="0.10"/></g>
-  <g class="device">
-    <rect x="491.16" y="1246.00" width="743.68" height="1560.89"
-          rx="104.44" fill="#1E1D1B"/>
-    <rect x="492.66" y="1247.50"
-          width="740.68" height="1557.89"
-          rx="102.94" fill="none" stroke="#52504A" stroke-width="3"/>
-    <rect class="screen-area" x="513.00" y="1267.84"
-          width="700.00" height="1517.21"
-          rx="82.60" fill="#D8D2C7"/>
-    <rect x="761.25" y="1285.67" width="203.49" height="59.68"
-          rx="29.84" fill="#0B0E12"/>
+  <rect width="1290" height="2796" fill="#F6F1E8"/>
+  <rect x="0" y="0" width="1290" height="1692" fill="#E9E5DC"/>
+  <rect x="0" y="1690" width="1290" height="150" fill="url(#divisionFade)"/>
+  <rect width="1290" height="2796" fill="url(#warmGlow)" opacity="0.45"/>
+  <g class="motif-stop">
+    <rect x="104.0" y="2101.0" width="1042.0" height="46.0" rx="23.0"
+          fill="none" stroke="#ADA391" stroke-width="7.0"/>
+    <rect x="104.0" y="2101.0" width="646.0" height="46.0" rx="23.0" fill="#FF8A1F"/>
+    <rect x="742.7" y="2072.5" width="14.7"
+          height="103.0" rx="7.4" fill="#ADA391"/>
   </g>
-  <text x="104.0" y="440.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Control every</tspan><tspan x="104.0" dy="118.7">active rental.</tspan></text>
-  <text x="104.0" y="707.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#413E38" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">See running costs and</tspan><tspan x="104.0" dy="70.7">upcoming rate changes.</tspan></text>
+  <g class="device-shadow"><ellipse cx="583.0" cy="1265.1" rx="679.5" ry="1023.9" fill="url(#deviceShadow)" opacity="0.09"/><ellipse cx="583.0" cy="2029.4" rx="409.4" ry="73.1" fill="url(#deviceShadow)" opacity="0.10"/></g>
+  <g class="device">
+    <rect x="147.42" y="168.00" width="871.17" height="1828.47"
+          rx="122.34" fill="#1E1D1B"/>
+    <rect x="148.92" y="169.50"
+          width="868.17" height="1825.47"
+          rx="120.84" fill="none" stroke="#52504A" stroke-width="3"/>
+    <rect class="screen-area" id="screen-1" x="173.00" y="193.58"
+          width="820.00" height="1777.30"
+          rx="96.76" fill="#D8D2C7"/>
+    <rect x="463.81" y="214.47" width="238.37" height="69.92"
+          rx="34.96" fill="#0B0E12"/>
+  </g>
+  <text x="104.0" y="2300.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="700" font-size="112" fill="#171A1F" text-anchor="start" letter-spacing="-2.46" xml:space="preserve"><tspan x="104.0" dy="0.0">Record</tspan><tspan x="104.0" dy="118.7">off-rent proof.</tspan></text>
+  <text x="104.0" y="2567.0" font-family="Inter, 'Inter Display', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="500" font-size="52" fill="#413E38" text-anchor="start" letter-spacing="-0.21" xml:space="preserve"><tspan x="104.0" dy="0.0">Confirmation number, meter, fuel,</tspan><tspan x="104.0" dy="70.7">and condition, kept together.</tspan></text>
 </svg>

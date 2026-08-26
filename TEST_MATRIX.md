@@ -67,6 +67,17 @@ derived its step from a rental's status, which is precisely the design §10 of t
 `WalkthroughScriptTests` (14) covers what took its place, and asserts the property the old design
 could not have: that the walkthrough ends.
 
+### Written, not executed here
+
+Two suites were added with the App Store capture work and have not been run in this environment —
+there is no Swift toolchain on it and no simulator. Both are wired into the Verify workflow, so
+the first push runs them; until that run reports, neither has a result.
+
+| Suite | Where it runs | What it covers |
+|---|---|---|
+| `AppStoreCaptureFixtureTests` | `swift test` (portable) | Every figure the App Store gallery advertises, derived by `RentalRateEngine`, `SnapshotBuilder` and `InvoiceComparisonEngine`: the $2,885 running total, the widget's four counts, the 11 May rate change inside Today's 48-hour window, and $2,280 expected against $2,565 invoiced leaving $285. Also that the fixture is pinned to a frozen instant rather than to the wall clock, which is the whole reason it exists |
+| `AppStoreFixtureTests` | Xcode, simulator | The same fixture as it lands in SwiftData: four machines in three statuses, one agreement each, every status assigned by `RentalWorkflowService` rather than around it, a timeline in the order things happened, seeding twice leaving one copy, and two runs producing byte-identical records |
+
 ### Also executed and passed
 
 | Check | Result |
@@ -372,9 +383,18 @@ of them.
 | Lock Screen and Control Centre widget rendering | ⛔ unverified |
 | Legal URL liveness | ⛔ unverified — the app does not claim they are live |
 | Bundle ID availability, Team ID, App Store Connect record | ⛔ unverified |
+| **The App Store capture run** | ⛔ unverified here — `AppStoreCaptureUITests` and `scripts/capture_appstore_screenshots.sh` are written and wired into the Verify workflow, but nothing in this environment has a simulator, so no screenshot has been produced from them |
+| **The Home Screen widget capture** | ⛔ **unautomatable** — XCUITest cannot add a widget to a Home Screen. Template 2's front opening is filled by hand, and `marketing/screenshots/README.md` is the procedure. Drawing it is not an alternative |
 
 **A passing StoreKit configuration test says nothing about production purchases.** The
 `.storekit` file is a local simulator fixture. Sandbox and TestFlight are separate real gates.
+
+**The App Store gallery is six blank templates, not six screenshots.** Every screen opening in
+`marketing/AppStore/` is an empty rectangle waiting for a capture, and
+`scripts/validate_appstore_templates.py` samples each one and fails if anything has been painted
+into it. The arithmetic behind the captures *is* verified — `AppStoreCaptureFixtureTests` and
+`AppStoreFixtureTests` assert the running total, the widget counts and the three invoice figures
+the gallery advertises — but the pictures themselves need a Mac.
 
 **What "the on-device model is tested" does and does not mean.** `ModelSuggestionValidatorTests`
 and `ScanIntelligenceTests` verify the *guardrail*: that a value not printed on the page is

@@ -1635,6 +1635,104 @@ def check_ocr_fixtures_exist() -> None:
         fail("fixtures", "OCRFixtures/README.md must state that the fixtures are synthetic")
 
 
+def _conditional_compilation_state(source: str) -> list[bool]:
+    """For each line of Swift, whether it is inside a `#if DEBUG` branch.
+
+    A small stack rather than a regex. `#if DEBUG` opens a debug-only region; `#else` after one
+    closes it and opens the opposite; any other `#if` is neutral but still has to be tracked, or
+    an unrelated `#if os(iOS)` inside a debug region would pop it early and the whole file after
+    that point would be reported as shippable when it is not.
+    """
+    inside: list[bool] = []
+    states: list[bool] = []
+    for line in source.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("#if"):
+            condition = stripped[3:].strip()
+            inside.append(condition == "DEBUG")
+            states.append(any(inside))
+            continue
+        if stripped.startswith("#elseif"):
+            if inside:
+                inside[-1] = False
+            states.append(any(inside))
+            continue
+        if stripped.startswith("#else"):
+            if inside:
+                # `#else` of a `#if DEBUG` is the release branch, and vice versa. Only the
+                # `#if !DEBUG` form makes the else-branch debug-only, and this repository does
+                # not use it — treating it as shippable is the conservative reading either way.
+                inside[-1] = False
+            states.append(any(inside))
+            continue
+        if stripped.startswith("#endif"):
+            if inside:
+                inside.pop()
+            states.append(any(inside))
+            continue
+        states.append(any(inside))
+    return states
+
+
+def check_appstore_fixture_is_debug_only() -> None:
+    """The App Store capture fixture cannot be reached from a Release build.
+
+    It seeds four invented rentals, two invented rental companies and an invoice with a
+    deliberate overcharge on it. That is exactly the right thing to put in front of a camera and
+    exactly the wrong thing to be reachable on a phone somebody has paid for — a fixture that
+    ships is a way for a reviewer, or anybody else, to see records that are not theirs and are
+    not real, next to their own.
+
+    `AppDependencies.testOverrides()` already returns nothing at all in Release, so the launch
+    argument is inert there. This is the second lock, and the stronger one: every *declaration*
+    and every *reference* to the fixture in shipped source has to sit inside a `#if DEBUG`, so
+    the symbols are not compiled into the binary at all rather than merely never called.
+
+    To check it by hand:
+
+        grep -rn "AppStoreCaptureFixture\|seedAppStore" OffRentLedger/
+
+    and confirm that every hit is between a `#if DEBUG` and its `#endif`. This does that, on
+    every push, and names the file and line when it is not.
+    """
+    check("The App Store capture fixture cannot be built into a Release")
+    needles = ("AppStoreCaptureFixture", "seedAppStore(", "openScanReview")
+    # `LaunchArgument.seedAppStoreFixture` and `TestOverrides.seedAppStore` are deliberately
+    # exempt: they are a string constant and a `Bool` field, they carry no fixture data, and the
+    # only thing that reads them is already inside `#if DEBUG`. Declaring them unconditionally is
+    # what lets a test assert the flag's spelling without a build configuration of its own.
+    exempt = ("seedAppStoreFixture", "static let openScanReview",
+              "overrides.seedAppStore =", "var seedAppStore =",
+              "overrides.openScanReview =", "var openScanReview =")
+
+    seen = 0
+    for path in swift_files(APP_SOURCES, SHARED_SOURCES, WIDGET_SOURCES):
+        source = path.read_text()
+        if not any(needle in source for needle in needles):
+            continue
+        states = _conditional_compilation_state(source)
+        for index, line in enumerate(source.split("\n")):
+            code = line.split("//", 1)[0]
+            if not any(needle in code for needle in needles):
+                continue
+            if any(allowed in code for allowed in exempt):
+                continue
+            seen += 1
+            if not states[index]:
+                fail(
+                    "appstore-fixture-ships",
+                    f"{path.relative_to(ROOT).as_posix()}:{index + 1} reaches the App Store "
+                    f"capture fixture outside a `#if DEBUG`: {line.strip()}",
+                )
+
+    if seen == 0:
+        fail(
+            "appstore-fixture-ships",
+            "nothing references the App Store capture fixture — either it has been deleted, or "
+            "this check has stopped looking at the right thing",
+        )
+
+
 def check_one_colour_scheme_decision() -> None:
     """The app decides its colour scheme in exactly one place.
 
@@ -1936,6 +2034,7 @@ def main() -> int:
         check_sequence_map_on_strings,
         check_app_icon,
         check_ocr_fixtures_exist,
+        check_appstore_fixture_is_debug_only,
         check_saves_are_not_silent,
         check_tests_live_inside_a_test_case,
         check_ipad_support_is_declared,

@@ -2,10 +2,24 @@
 """Builds the six App Store screenshot templates for OffRent Ledger.
 
 These are **empty marketing templates**. Each one carries a finished background, headline,
-supporting line and a correctly proportioned iPhone with a *blank* screen opening. Not one of
-them contains app UI: no cards, no tabs, no figures, no status bar. The app has never been
-launched, so no screenshot of it exists, and drawing one would put an invented interface in
-front of people deciding whether to install the real thing.
+supporting line and correctly proportioned iPhones with *blank* screen openings. Not one of them
+contains app UI: no cards, no tabs, no figures, no status bar. Drawing one would put an invented
+interface in front of people deciding whether to install the real thing, so every opening is a
+flat neutral rectangle waiting for a capture taken from the running app.
+
+The gallery tells one story in six frames, in this order:
+
+    1  hero              Stop the rental clock with proof.        Today dashboard
+    2  widget-glance     Rental cost at a glance.                 Home Screen widget + Rentals
+    3  off-rent-proof    Record off-rent proof.                   confirmed rental detail
+    4  operations-map    Find every rental on the map.            Operations Map, awaiting pickup
+    5  scan-review       Scan the contract. Review every field.   Scan Review
+    6  invoice-variance  Spot possible billing differences.       Invoice Review
+
+Frame 2 is the only one with two devices, and the only one on a graphite ground before the
+closing frame — so the first three read light, contrast, light. Every other frame carries one
+phone whose screen opening is 62–68% of the canvas width, because the App Store shows this
+gallery at about a fifth of full size and a smaller phone there is a screenshot nobody can read.
 
 Everything is deterministic vector construction. The masters are SVG with live `<text>`, so the
 copy stays editable, and the PNGs are rasterised from those same masters by cairosvg — the SVG
@@ -13,7 +27,9 @@ is the source, the PNG is the output, and they cannot disagree.
 
 Type is measured, not guessed. Every headline and supporting line is fitted with the real font
 metrics before it is written, so a line that would overrun its column is shrunk to fit rather
-than clipped at the canvas edge.
+than clipped at the canvas edge. Composition is asserted arithmetically for the same reason: a
+headline that runs into a phone, a motif that runs through a supporting line, or a device with
+too little of itself on the canvas fails the build rather than shipping.
 
 Run: python3 scripts/generate_appstore_templates.py
 """
@@ -110,11 +126,16 @@ def phone_geometry(screen_w: float, screen_x: float, screen_y: float) -> dict:
     }
 
 
-def phone_svg(g: dict, *, screen_fill: str, dark: bool, rotation: float = 0.0) -> str:
+def phone_svg(g: dict, *, screen_fill: str, dark: bool, rotation: float = 0.0,
+              opening: int = 1) -> str:
     """The device: body, bezel, blank screen, Dynamic Island.
 
     The screen is a flat neutral and nothing else. It is a hole to drop a real screenshot into,
     and anything drawn inside it would have to be painted out again by whoever does that.
+
+    `opening` numbers the hole within its own template, so a frame with two devices has
+    `screen-1` and `screen-2` rather than two rectangles nobody can tell apart. The placement
+    guide and `validate_appstore_templates.py` both address them by that id.
     """
     body = "#0E1116" if dark else "#1E1D1B"
     rail = RAIL_DARK if dark else RAIL_LIGHT
@@ -139,7 +160,7 @@ def phone_svg(g: dict, *, screen_fill: str, dark: bool, rotation: float = 0.0) -
     <rect x="{g['device_x'] + 1.5:.2f}" y="{g['device_y'] + 1.5:.2f}"
           width="{g['device_w'] - 3:.2f}" height="{g['device_h'] - 3:.2f}"
           rx="{g['device_r'] - 1.5:.2f}" fill="none" stroke="{rail}" stroke-width="3"/>
-    <rect class="screen-area" x="{g['screen_x']:.2f}" y="{g['screen_y']:.2f}"
+    <rect class="screen-area" id="screen-{opening}" x="{g['screen_x']:.2f}" y="{g['screen_y']:.2f}"
           width="{g['screen_w']:.2f}" height="{g['screen_h']:.2f}"
           rx="{g['screen_r']:.2f}" fill="{screen_fill}"/>
     <rect x="{g['island_x']:.2f}" y="{g['island_y']:.2f}" width="{g['island_w']:.2f}" height="{g['island_h']:.2f}"
@@ -323,6 +344,35 @@ def motif_variance(x: float, y: float, w: float, *, bar_h: float, gap: float, ex
   </g>"""
 
 
+def disclosure_badge(text: str, x: float, y: float, *, size: int, ink: str,
+                     rule: str) -> tuple[str, tuple[float, float, float, float]]:
+    """A small outlined pill saying what tier a feature belongs to.
+
+    One frame in this gallery shows a widget whose useful state is behind the subscription. A
+    filled orange pill would shout it and a footnote would hide it; an outlined pill at the size
+    of the supporting copy says it once, where the claim is made, and then gets out of the way.
+
+    Returns the markup and its box, so the layout assertions can keep the headline off it the
+    same way they keep the headline off everything else.
+    """
+    pad_x, pad_y = 30.0, 17.0
+    tracking = 0.02
+    text_w = measure(text, "SemiBold", size, tracking)
+    w = text_w + pad_x * 2
+    h = size + pad_y * 2
+    baseline = y + pad_y + size * 0.74
+    return (
+        f'  <g class="disclosure-badge">\n'
+        f'    <rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="{h / 2:.1f}" '
+        f'fill="none" stroke="{rule}" stroke-width="2.5"/>\n'
+        f'    <text x="{x + pad_x:.1f}" y="{baseline:.1f}" font-family="{FONT_STACK}" '
+        f'font-weight="600" font-size="{size}" fill="{ink}" '
+        f'letter-spacing="{tracking * size:.2f}" xml:space="preserve">{text}</text>\n'
+        f'  </g>',
+        (x, y, w, h),
+    )
+
+
 # --- shared defs ------------------------------------------------------------------------------------
 
 def defs(dark: bool) -> str:
@@ -372,6 +422,11 @@ def defs(dark: bool) -> str:
       <stop offset="0%" stop-color="{GRAPHITE}"/>
       <stop offset="100%" stop-color="{GRAPHITE_2}"/>
     </linearGradient>
+    <linearGradient id="graphiteRise" x1="0" y1="0" x2="0.22" y2="1">
+      <stop offset="0%" stop-color="{GRAPHITE_2}"/>
+      <stop offset="62%" stop-color="{GRAPHITE}"/>
+      <stop offset="100%" stop-color="{GRAPHITE}"/>
+    </linearGradient>
     <linearGradient id="stoneFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="{STONE}"/>
       <stop offset="100%" stop-color="{IVORY}"/>
@@ -381,72 +436,137 @@ def defs(dark: bool) -> str:
 
 # --- the six templates ------------------------------------------------------------------------------
 #
-# Position, scale and rhythm vary deliberately: phone centred and fully visible, phone low-right
-# bleeding off the bottom, phone rotated, phone at the *top* with the copy beneath it, phone
-# running off the right edge, phone low-left on graphite. Bezel, corner radius and Dynamic Island
-# are identical in every one of them, because those are the things a viewer notices when they are
-# not.
+# One story, six frames, in the order a stranger reads them: the promise, the glance, the proof,
+# the map, the scan, the invoice. Position and rhythm vary deliberately — phone centred, two
+# phones on graphite, phone above the copy, phone below it, phone rotated, phone cropped at the
+# bottom edge. Bezel, corner radius and Dynamic Island are identical in every one of them,
+# because those are the things a viewer notices when they are not.
+#
+# Each device declares what belongs in its opening. `capture` is `app` for a screen recorded
+# inside OffRent Ledger and `home-screen` for a real iOS Home Screen with the widget on it;
+# nothing here is ever drawn, and the two are captured by different procedures, so the guide has
+# to say which is which.
 
 TEMPLATES = [
     {
         "n": 1, "slug": "hero",
         "headline": ["Stop the rental clock", "with proof."],
-        "sub": ["Track costs, confirmations, pickup,", "and final charges."],
-        "shot": "Today dashboard",
+        "sub": ["Running cost, urgent calls, and", "every jobsite in one place."],
         "dark": False, "bg": "hero",
-        "screen_w": 780, "device_y": 987, "device_dx": 0, "rotation": 0.0,
-        "head_y": 470, "head_max": 108, "align": "center",
+        "head_y": 452, "align": "center",
+        # 850 of 1290 is 65.9% of the canvas. The old hero was 780, and the difference is what
+        # decides whether the running-rent figure is a number or a smudge in a search result.
+        "devices": [
+            {"screen_w": 850, "device_y": 830, "device_dx": 0, "rotation": 0.0,
+             "capture": "app", "layer": "single",
+             "shot": "Today dashboard",
+             "file": "appstore-01-today.png",
+             "crop": "None. The whole capture is placed; the phone sits clear of every edge.",
+             "why": "The estimated running rent, the action counts, the upcoming rate change "
+                    "and the map card are all on this one screen."},
+        ],
     },
     {
-        "n": 2, "slug": "active-costs",
-        "headline": ["Control every", "active rental."],
-        "sub": ["See running costs and", "upcoming rate changes."],
-        "shot": "Rentals list, or an active rental's detail",
-        "dark": False, "bg": "stone",
-        # Was 720 wide starting at y=1300, which put 110px of the screen off the bottom and made
-        # the device the loudest thing in the frame. Smaller and higher: 96% of the screen is on
-        # canvas, so a rentals list, its running costs and a rate change all survive placement.
-        "screen_w": 700, "device_y": 1246, "device_dx": 218, "rotation": 0.0,
-        "head_y": 440, "head_max": 116, "align": "left",
+        "n": 2, "slug": "widget-glance",
+        "headline": ["Rental cost", "at a glance."],
+        "sub": ["See the running total without", "opening the app."],
+        "dark": True, "bg": "graphite-riser",
+        "head_y": 430, "align": "left",
+        # The one disclosure in the gallery. The useful widget state is Pro-only, and a frame
+        # that shows it without saying so is a promise the free tier does not keep.
+        "badge": "Pro feature",
+        # The only two-device frame in the set. Front is the Home Screen, because the headline is
+        # about the widget; the app screen behind it is what the widget is a glance *at*.
+        "devices": [
+            {"screen_w": 550, "device_x": 726, "device_y": 946, "rotation": 0.0,
+             "capture": "app", "layer": "back",
+             "shot": "Rentals list",
+             "file": "appstore-02-rentals.png",
+             "crop": "A hair off the right edge — about 3 px of the capture, where the device "
+                     "runs off the canvas. Place the whole capture at the coordinates given "
+                     "and let the canvas trim it; there is nothing to pre-crop.",
+             "why": "The machines behind the widget's total, with their statuses and estimates."},
+            {"screen_w": 720, "device_x": 28, "device_y": 1128, "rotation": 0.0,
+             "capture": "home-screen", "layer": "front",
+             "shot": "iOS Home Screen with the medium OffRent Summary widget",
+             "file": "appstore-02-home-screen-widget.png",
+             "crop": "None. The whole Home Screen capture is placed.",
+             "why": "A real Home Screen with the real widget on it. Never drawn, never "
+                    "recreated — see marketing/screenshots/README.md for the capture steps."},
+        ],
     },
     {
-        "n": 3, "slug": "scan-review",
-        "headline": ["Scan rental details", "in seconds."],
-        "sub": ["Review every field before", "anything is saved."],
-        "shot": "Scan Review",
-        "dark": False, "bg": "band",
-        "screen_w": 655, "device_y": 1105, "device_dx": 0, "rotation": -5.5,
-        "head_y": 440, "head_max": 112, "align": "left",
-    },
-    {
-        "n": 4, "slug": "off-rent-proof",
+        "n": 3, "slug": "off-rent-proof",
         "headline": ["Record", "off-rent proof."],
-        "sub": ["Keep confirmation, meter, fuel,", "and condition together."],
-        "shot": "Record Confirmation, or a confirmed rental's detail",
+        "sub": ["Confirmation number, meter, fuel,", "and condition, kept together."],
         "dark": False, "bg": "stone-top",
-        "screen_w": 735, "device_y": 168, "device_dx": -84, "rotation": 0.0,
-        "head_y": 2246, "head_max": 116, "align": "left",
+        "head_y": 2300, "align": "left",
+        "devices": [
+            {"screen_w": 820, "device_y": 168, "device_dx": -62, "rotation": 0.0,
+             "capture": "app", "layer": "single",
+             "shot": "A confirmed rental's detail, scrolled to Off-rent confirmation",
+             "file": "appstore-03-off-rent-proof.png",
+             "crop": "None. The copy sits below the phone, so the whole screen is visible.",
+             "why": "Recorded at, confirmation number, who was spoken to, how, meter and fuel — "
+                    "the evidence, in the order the app files it."},
+        ],
     },
     {
-        "n": 5, "slug": "awaiting-pickup",
-        "headline": ["Track equipment", "awaiting pickup."],
-        "sub": ["Keep off-rented machines", "visible until they leave."],
-        "shot": "Awaiting Pickup list, or a rental's detail",
+        "n": 4, "slug": "operations-map",
+        "headline": ["Find every rental", "on the map."],
+        "sub": ["Search your own records, and see", "what is still awaiting pickup."],
         "dark": False, "bg": "wedge",
-        # Was 760 wide at dx=391, leaving 81% of the device on canvas — enough of a phone, not
-        # enough of a list. Smaller and further left: 89% visible, so the status, the equipment
-        # and several rows of the Awaiting Pickup screen are all still there after placement.
-        "screen_w": 690, "device_y": 940, "device_dx": 362, "rotation": 0.0,
-        "head_y": 440, "head_max": 112, "align": "left",
+        "head_y": 420, "align": "left",
+        "devices": [
+            {"screen_w": 810, "device_y": 870, "device_dx": 34, "rotation": 0.0,
+             "capture": "app", "layer": "single",
+             "shot": "Operations Map with an Awaiting Pickup card selected",
+             "file": "appstore-04-operations-map.png",
+             "crop": "None, and none is allowed: the search field and filters are at the top of "
+                     "this screen and the selected record's card is at the bottom.",
+             "why": "Search, filters, the key, several jobsites, and one machine's card reading "
+                    "Awaiting Pickup."},
+        ],
+    },
+    {
+        "n": 5, "slug": "scan-review",
+        "headline": ["Scan the contract.", "Review every field."],
+        "sub": ["Every value is yours to check", "before anything is saved."],
+        "dark": False, "bg": "band",
+        "head_y": 420, "align": "left",
+        # -3.0 degrees, down from -5.5. At the old angle and the old size the extracted values ran
+        # visibly downhill; at this one the frame still reads as a document on a desk and the
+        # figures stay level enough to be read at thumbnail size.
+        "devices": [
+            {"screen_w": 830, "device_y": 858, "device_dx": 0, "rotation": -3.0,
+             "capture": "app", "layer": "single",
+             "shot": "Scan Review",
+             "file": "appstore-05-scan-review.png",
+             "crop": "None. Rotate the placed capture about the pivot below, after resizing.",
+             "why": "The extracted company, unit, dates and rates, each with its own tick, above "
+                    "the line that says nothing is saved until the user says so."},
+        ],
     },
     {
         "n": 6, "slug": "invoice-variance",
         "headline": ["Spot possible billing", "differences."],
-        "sub": ["Compare expected cost with", "the vendor invoice."],
-        "shot": "Invoice Review showing an expected-versus-invoiced difference",
+        "sub": ["Compare the invoice with the", "terms you confirmed."],
         "dark": True, "bg": "graphite",
-        "screen_w": 715, "device_y": 1245, "device_dx": -158, "rotation": 0.0,
-        "head_y": 440, "head_max": 116, "align": "left",
+        "head_y": 420, "align": "left",
+        # Cropped at the bottom on purpose. Expected, Invoiced and Possible difference are the
+        # first panel on this screen, so trading the bottom ninth of the phone for a bigger one
+        # buys legibility exactly where the frame's whole argument is.
+        "devices": [
+            {"screen_w": 870, "device_y": 1030, "device_dx": -60, "rotation": 0.0,
+             "capture": "app", "layer": "single",
+             "shot": "Invoice Review showing an expected-versus-invoiced difference",
+             "file": "appstore-06-invoice-review.png",
+             "crop": "Bottom edge, on purpose. Align the capture's top with the opening's top; "
+                     "the last ~8% of the screen runs off the canvas, and the three figures this "
+                     "frame is about are in the panel at the very top of it.",
+             "why": "Expected $2,280, Invoiced $2,565, Possible difference $285 — the three "
+                    "figures this frame exists for, in the panel at the top of the screen."},
+        ],
     },
 ]
 
@@ -464,7 +584,7 @@ def gallery_type_sizes() -> tuple[int, int]:
             fit(subs, "Medium", 52, column, tracking_em=-0.004))
 
 
-def background(kind: str, g: dict | None = None) -> str:
+def background(kind: str, g: dict | None = None, rotation: float = 0.0) -> str:
     """The ground each template stands on.
 
     The first version was five near-identical warm-white canvases: correct, premium and, seen as
@@ -492,14 +612,19 @@ def background(kind: str, g: dict | None = None) -> str:
     if kind == "band":
         # Ivory, with an oversized pale document field behind the phone, tilted to the same
         # angle as the device so the two read as one gesture rather than two.
+        #
+        # The angle is read from the device rather than written here. It used to be a literal
+        # -5.5, and when the phone was straightened to -3 the field stayed where it was: two
+        # rectangles two and a half degrees apart, which is close enough to look like a mistake
+        # and far enough to see.
         field = ""
         if g:
-            fw, fh = g["device_w"] + 300, g["device_h"] + 250
-            fx, fy = g["device_x"] - 150, g["device_y"] - 125
+            fw, fh = g["device_w"] + 260, g["device_h"] + 210
+            fx, fy = g["device_x"] - 130, g["device_y"] - 105
             cx, cy = fx + fw / 2, fy + fh / 2
             field = (f'  <rect x="{fx:.0f}" y="{fy:.0f}" width="{fw:.0f}" height="{fh:.0f}" '
                      f'rx="56" fill="{STONE}" opacity="0.66" '
-                     f'transform="rotate(-5.5 {cx:.1f} {cy:.1f})"/>\n')
+                     f'transform="rotate({rotation:.3f} {cx:.1f} {cy:.1f})"/>\n')
         return (f'  <rect width="{W}" height="{H}" fill="{IVORY}"/>\n'
                 f'  <path d="M 0 {H * 0.315:.0f} L {W} {H * 0.245:.0f} L {W} {H} L 0 {H} Z" '
                 f'fill="{STONE}" opacity="0.40"/>\n'
@@ -521,6 +646,19 @@ def background(kind: str, g: dict | None = None) -> str:
                 f'fill="{STONE_WARMER_2}" opacity="0.85"/>\n'
                 f'  <rect width="{W}" height="{H}" fill="url(#topLift)"/>')
 
+    if kind == "graphite-riser":
+        # The second graphite frame, and deliberately not the same graphite frame.
+        #
+        # Two dark grounds in one gallery read as a mistake unless they are visibly different
+        # pieces of art. Template 6 falls from deep graphite at the top to secondary graphite at
+        # the bottom, with a neutral bloom high on the right. This one runs the other way — the
+        # lighter graphite at the top, the deeper one under the devices — with the bloom low on
+        # the left, where the front phone stands. Same two brand darks, opposite direction, so
+        # the pair reads as bookends rather than as a repeat.
+        return (f'  <rect width="{W}" height="{H}" fill="url(#graphiteRise)"/>\n'
+                f'  <ellipse cx="{W * 0.20:.0f}" cy="{H * 0.84:.0f}" rx="{W * 0.74:.0f}" '
+                f'ry="{H * 0.26:.0f}" fill="url(#neutralLift)"/>')
+
     if kind == "graphite":
         # Graphite, and graphite all the way down.
         #
@@ -540,42 +678,73 @@ def background(kind: str, g: dict | None = None) -> str:
     raise ValueError(kind)
 
 
-def motif_for(spec: dict, g: dict) -> tuple[str, tuple[float, float, float, float] | None]:
-    # Each motif passes its own ink: they sit on six different grounds, and one shared value
-    # would be too faint on the deeper ones and too heavy on ivory.
-    n = spec["n"]
-    if n == 1:
-        cx, cy, r = W - MARGIN - 78, 252, 78
+def motif_for(spec: dict) -> tuple[str, tuple[float, float, float, float] | None]:
+    """The one abstract mark each frame carries, and the box it occupies.
+
+    Keyed by slug rather than by number: the sequence was reordered once and a table keyed by
+    position silently moved a rental meter onto the invoice frame. Each motif passes its own ink
+    because they sit on six different grounds, and one shared value would be too faint on the
+    deeper ones and too heavy on ivory.
+    """
+    slug = spec["slug"]
+
+    if slug == "hero":
+        cx, cy, r = W - MARGIN - 78, 226, 78
         return (motif_meter_arc(cx, cy, r, sweep=0.63, ink=ORANGE, track=STONE_SHADE,
                                 width=16, hand=GRAPHITE),
                 (cx - r - 8, cy - r - 8, (r + 8) * 2, (r + 8) * 2))
-    if n == 2:
-        # Sits between the supporting line and the phone. At the old y it ran straight through
-        # "upcoming rate changes" — the bars are 294px tall at the right-hand end.
-        tallest = 54 + 30 * 8
-        return (motif_progression(MARGIN, 1198, count=9, gap=22, base=54, growth=30,
-                                  width=26, ink="#BFB7A6", accent=ORANGE, accent_from=7),
-                (MARGIN, 1198 - tallest, 9 * 48 - 22, tallest))
-    if n == 3:
-        pad = 74
-        box = (g["device_x"] - pad, g["device_y"] - pad,
-               g["device_w"] + pad * 2, g["device_h"] + pad * 2)
-        return (motif_scan_edges(*box, ink="#B4AB99", accent=ORANGE, stroke=8), box)
-    if n == 4:
-        return (motif_stop_block(MARGIN, 1960, W - MARGIN * 2 - 40, 46, ran=0.62,
+
+    if slug == "widget-glance":
+        # Six ticks, not nine, and in the top-right rather than under the copy. The frame below
+        # the headline belongs to two phones and a disclosure pill, and the old nine-bar run at
+        # full height would have crossed both.
+        count, width, gap, base, growth = 6, 26, 22, 40, 22
+        span = count * (width + gap) - gap
+        tallest = base + growth * (count - 1)
+        x = W - MARGIN - span
+        return (motif_progression(x, 300, count=count, gap=gap, base=base, growth=growth,
+                                  width=width, ink=WARM_GRAY, accent=ORANGE, accent_from=4),
+                (x, 300 - tallest, span, tallest))
+
+    if slug == "off-rent-proof":
+        # The meter that runs and then stops, in the band between the phone and the copy.
+        y, h = 2101, 46
+        return (motif_stop_block(MARGIN, y, W - MARGIN * 2 - 40, h, ran=0.62,
                                  ink="#ADA391", accent=ORANGE, stroke=7),
-                (MARGIN, 1960 - 29, W - MARGIN * 2 - 40, 46 + 58))
-    if n == 5:
-        return (motif_staged(MARGIN, 2452, count=3, w=108, h=76, gap=30,
+                (MARGIN, y - 29, W - MARGIN * 2 - 40, h + 58))
+
+    if slug == "operations-map":
+        # Machines staged in a line with a direction of travel: the awaiting-pickup half of what
+        # this frame is about, said without drawing a pin, a truck or a map control.
+        #
+        # In the corner, not under the supporting line. Sat there, three rounded rectangles and
+        # an arrow thirty pixels below a sentence read as a row of filter chips — a fake control
+        # on the one frame whose whole promise is that everything inside the phone is real.
+        count, w, h, gap = 3, 76, 54, 22
+        span = count * (w + gap) + w * 0.55
+        x, y = W - MARGIN - span, 214
+        return (motif_staged(x, y, count=count, w=w, h=h, gap=gap,
                              ink="#B0A796", accent=ORANGE, stroke=7),
-                (MARGIN, 2452, 3 * 138 + 60, 76))
-    if n == 6:
+                (x, y, span, h))
+
+    if slug == "scan-review":
+        # Capture corners as a mark of their own, in the top-right, rather than wrapped around
+        # the device. Wrapped, at this phone size, they ran to within fourteen pixels of the
+        # bottom of the canvas and read as a border rather than as a viewfinder.
+        size = 168
+        x, y = W - MARGIN - size, 132
+        return (motif_scan_edges(x, y, size, size, ink="#B4AB99", accent=ORANGE, stroke=8),
+                (x, y, size, size))
+
+    if slug == "invoice-variance":
         # WARM_GRAY, not GRAPHITE_3. The expected-cost lines were blue-grey, which is the one
         # thing the closing frame of this gallery must not be.
-        return (motif_variance(MARGIN, 1000, W - MARGIN * 2 - 120, bar_h=46, gap=30,
+        y, bar_h, gap = 830, 46, 30
+        return (motif_variance(MARGIN, y, W - MARGIN * 2 - 120, bar_h=bar_h, gap=gap,
                                expected=0.58, invoiced=0.86, ink=WARM_GRAY, accent=ORANGE),
-                (MARGIN, 1000 - 23, W - MARGIN * 2 - 120, 46 * 2 + 30 + 46))
-    return "", None
+                (MARGIN, y - 23, W - MARGIN * 2 - 120, bar_h * 2 + gap + bar_h))
+
+    raise ValueError(f"no motif for {slug!r}")
 
 
 def overlaps(a: tuple, b: tuple, slack: float = 12.0) -> bool:
@@ -601,22 +770,36 @@ def rotated_bounds(g: dict, rotation: float) -> tuple[float, float, float, float
 GALLERY_HEAD_SIZE, GALLERY_SUB_SIZE = gallery_type_sizes()
 
 
+def device_geometry(device: dict) -> dict:
+    """One device's full geometry from its spec.
+
+    `device_x` places the device body outright; `device_dx` offsets it from centred. The first
+    form is what a two-device composition needs — "centred, minus 229" describes nothing anybody
+    can check — and the second is what a single centred phone reads best as.
+    """
+    screen_w = device["screen_w"]
+    bezel = screen_w * BEZEL_RATIO
+    if "device_x" in device:
+        device_x = device["device_x"]
+    else:
+        device_w = screen_w + bezel * 2
+        device_x = (W - device_w) / 2 + device.get("device_dx", 0)
+    return phone_geometry(screen_w, screen_x=device_x + bezel, screen_y=device["device_y"] + bezel)
+
+
 def build_template(spec: dict) -> tuple[str, dict]:
     dark = spec["dark"]
     ink = IVORY if dark else GRAPHITE
     muted = IVORY_SUPPORT if dark else INK_SUPPORT
+    screen_fill = SCREEN_DARK if dark else SCREEN_LIGHT
 
-    g = phone_geometry(
-        spec["screen_w"],
-        screen_x=(W - (spec["screen_w"] + spec["screen_w"] * BEZEL_RATIO * 2)) / 2
-        + spec["screen_w"] * BEZEL_RATIO + spec["device_dx"],
-        screen_y=spec["device_y"] + spec["screen_w"] * BEZEL_RATIO,
-    )
+    devices = spec["devices"]
+    geometries = [device_geometry(device) for device in devices]
 
     head_size = GALLERY_HEAD_SIZE
     sub_size = GALLERY_SUB_SIZE
 
-    motif, motif_box = motif_for(spec, g)
+    motif, motif_box = motif_for(spec)
 
     if spec["align"] == "center":
         tx, anchor = W / 2, "middle"
@@ -627,22 +810,40 @@ def build_template(spec: dict) -> tuple[str, dict]:
     head_y = spec["head_y"]
     sub_y = head_y + head_leading * (len(spec["headline"]) - 1) + head_size * 1.02 + 34
 
+    # The disclosure pill, where the frame carries one. Below the supporting copy, at its left
+    # edge, because that is where the sentence it qualifies ends.
+    badge_svg, badge_box = "", None
+    if spec.get("badge"):
+        badge_svg, badge_box = disclosure_badge(
+            spec["badge"], MARGIN, sub_y + sub_size * 1.36 * (len(spec["sub"]) - 1) + 46,
+            size=sub_size - 6, ink=ORANGE, rule=ORANGE,
+        )
+
+    # Back to front. The devices are written in the order they are declared, so a front phone's
+    # shadow falls across the one behind it rather than under it.
+    device_svg = "\n".join(
+        phone_svg(g, screen_fill=screen_fill, dark=dark, rotation=device["rotation"],
+                  opening=index + 1)
+        for index, (device, g) in enumerate(zip(devices, geometries))
+    )
+
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
         f'viewBox="0 0 {W} {H}" role="img" '
         f'aria-label="OffRent Ledger App Store template {spec["n"]}">',
         f"  <title>OffRent Ledger — App Store template {spec['n']} — {spec['slug']}</title>",
         defs(dark),
-        background(spec["bg"], g),
+        background(spec["bg"], geometries[0], devices[0]["rotation"]),
         motif,
-        phone_svg(g, screen_fill=SCREEN_DARK if dark else SCREEN_LIGHT, dark=dark,
-                  rotation=spec["rotation"]),
+        device_svg,
         text_block(spec["headline"], x=tx, y=head_y, weight="Bold", size=head_size,
                    fill=ink, leading=head_leading, tracking_em=-0.022, anchor=anchor),
         text_block(spec["sub"], x=tx, y=sub_y, weight="Medium", size=sub_size,
                    fill=muted, leading=sub_size * 1.36, tracking_em=-0.004, anchor=anchor),
-        "</svg>",
     ]
+    if badge_svg:
+        parts.append(badge_svg)
+    parts.append("</svg>")
 
     # --- layout assertions -------------------------------------------------------------------
     #
@@ -658,37 +859,79 @@ def build_template(spec: dict) -> tuple[str, dict]:
                 head_w, head_leading * (len(spec["headline"]) - 1) + ascent + descent)
     sub_box = (sub_left, sub_y - sub_size * 0.76, sub_w,
                sub_size * 1.36 * (len(spec["sub"]) - 1) + sub_size)
-    device_box = rotated_bounds(g, spec["rotation"])
+    device_boxes = [
+        rotated_bounds(g, device["rotation"]) for device, g in zip(devices, geometries)
+    ]
 
-    for name, box in [("headline", head_box), ("supporting text", sub_box)]:
+    drawn: list[tuple[str, tuple]] = [("headline", head_box), ("supporting text", sub_box)]
+    if badge_box:
+        drawn.append((f"the {spec['badge']!r} badge", badge_box))
+
+    for name, box in drawn:
         if box[0] < MARGIN - 1 or box[0] + box[2] > W - MARGIN + 1:
             raise SystemExit(
                 f"template {spec['n']}: {name} breaks the {MARGIN}px margin "
                 f"(x {box[0]:.0f} to {box[0] + box[2]:.0f})")
         if box[1] < 40 or box[1] + box[3] > H - 40:
             raise SystemExit(f"template {spec['n']}: {name} runs off the canvas vertically")
-        if overlaps(box, device_box):
-            raise SystemExit(f"template {spec['n']}: {name} overlaps the phone")
+        for index, device_box in enumerate(device_boxes, start=1):
+            if overlaps(box, device_box):
+                raise SystemExit(f"template {spec['n']}: {name} overlaps phone {index}")
         if motif_box and overlaps(box, motif_box):
             raise SystemExit(f"template {spec['n']}: {name} overlaps the accent motif")
 
-    # The device may bleed off an edge on purpose, but never so far that it stops being a phone.
-    visible_w = min(device_box[0] + device_box[2], W) - max(device_box[0], 0)
-    visible_h = min(device_box[1] + device_box[3], H) - max(device_box[1], 0)
-    if visible_w < device_box[2] * 0.62 or visible_h < device_box[3] * 0.55:
-        raise SystemExit(f"template {spec['n']}: too little of the phone is on the canvas")
+    # Type may not collide with type either. Two blocks and a pill is three chances to discover
+    # by eye what arithmetic can say outright.
+    for (a_name, a_box), (b_name, b_box) in zip(drawn, drawn[1:]):
+        if overlaps(a_box, b_box, slack=4):
+            raise SystemExit(f"template {spec['n']}: {a_name} overlaps {b_name}")
+
+    for index, (device, box) in enumerate(zip(devices, device_boxes), start=1):
+        # The device may bleed off an edge on purpose, but never so far that it stops being a
+        # phone.
+        visible_w = min(box[0] + box[2], W) - max(box[0], 0)
+        visible_h = min(box[1] + box[3], H) - max(box[1], 0)
+        if visible_w < box[2] * 0.62 or visible_h < box[3] * 0.55:
+            raise SystemExit(
+                f"template {spec['n']}: too little of phone {index} is on the canvas")
+        # The whole point of the redesign: a screen opening small enough to be unreadable in a
+        # search result is a failed frame, however elegant the rest of it is. Two-device frames
+        # are exempt — the pair carries the same information across two smaller screens.
+        share = device["screen_w"] / W
+        floor = 0.42 if len(devices) > 1 else 0.62
+        if share < floor:
+            raise SystemExit(
+                f"template {spec['n']}: phone {index}'s opening is {share:.1%} of the canvas, "
+                f"under the {floor:.0%} floor")
+
+    openings = []
+    for index, (device, g) in enumerate(zip(devices, geometries), start=1):
+        openings.append({
+            "index": index,
+            "capture": device["capture"],
+            "layer": device["layer"],
+            "shot": device["shot"],
+            "file": device["file"],
+            "crop": device["crop"],
+            "why": device["why"],
+            "screen_x": round(g["screen_x"], 1), "screen_y": round(g["screen_y"], 1),
+            "screen_w": round(g["screen_w"], 1), "screen_h": round(g["screen_h"], 1),
+            "screen_r": round(g["screen_r"], 1),
+            "rotation": device["rotation"],
+            "pivot_x": round(g["device_x"] + g["device_w"] / 2, 1),
+            "pivot_y": round(g["device_y"] + g["device_h"] / 2, 1),
+            "scale": round(g["screen_w"] / W, 4),
+            "share": round(g["screen_w"] / W, 4),
+        })
 
     placement = {
-        "n": spec["n"], "slug": spec["slug"], "shot": spec["shot"],
-        "screen_x": round(g["screen_x"], 1), "screen_y": round(g["screen_y"], 1),
-        "screen_w": round(g["screen_w"], 1), "screen_h": round(g["screen_h"], 1),
-        "screen_r": round(g["screen_r"], 1),
-        "rotation": spec["rotation"],
-        "pivot_x": round(g["device_x"] + g["device_w"] / 2, 1),
-        "pivot_y": round(g["device_y"] + g["device_h"] / 2, 1),
-        "scale": round(g["screen_w"] / W, 4),
-        "head_size": head_size, "sub_size": sub_size,
+        "n": spec["n"], "slug": spec["slug"],
         "headline": " ".join(spec["headline"]),
+        "sub": " ".join(spec["sub"]),
+        "badge": spec.get("badge"),
+        "dark": spec["dark"],
+        "head_size": head_size, "sub_size": sub_size,
+        "openings": openings,
     }
     return "\n".join(parts) + "\n", placement
 
@@ -733,87 +976,137 @@ def contact_sheet(pngs: list[pathlib.Path], target: pathlib.Path) -> None:
     sheet.save(target, format="PNG", optimize=True)
 
 
+CAPTURE_LABEL = {
+    "app": "App capture",
+    "home-screen": "Home Screen capture",
+}
+
+LAYER_LABEL = {
+    "single": "only device",
+    "front": "front device",
+    "back": "back device",
+}
+
+
 def placement_guide(placements: list[dict]) -> str:
-    rows = "\n".join(
-        f"| {p['n']} | `{p['screen_x']}` | `{p['screen_y']}` | `{p['screen_w']}` | "
-        f"`{p['screen_h']}` | `{p['screen_r']}` | `{p['rotation']}°` | {p['shot']} |"
-        for p in placements
-    )
-    detail = "\n\n".join(
-        f"""### Template {p['n']} — {p['slug']}
+    rows = []
+    for p in placements:
+        for opening in p["openings"]:
+            rows.append(
+                f"| {p['n']} | `screen-{opening['index']}` | `{opening['screen_x']}` | "
+                f"`{opening['screen_y']}` | `{opening['screen_w']}` | `{opening['screen_h']}` | "
+                f"`{opening['screen_r']}` | `{opening['rotation']}°` | "
+                f"{CAPTURE_LABEL[opening['capture']]} | `{opening['file']}` |"
+            )
+    row_block = "\n".join(rows)
 
-> {p['headline']}
-
-**Intended screenshot:** {p['shot']}
+    sections = []
+    for p in placements:
+        badge = f"\n\n**Disclosure badge:** “{p['badge']}”, below the supporting line." if p["badge"] else ""
+        opening_blocks = []
+        for opening in p["openings"]:
+            rotation = (
+                f"`{opening['rotation']}°`" if not opening["rotation"]
+                else f"`{opening['rotation']}°` about `({opening['pivot_x']}, {opening['pivot_y']})` "
+                     f"— the pivot is the centre of the **device body**, not of the screen"
+            )
+            opening_blocks.append(f"""#### Opening `screen-{opening['index']}` — {LAYER_LABEL[opening['layer']]}
 
 | | |
 |---|---|
-| Screen opening | `{p['screen_w']} × {p['screen_h']}` px |
-| Top-left corner | `x = {p['screen_x']}`, `y = {p['screen_y']}` |
-| Corner radius | `{p['screen_r']}` px |
-| Rotation | `{p['rotation']}°`{'' if not p['rotation'] else f" about `({p['pivot_x']}, {p['pivot_y']})`"} |
-| Scale from source | `{p['scale']}` — resize the 1290 × 2796 capture to `{p['screen_w']} × {p['screen_h']}` |
-"""
-        for p in placements
-    )
+| Source screenshot | `marketing/screenshots/{opening['file']}` |
+| Intended screen | {opening['shot']} |
+| Capture kind | **{CAPTURE_LABEL[opening['capture']]}** |
+| Screen opening | `{opening['screen_w']} × {opening['screen_h']}` px |
+| Top-left corner | `x = {opening['screen_x']}`, `y = {opening['screen_y']}` |
+| Corner radius | `{opening['screen_r']}` px |
+| Screenshot aspect | `1290 : 2796` — the opening is locked to it, so a proportional resize lands exactly |
+| Scale from source | `{opening['scale']}` — resize the 1290 × 2796 capture to `{opening['screen_w']} × {opening['screen_h']}` |
+| Opening width | `{opening['share'] * 100:.1f}%` of the canvas |
+| Rotation | {rotation} |
+| Crop | {opening['crop']} |
+
+{opening['why']}
+""")
+        joined = "\n".join(opening_blocks)
+        sections.append(f"""### Template {p['n']} — {p['slug']}
+
+> {p['headline']}
+
+{p['sub']}{badge}
+
+{joined}""")
+    detail = "\n\n".join(sections)
 
     return f"""# OffRent Ledger — App Store template placement guide
 
-Six empty templates at **1290 × 2796** (6.9-inch iPhone). Each carries a finished background,
-headline, supporting line and a correctly proportioned iPhone with a **blank** screen. Drop a real
-screenshot into the opening and the template is finished — no repainting, no rebuilding.
+Six templates at **1290 × 2796** (6.9-inch iPhone). Each carries a finished background, headline,
+supporting line and correctly proportioned iPhones with **blank** screen openings. Drop a real
+screenshot into each opening and the template is finished — no repainting, no rebuilding.
 
-**No app UI was generated.** Not a card, not a tab, not a figure, not a status bar. The app has
-not been launched yet, so no screenshot of it exists; inventing one would put a picture of an
-interface nobody has run in front of people deciding whether to install the real thing. Every
-screen opening is a flat neutral rectangle waiting for a real capture.
+**No app UI was generated.** Not a card, not a tab, not a figure, not a status bar, and not a
+single pixel of iOS. Every screen opening is a flat neutral rectangle waiting for a real capture,
+because a drawn interface in an App Store gallery is a picture of software nobody can install.
+
+Seven captures fill the seven openings. Six come from the running app; one — template 2's front
+device — is a real iPhone Home Screen with the OffRent Summary widget on it, which cannot be
+produced by a simulator and is not permitted to be drawn. `marketing/screenshots/README.md` is
+the procedure for all seven, including the deterministic fixture and the fixed clock that make
+the figures on them agree with each other.
 
 ## How to place a screenshot
 
 1. Capture the intended screen on a 6.9-inch iPhone (or its simulator) at **1290 × 2796**.
-   That is the same size as the template, so there is no cropping and no distortion — only a
-   uniform resize.
+   That is the same size as the template, so there is no distortion — only a uniform resize.
 2. Resize the capture to the screen opening below. The opening is locked to 1290:2796, so a
    proportional resize lands exactly.
 3. Position its top-left corner at the coordinates given, measuring from the top-left of the
    1290 × 2796 canvas.
 4. Round the corners to the radius given. In Canva: place the image, then apply the rounded-corner
    frame. In Figma or Illustrator: clip it to a rounded rectangle of the same geometry.
-5. Where a rotation is listed, rotate the placed screenshot by that angle about the pivot given —
-   the pivot is the centre of the device body, not the centre of the screen.
+5. Where a rotation is listed, rotate the placed screenshot by that angle **about the pivot
+   given** — the pivot is the centre of the device body, not the centre of the screen.
+6. Where a crop is listed, the opening runs off the canvas on that edge. Place the whole capture
+   at the coordinates above and let the canvas do the cropping; do not pre-crop and re-fit, which
+   changes the scale and breaks the alignment with the bezel.
 
 The Dynamic Island is drawn **on top of** the screen in the template. Place the screenshot behind
 it, or place it above and re-draw the island; the island is a separate rounded rectangle in the
 SVG master, so either is a one-step edit.
 
-## Every template at a glance
+Template 2 has two openings. `screen-1` is the **back** device and `screen-2` is the **front**
+one, and they are written to the SVG in that order — so placing them in numeric order, each
+behind the next, reproduces the overlap without any restacking.
 
-| # | Screen x | Screen y | Screen w | Screen h | Radius | Rotation | Intended screenshot |
-|---|---|---|---|---|---|---|---|
-{rows}
+## Every opening at a glance
 
-## Device geometry, identical across all six
+| # | Opening | Screen x | Screen y | Screen w | Screen h | Radius | Rotation | Capture | Source file |
+|---|---|---|---|---|---|---|---|---|---|
+{row_block}
+
+## Device geometry, identical across all seven
 
 Bezel, corner radius and Dynamic Island are expressed as fractions of the screen width, so they
-stay visually identical at six different phone scales — which is what a viewer notices when it is
-not true.
+stay visually identical at several different phone scales — which is what a viewer notices when
+it is not true.
 
 | | |
 |---|---|
 | Screen aspect | `1290 : 2796` — the App Store screenshot size itself |
-| Bezel | `0.0312 × screen width`, uniform on all four sides |
-| Screen corner radius | `0.1180 × screen width` |
+| Bezel | `{BEZEL_RATIO} × screen width`, uniform on all four sides |
+| Screen corner radius | `{SCREEN_RADIUS_RATIO} × screen width` |
 | Device corner radius | screen radius + bezel |
-| Dynamic Island | `0.2907 × screen width` wide, `0.2933 × island width` tall, fully rounded |
-| Island top offset | `0.01175 × screen height` from the top of the screen |
+| Dynamic Island | `{ISLAND_WIDTH_RATIO} × screen width` wide, `{ISLAND_ASPECT} × island width` tall, fully rounded |
+| Island top offset | `{ISLAND_TOP_RATIO} × screen height` from the top of the screen |
 
 {detail}
 
 ## Editing the masters
 
 `OffRent-AppStore-Template-NN-*.svg` are the editable masters. Headlines and supporting lines are
-live `<text>` elements, not outlines, so the copy can be changed in any vector editor. The screen
-opening carries `class="screen-area"` for easy selection.
+live `<text>` elements, not outlines, so the copy can be changed in any vector editor. Every
+screen opening carries `class="screen-area"` and an `id` of `screen-1` or `screen-2`, so it can be
+selected by name rather than by clicking around.
 
 Type is **Inter** (SIL Open Font License), with a fallback stack of SF Pro Display, Helvetica Neue,
 Helvetica and Arial. `fonts/` in this package holds the four weights used and the licence. Install
@@ -822,6 +1115,8 @@ them before editing, or the fallback will reflow the lines.
 To regenerate everything from source:
 
     python3 scripts/generate_appstore_templates.py
+    python3 scripts/validate_appstore_templates.py
+    python3 scripts/package_appstore_templates.py
 
 ## Colour
 
@@ -833,11 +1128,13 @@ To regenerate everything from source:
 | Secondary graphite | `{GRAPHITE_2}` |
 | Construction orange | `{ORANGE}` |
 | Blank screen, light templates | `{SCREEN_LIGHT}` |
-| Blank screen, graphite template | `{SCREEN_DARK}` |
+| Blank screen, graphite templates | `{SCREEN_DARK}` |
 
-Five of the six are light — warm ivory and pale stone with graphite structure. Template 6 is the
-single graphite frame, placed last so the gallery closes on its strongest contrast rather than
-opening on it.
+Four of the six are light — warm ivory and pale stone with graphite structure. Templates 2 and 6
+are graphite: 2 because the sequence has to break to dark once early, so the first three frames
+read light → contrast → light rather than as three shades of the same cream, and 6 because the
+gallery should close on its strongest contrast rather than open on it. The two are drawn from the
+same pair of brand darks in opposite directions, so they read as bookends rather than as a repeat.
 
 The palette is ivory, stone, graphite and one orange. There is no blue anywhere in the set, from
 a sibling product or otherwise — `validate_appstore_templates.py` samples every finished PNG and
@@ -848,6 +1145,7 @@ fails on any blue-dominant pixel.
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     placements, pngs = [], []
+    written: set[pathlib.Path] = set()
 
     for spec in TEMPLATES:
         svg, placement = build_template(spec)
@@ -856,15 +1154,30 @@ def main() -> int:
         png_path = OUT / f"OffRent-AppStore-Template-{spec['n']:02d}.png"
         svg_path.write_text(svg)
         rasterise(svg_path, png_path)
+        written.update({svg_path, png_path})
         placements.append(placement)
         pngs.append(png_path)
-        print(f"  {png_path.name}  head {placement['head_size']}px  "
-              f"screen {placement['screen_w']}x{placement['screen_h']} @ "
-              f"({placement['screen_x']}, {placement['screen_y']})")
+        openings = ", ".join(
+            f"screen-{o['index']} {o['screen_w']:.0f}x{o['screen_h']:.0f} "
+            f"@ ({o['screen_x']:.0f}, {o['screen_y']:.0f})"
+            for o in placement["openings"]
+        )
+        print(f"  {png_path.name}  head {placement['head_size']}px  {openings}")
+
+    # A slug that changed, or a frame that was retired, leaves a master behind — and the packager
+    # globs the folder, so the stale file ships in the ZIP and the validator counts seven SVGs
+    # where it expects six. The generator owns this directory's template files, so it removes the
+    # ones it did not just write.
+    for stale in sorted(OUT.glob("OffRent-AppStore-Template-*")):
+        if stale.suffix in {".svg", ".png"} and stale not in written:
+            stale.unlink()
+            print(f"  removed stale {stale.name}")
 
     contact_sheet(pngs, OUT / "OffRent-AppStore-Contact-Sheet.png")
     (OUT / "OffRent-AppStore-Template-Placement-Guide.md").write_text(placement_guide(placements))
-    print(f"wrote: {OUT.relative_to(ROOT)}/ — 6 SVG masters, 6 PNGs, contact sheet, placement guide")
+    total = sum(len(p["openings"]) for p in placements)
+    print(f"wrote: {OUT.relative_to(ROOT)}/ — 6 SVG masters, 6 PNGs, {total} screen openings, "
+          f"contact sheet, placement guide")
     return 0
 
 

@@ -69,4 +69,36 @@ struct FixtureParityTests {
             #expect(stub.document.rawText.contains(line), "stub drifted: \(line)")
         }
     }
+
+    /// The same parity rule for the contract the App Store capture scans.
+    ///
+    /// And one more thing besides: the values on that page have to be the machine the *other*
+    /// five screenshots are of. A gallery whose scan frame quotes a different yard and a
+    /// different day rate from its dashboard frame is six pictures of two products.
+    @Test func theAppStoreStubMatchesItsFixtureAndTheCaptureData() throws {
+        let url = try #require(
+            Bundle.main.url(forResource: "contract_appstore_excavator", withExtension: "txt")
+        )
+        let fixture = try String(contentsOf: url, encoding: .utf8)
+        let stub = StubTextRecognizer.appStoreExcavatorContract
+
+        for line in [
+            "SUMMIT RENTAL CO.",
+            "RENTAL AGREEMENT NO: SR-58204",
+            "UNIT #: EX-118",
+            "SERIAL NUMBER: 5KX2290741",
+            "DATE OUT: 05/05/2026",
+            "DAILY RATE: $425.00",
+        ] {
+            #expect(fixture.contains(line), "fixture drifted: \(line)")
+            #expect(stub.document.rawText.contains(line), "stub drifted: \(line)")
+        }
+
+        let machine = AppStoreCaptureFixture.miniExcavator
+        #expect(stub.document.rawText.contains(machine.company.name))
+        #expect(fixture.contains(machine.vendorEquipmentIdentifier))
+        #expect(fixture.contains(machine.serialNumber))
+        #expect(fixture.contains(machine.agreementNumber))
+        #expect(fixture.contains(machine.purchaseOrderNumber))
+    }
 }

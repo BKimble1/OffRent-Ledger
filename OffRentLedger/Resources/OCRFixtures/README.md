@@ -17,6 +17,7 @@ the test, to exercise the rule that a marginal scan must not produce preselected
 | File | Why it exists |
 | --- | --- |
 | `contract_skidsteer_clean.txt` | The happy path: every label present and spelled as expected. |
+| `contract_appstore_excavator.txt` | The App Store capture's contract: the same yard, unit and day rate as `AppStoreCaptureFixture.miniExcavator`, in the clean layout. |
 | `contract_excavator_messy.txt` | A second vendor's layout, with `Daily Rate 410.00` and no colons. |
 | `contract_minimal.txt` | A contract carrying almost nothing, to prove the parser does not guess. |
 | `contract_split_labels.txt` | A third layout where the label and its value are on **different lines**, and the rate table is a dotted-leader list. |

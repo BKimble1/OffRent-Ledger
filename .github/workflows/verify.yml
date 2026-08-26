@@ -125,6 +125,12 @@ jobs:
       # The app's first actual launch. Separate from the unit tests so that a UI failure is
       # legible as one, and named per class so a slow scenario added later cannot silently turn
       # this into something nobody wants to wait for.
+      #
+      # `AppStoreCaptureUITests` is in this list for a different reason from the rest. It asserts
+      # almost nothing — it walks to the six screens the App Store gallery is built from and
+      # photographs each one. Running it on every push is what stops the capture path rotting
+      # between the releases that need it, and the screenshots it attaches to the result bundle
+      # are pulled out by `scripts/capture_appstore_screenshots.sh` when somebody wants them.
       - name: UI tests
         run: |
           set -o pipefail
@@ -146,6 +152,7 @@ jobs:
             -only-testing:OffRentLedgerUITests/MapAndEditingUITests \
             -only-testing:OffRentLedgerUITests/LayoutObstructionUITests \
             -only-testing:OffRentLedgerUITests/InvoiceAcceptanceUITests \
+            -only-testing:OffRentLedgerUITests/AppStoreCaptureUITests \
             -resultBundlePath OffRentLedgerUITests.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             | tee xcodebuild-uitests.log || STATUS=$?
