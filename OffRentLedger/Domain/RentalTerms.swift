@@ -29,6 +29,18 @@ enum BillingBasis: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// What the rate field for this basis is called on a form.
+    ///
+    /// Shorter than `displayName`, which carries the day count for the picker where the choice is
+    /// being made. Beside a figure the user is typing, "Daily rate" is the whole of it.
+    var rateFieldTitle: String {
+        switch self {
+        case .daily: "Daily rate"
+        case .weekly: "Weekly rate"
+        case .fourWeek: "4-week rate"
+        }
+    }
+
     var shortName: String {
         switch self {
         case .daily: "day"

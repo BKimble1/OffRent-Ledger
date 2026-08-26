@@ -273,11 +273,12 @@ struct JobsiteMapEditor: View {
                 VStack(alignment: .leading, spacing: Space.tight) {
                     // The name, editable, and pre-filled with something a person would say —
                     // never a postal code and never a coordinate.
+                    FieldLabel("Jobsite name", isRequired: true)
                     TextField("Jobsite name", text: $siteName)
                         .font(Typography.rowTitle)
                         .textFieldStyle(.roundedBorder)
                         .accessibilityIdentifier(A11yID.Jobsite.name)
-                        .accessibilityLabel("Jobsite name")
+                        .accessibilityLabel("Jobsite name, required")
 
                     if let address = pinned.address, !address.isEmpty {
                         Text(address)
@@ -321,11 +322,13 @@ struct JobsiteMapEditor: View {
                 // A site that has a name but no pin. Either it predates places entirely, or the
                 // user is naming somewhere the map does not help with. Both are saveable: the
                 // name is what the schema requires.
+                FieldLabel("Jobsite name", isRequired: true)
                 TextField("Jobsite name", text: $siteName)
                     .font(Typography.rowTitle)
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
                     .accessibilityIdentifier(A11yID.Jobsite.name)
+                    .accessibilityLabel("Jobsite name, required")
 
                 Text("This site has no location on the map yet. You can still save its name, or drop a pin first.")
                     .font(Typography.caption)

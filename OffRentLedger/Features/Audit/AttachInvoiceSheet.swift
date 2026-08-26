@@ -105,13 +105,17 @@ struct AttachInvoiceSheet: View {
     }
 
     private var invoiceSection: some View {
-        Section("Invoice") {
+        Section {
             TextField("Invoice number", text: $invoiceNumber)
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
             DatePicker("Received", selection: $receivedDate, displayedComponents: .date)
             OptionalDatePicker(title: "Billed through", date: $billedThroughDate)
-            CurrencyField(title: "Invoice total", value: $invoiceTotal)
+            CurrencyField(title: "Invoice total", value: $invoiceTotal, isRequired: true)
+        } header: {
+            Text("Invoice")
+        } footer: {
+            RequiredLegend()
         }
     }
 

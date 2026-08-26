@@ -117,6 +117,7 @@ enum A11yID {
         static let weeklyRate = "addRental.weeklyRate"
         static let fourWeekRate = "addRental.fourWeekRate"
         static let billingBasis = "addRental.billingBasis"
+        static let otherRates = "addRental.otherRates"
         static let nextRollover = "addRental.nextRollover"
         static let expectedIncrement = "addRental.expectedIncrement"
         static let save = "addRental.save"

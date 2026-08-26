@@ -51,6 +51,8 @@ final class RentalDraft {
     /// for equipment, scan, company, jobsite, dates and rates first, with the rest available but
     /// not dominating — and a form that opens with eleven fields is one nobody finishes.
     var showsMoreDetails = false
+    /// Whether the two rates the current billing basis does not use are showing.
+    var showsOtherRates = false
 
     init(now: Date = Date()) {
         deliveryDate = now
@@ -89,6 +91,9 @@ final class RentalDraft {
         // to let somebody correct. The agreement number counts: it is inside the disclosure too,
         // and a rental that has one and nothing else would have opened with it hidden.
         showsMoreDetails = !vendorEquipmentIdentifier.isEmpty || !serialNumber.isEmpty
+        // A rate the basis does not use is still a rate somebody entered. Folded away it looks
+        // like the app lost it, which on a screen about money is the wrong thing to look like.
+        showsOtherRates = hasARateOutsideTheBillingBasis
             || !purchaseOrderNumber.isEmpty || !agreementNumber.isEmpty
     }
 
@@ -137,6 +142,21 @@ final class RentalDraft {
     }
 
     var canSave: Bool { missingRequirement == nil }
+
+    /// True when a rate is entered for a basis other than the one being billed.
+    ///
+    /// Drives whether the "Other rates" group opens itself. A figure the user typed, or a scan
+    /// read, must not be hidden behind a disclosure they have no reason to open.
+    var hasARateOutsideTheBillingBasis: Bool {
+        BillingBasis.allCases.contains { basis in
+            guard basis != billingBasis else { return false }
+            switch basis {
+            case .daily: return dailyRate != nil
+            case .weekly: return weeklyRate != nil
+            case .fourWeek: return fourWeekRate != nil
+            }
+        }
+    }
 
     // MARK: - Scanning
 

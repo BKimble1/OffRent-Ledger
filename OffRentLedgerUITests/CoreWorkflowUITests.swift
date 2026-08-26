@@ -177,6 +177,48 @@ final class CoreWorkflowUITests: XCTestCase {
         app.expect(app.buttons[A11yUI.Settings.remindersPrimingNotNow]).tap()
         XCTAssertTrue(app.expect(app.buttons[A11yUI.Settings.remindersEnable]).exists)
     }
+
+    /// One rate field, chosen by how the rental is billed — not three and then a question.
+    ///
+    /// The form used to list Daily, Weekly and 4-week rates and then ask, underneath, which of
+    /// them was in force: the first thing on screen was a decision the user could not make yet,
+    /// and the question framing it came last. The basis is asked first now, and the rate it needs
+    /// is the only one showing. The other two stay reachable, because a contract that quotes two
+    /// rates is ordinary.
+    func testTheRateFormAsksHowItIsBilledBeforeAskingForARate() {
+        let app = XCUIApplication.launched()
+        app.tab(A11yUI.Tab.rentals).tap()
+        app.openNewRental()
+
+        XCTAssertTrue(
+            app.reveal(app.anyElement(A11yUI.AddRental.billingBasis)).exists,
+            "the billing basis is the first thing the rates section asks"
+        )
+        XCTAssertTrue(
+            app.reveal(app.textFields[A11yUI.AddRental.dailyRate]).exists,
+            "a daily-billed rental shows the daily rate and no other"
+        )
+
+        // The other two are one tap away, not gone.
+        app.revealAndTap(app.anyElement(A11yUI.AddRental.otherRates))
+        XCTAssertTrue(
+            app.reveal(app.textFields[A11yUI.AddRental.weeklyRate]).exists,
+            "opening Other rates reveals the rates this basis does not use"
+        )
+    }
+
+    /// A field you cannot save without says so, before you try.
+    func testRequiredFieldsAreMarkedBeforeSaveIsAttempted() {
+        let app = XCUIApplication.launched()
+        app.tab(A11yUI.Tab.rentals).tap()
+        app.openNewRental()
+
+        let equipment = app.reveal(app.textFields[A11yUI.AddRental.equipmentName], searching: .above)
+        XCTAssertTrue(
+            equipment.label.lowercased().contains("required"),
+            "the equipment name is required to save, so it is announced as required. Was: \(equipment.label)"
+        )
+    }
 }
 
 /// Keeps the tapping out of the assertions.

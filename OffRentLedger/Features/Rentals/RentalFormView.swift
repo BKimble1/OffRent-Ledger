@@ -142,7 +142,7 @@ struct RentalFormView: View {
     // MARK: - Sections
 
     private var equipmentSection: some View {
-        Section("Equipment") {
+        Section {
             // Deliberately not auto-focused.
             //
             // The old form put the cursor here on appear, which was right when the next thing
@@ -151,11 +151,21 @@ struct RentalFormView: View {
             // on appear puts them behind the pinned Save bar with nothing on screen suggesting
             // they are there. The UI suite found it by being unable to reach the company row at
             // all; a person would have found it by concluding the app could not do it.
-            TextField("What is it?", text: $draft.equipmentName)
-                .submitLabel(.next)
-                .accessibilityIdentifier(A11yID.AddRental.equipmentName)
+            LabeledContent {
+                TextField("What is it?", text: $draft.equipmentName)
+                    .submitLabel(.next)
+                    .multilineTextAlignment(.trailing)
+                    .accessibilityIdentifier(A11yID.AddRental.equipmentName)
+                    .accessibilityLabel("Equipment name, required")
+            } label: {
+                FieldLabel("Equipment", isRequired: true)
+            }
             TextField("Class or description (optional)", text: $draft.equipmentClass)
                 .accessibilityIdentifier(A11yID.AddRental.equipmentClass)
+        } header: {
+            Text("Equipment")
+        } footer: {
+            RequiredLegend()
         }
     }
 
@@ -212,7 +222,8 @@ struct RentalFormView: View {
                 detail: companyDetail,
                 placeholder: "Choose company",
                 symbol: "building.2",
-                identifier: A11yID.AddRental.companyRow
+                identifier: A11yID.AddRental.companyRow,
+                isRequired: true
             ) {
                 choosingCompany = true
             }
@@ -269,17 +280,43 @@ struct RentalFormView: View {
         }
     }
 
+    /// How it is billed, then that rate. The other two only if the contract quotes them.
+    ///
+    /// This used to be three rate rows and then a picker underneath asking which of them was in
+    /// force — so the first thing on screen was a decision the user could not make yet, and the
+    /// question that framed it came last. Nearly every rental bills on one basis, and asking for
+    /// that first turns three fields into one.
+    ///
+    /// The other two stay reachable and stay optional. A contract that quotes a daily *and* a
+    /// weekly rate is ordinary, and the invoice comparison is better for having both.
     private var ratesSection: some View {
         Section {
-            CurrencyField(title: "Daily rate", value: $draft.dailyRate, identifier: A11yID.AddRental.dailyRate)
-            CurrencyField(title: "Weekly rate", value: $draft.weeklyRate, identifier: A11yID.AddRental.weeklyRate)
-            CurrencyField(title: "4-week rate", value: $draft.fourWeekRate, identifier: A11yID.AddRental.fourWeekRate)
-            Picker("Currently billing", selection: $draft.billingBasis) {
+            Picker("How is it billed?", selection: $draft.billingBasis) {
                 ForEach(BillingBasis.allCases, id: \.self) { basis in
                     Text(basis.displayName).tag(basis)
                 }
             }
+            .pickerStyle(.menu)
             .accessibilityIdentifier(A11yID.AddRental.billingBasis)
+
+            CurrencyField(
+                title: draft.billingBasis.rateFieldTitle,
+                value: rateBinding(for: draft.billingBasis),
+                identifier: identifier(for: draft.billingBasis)
+            )
+
+            DisclosureGroup(isExpanded: $draft.showsOtherRates) {
+                ForEach(BillingBasis.allCases.filter { $0 != draft.billingBasis }, id: \.self) { basis in
+                    CurrencyField(
+                        title: basis.rateFieldTitle,
+                        value: rateBinding(for: basis),
+                        identifier: identifier(for: basis)
+                    )
+                }
+            } label: {
+                Label("Other rates on the contract", systemImage: "plus.forwardslash.minus")
+            }
+            .accessibilityIdentifier(A11yID.AddRental.otherRates)
         } header: {
             Text("Rates from the contract")
         } footer: {
@@ -288,6 +325,23 @@ struct RentalFormView: View {
                 \(AppConfiguration.displayName) will not guess the others, and it will not pick a \
                 cheaper combination on your behalf.
                 """)
+        }
+    }
+
+    /// The draft field each basis writes to. One place, so the picker and the fields cannot drift.
+    private func rateBinding(for basis: BillingBasis) -> Binding<Decimal?> {
+        switch basis {
+        case .daily: $draft.dailyRate
+        case .weekly: $draft.weeklyRate
+        case .fourWeek: $draft.fourWeekRate
+        }
+    }
+
+    private func identifier(for basis: BillingBasis) -> String {
+        switch basis {
+        case .daily: A11yID.AddRental.dailyRate
+        case .weekly: A11yID.AddRental.weeklyRate
+        case .fourWeek: A11yID.AddRental.fourWeekRate
         }
     }
 
@@ -470,6 +524,7 @@ struct SelectorRow: View {
     let placeholder: String
     var symbol: String?
     var identifier: String?
+    var isRequired: Bool = false
     let action: () -> Void
 
     var body: some View {
@@ -479,9 +534,14 @@ struct SelectorRow: View {
                     RowIcon(symbol: symbol, tint: value == nil ? .secondary : Palette.accent)
                 }
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(Typography.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 2) {
+                        Text(title)
+                        if isRequired {
+                            Text(verbatim: "*").foregroundStyle(Palette.attentionText)
+                        }
+                    }
+                    .font(Typography.caption)
+                    .foregroundStyle(.secondary)
                     Text(value ?? placeholder)
                         .font(Typography.rowTitle)
                         .foregroundStyle(value == nil ? Color.secondary : .primary)

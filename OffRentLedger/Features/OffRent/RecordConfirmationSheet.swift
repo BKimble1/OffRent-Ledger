@@ -57,12 +57,25 @@ struct RecordConfirmationSheet: View {
                 // initialiser is `Section(_:content:)` and has no footer variant. A header
                 // closure is the form that takes both.
                 Section {
-                    TextField("Confirmation number", text: $confirmationNumber)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .fontDesign(.monospaced)
-                        .disabled(noNumberGiven)
-                        .accessibilityIdentifier(A11yID.Confirmation.number)
+                    LabeledContent {
+                        TextField("Number", text: $confirmationNumber)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .fontDesign(.monospaced)
+                            .multilineTextAlignment(.trailing)
+                            .disabled(noNumberGiven)
+                            .accessibilityIdentifier(A11yID.Confirmation.number)
+                            .accessibilityLabel(
+                                noNumberGiven
+                                    ? "Confirmation number, not applicable"
+                                    : "Confirmation number, required"
+                            )
+                    } label: {
+                        // The mark follows the toggle underneath. Leaving it on permanently would
+                        // be wrong half the time, and a required mark that is sometimes a lie is
+                        // worse than none.
+                        FieldLabel("Confirmation number", isRequired: !noNumberGiven)
+                    }
 
                     Toggle("The vendor did not give a number", isOn: $noNumberGiven)
                         .accessibilityIdentifier(A11yID.Confirmation.noNumberToggle)
@@ -96,7 +109,11 @@ struct RecordConfirmationSheet: View {
 
                 Section {
                     Toggle(isOn: $affirmed) {
-                        Text(AppCopy.confirmationAffirmation).fixedSize(horizontal: false, vertical: true)
+                        HStack(alignment: .firstTextBaseline, spacing: 2) {
+                            Text(AppCopy.confirmationAffirmation)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(verbatim: "*").foregroundStyle(Palette.attentionText)
+                        }
                     }
                     .accessibilityIdentifier(A11yID.Confirmation.affirmation)
                     .accessibilityHint(AppCopy.confirmationAffirmationHint)

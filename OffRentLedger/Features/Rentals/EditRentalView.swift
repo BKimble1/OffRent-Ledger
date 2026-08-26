@@ -84,7 +84,7 @@ struct EditRentalView: View {
                 if let missing = draft.missingRequirement {
                     Text(missing)
                         .font(Typography.micro)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.attentionText)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 } else if let note = historyNote {

@@ -263,21 +263,37 @@ struct CurrencyField: View {
     let title: String
     @Binding var value: Decimal?
     var identifier: String?
+    var isRequired: Bool = false
 
     @State private var text: String = ""
     @FocusState private var isFocused: Bool
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
-        HStack {
-            Text(title).font(Typography.rowDetail).foregroundStyle(.secondary)
-            Spacer(minLength: Space.base)
-            TextField("—", text: $text)
-                .font(.body.weight(.medium))
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .monospacedDigit()
-                .focused($isFocused)
-                .accessibilityIdentifier(identifier ?? "currencyField.\(title)")
+        HStack(spacing: Space.base) {
+            FieldLabel(title, isRequired: isRequired)
+            Spacer(minLength: Space.snug)
+
+            // A box with a currency symbol in it, rather than a bare row with a dash at the end.
+            //
+            // The old field was a label, a lot of empty space, and an em dash. Nothing said it was
+            // money, nothing said it was editable, and the only way to find out was to tap a line
+            // that looked like a heading. On a form with three of them in a row, people tapped the
+            // wrong one or did not tap at all. The symbol, the border and the zero placeholder are
+            // all doing the same job: making a text field look like a text field for money.
+            HStack(spacing: 2) {
+                Text(verbatim: "$")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(text.isEmpty ? .tertiary : .secondary)
+                    .accessibilityHidden(true)
+                TextField("0.00", text: $text)
+                    .font(.body.weight(.medium))
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    .focused($isFocused)
+                    .accessibilityIdentifier(identifier ?? "currencyField.\(title)")
+                    .accessibilityLabel(isRequired ? "\(title), required, in dollars" : "\(title), in dollars")
                 .onChange(of: text) { _, newValue in
                     value = newValue.isEmpty ? nil : MoneyMath.parse(newValue)
                 }
@@ -290,17 +306,72 @@ struct CurrencyField: View {
                 // The decimal pad has no return key. Without this there is no way to put it away
                 // except by tapping some other control, which on a long form means scrolling
                 // blind behind a keyboard covering half the screen.
-                .toolbar {
-                    if isFocused {
-                        ToolbarItemGroup(placement: .keyboard) {
-                            Spacer()
-                            Button("Done") { isFocused = false }
+                    .toolbar {
+                        if isFocused {
+                            ToolbarItemGroup(placement: .keyboard) {
+                                Spacer()
+                                Button("Done") { isFocused = false }
+                            }
                         }
                     }
-                }
+            }
+            .padding(.horizontal, Space.snug)
+            .padding(.vertical, Space.tight)
+            .frame(minWidth: 96)
+            .background(Palette.sunken, in: RoundedRectangle(cornerRadius: Radius.control))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.control)
+                    .strokeBorder(
+                        isFocused ? Palette.accent : Palette.edge(contrast),
+                        lineWidth: isFocused ? 2 : Layout.edgeWidth(contrast)
+                    )
+            )
+            // The whole box takes the tap, not just the glyphs inside it.
+            .contentShape(Rectangle())
+            .onTapGesture { isFocused = true }
         }
         .minimumTapTarget()
         .onAppear { if let value { text = "\(MoneyMath.rounded(value))" } }
+    }
+}
+
+/// A field's name, with the mark that says it cannot be left empty.
+///
+/// One component so "required" looks the same everywhere and is spoken the same way. VoiceOver
+/// gets the word; sighted users get the asterisk, in the attention colour rather than plain red,
+/// which is the palette's own and clears 4.5:1 on every surface it sits on.
+struct FieldLabel: View {
+    let title: String
+    var isRequired: Bool = false
+
+    init(_ title: String, isRequired: Bool = false) {
+        self.title = title
+        self.isRequired = isRequired
+    }
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Text(title)
+            if isRequired {
+                Text(verbatim: "*")
+                    .foregroundStyle(Palette.attentionText)
+                    .accessibilityHidden(true)
+            }
+        }
+        .font(Typography.rowDetail)
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(isRequired ? "\(title), required" : title)
+    }
+}
+
+/// The line that explains the asterisk. One per form, under the first section that uses one.
+struct RequiredLegend: View {
+    var body: some View {
+        (Text(verbatim: "* ").foregroundColor(Palette.attentionText) + Text("Required to save."))
+            .font(Typography.micro)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("Fields marked with an asterisk are required to save.")
     }
 }
 

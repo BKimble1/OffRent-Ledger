@@ -42,10 +42,16 @@ struct CompanyEditorView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Company name", text: $name)
-                        .textContentType(.organizationName)
-                        .focused($nameIsFocused)
-                        .accessibilityIdentifier(A11yID.Company.name)
+                    LabeledContent {
+                        TextField("Company name", text: $name)
+                            .textContentType(.organizationName)
+                            .focused($nameIsFocused)
+                            .multilineTextAlignment(.trailing)
+                            .accessibilityIdentifier(A11yID.Company.name)
+                            .accessibilityLabel("Company name, required")
+                    } label: {
+                        FieldLabel("Name", isRequired: true)
+                    }
                     TextField("Branch or yard (optional)", text: $branch)
                         .accessibilityIdentifier(A11yID.Company.branch)
                 } header: {

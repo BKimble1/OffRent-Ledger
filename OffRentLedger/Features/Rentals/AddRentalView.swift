@@ -70,9 +70,11 @@ struct AddRentalView: View {
                     .accessibilityIdentifier(A11yID.AddRental.save)
                     .disabled(!draft.canSave || isSaving)
                 if let missing = draft.missingRequirement {
+                    // The same colour as the asterisk that marked the field. The mark and the
+                    // reason Save is refusing are one thought, and they should look like it.
                     Text(missing)
                         .font(Typography.micro)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.attentionText)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier(A11yID.AddRental.missingRequirement)
