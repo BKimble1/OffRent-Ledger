@@ -322,6 +322,26 @@ extension XCUIApplication {
         var lastBox = CGRect.zero
         var lastBlocker: CGRect?
         for _ in 0..<8 {
+            // Re-checked every turn, not assumed from the fact that `reveal` just found it.
+            //
+            // Reading `frame` on an element that is no longer there does not return an empty
+            // rect — it raises "Failed to get matching snapshot: No matches found", which is
+            // reported against this line and says nothing about the screen. That is how two
+            // attachment tests failed: `reveal` found the row, the screen settled again
+            // underneath it, and the tap threw on the frame of something that had been replaced.
+            // A row that has gone can be waited for; a raised snapshot error cannot.
+            guard element.waitForExistence(timeout: 4) else {
+                XCTFail(
+                    """
+                    element was found and then went away before it could be tapped, which means \
+                    the screen rebuilt underneath it.
+                    Identified elements on screen:
+                    \(identifiedElements())
+                    """,
+                    file: file, line: line
+                )
+                return
+            }
             let box = element.frame
             lastBox = box
             let scroller = scrollableContainer() ?? self

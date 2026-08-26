@@ -28,8 +28,8 @@ final class AttachmentEditingUITests: XCTestCase {
         let app = XCUIApplication.launched(seed: .attachment, stubbingThePhotoPicker: true)
         app.tab(A11yUI.Tab.rentals).tap()
         app.openRental(named: "Skid Steer Loader")
-        app.revealAndTap(app.buttons[A11yUI.ItemDetail.manageAttachments])
-        app.revealAndTap(app.expect(app.buttons[A11yUI.Attachment.openRow]))
+        app.revealAndTap(app.anyElement(A11yUI.ItemDetail.manageAttachments))
+        app.revealAndTap(app.expect(app.anyElement(A11yUI.Attachment.openRow)))
         app.expect(app.textFields[A11yUI.Attachment.name])
         return app
     }
@@ -64,7 +64,7 @@ final class AttachmentEditingUITests: XCTestCase {
         // Back on the attachments list, then into the editor a second time. Reading the field
         // back on the same screen would only prove the `@State` still holds what was typed,
         // which was equally true of the version that never saved at all.
-        app.revealAndTap(app.expect(app.buttons[A11yUI.Attachment.openRow]))
+        app.revealAndTap(app.expect(app.anyElement(A11yUI.Attachment.openRow)))
         let reopened = app.expect(app.textFields[A11yUI.Attachment.name])
         XCTAssertEqual(
             reopened.value as? String, "Boom cylinder, delivery day",
@@ -103,7 +103,7 @@ final class AttachmentEditingUITests: XCTestCase {
         app.expect(app.buttons[A11yUI.Attachment.confirmDelete]).tap()
 
         XCTAssertFalse(
-            app.buttons[A11yUI.Attachment.openRow].waitForExistence(timeout: 5),
+            app.anyElement(A11yUI.Attachment.openRow).waitForExistence(timeout: 5),
             "the row must be gone from the list the editor returned to"
         )
     }
