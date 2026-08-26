@@ -45,17 +45,30 @@ final class CoreWorkflowUITests: XCTestCase {
         // it differs between an iPhone and an iPad — the note already written on `anyElement`.
         let preview = app.anyElement(A11yUI.EvidenceExport.previewOpen)
         let stated = app.anyElement(A11yUI.Failure.evidenceExport)
+        // The third outcome, and the one that would explain a vanishing sheet: `generate()`
+        // dismisses this screen and opens the paywall when the entitlement check refuses. That
+        // should be impossible under `-offrent-force-pro`, so if it happens the run is telling
+        // us the override did not take effect and everything after it is testing the wrong
+        // thing.
+        let paywall = app.anyElement(A11yUI.Paywall.root)
         let deadline = Date().addingTimeInterval(30)
-        while !preview.exists && !stated.exists && Date() < deadline {}
+        while !preview.exists && !stated.exists && !paywall.exists && Date() < deadline {}
 
+        if paywall.exists {
+            XCTFail("generating opened the paywall, so this run is not entitled to export")
+            return
+        }
         if stated.exists {
             XCTFail("generating the packet failed, and the screen said: \(stated.label)")
             return
         }
         XCTAssertTrue(
             preview.exists,
-            "generating produced neither a file nor a stated failure. On screen: "
-                + app.identifiedElements()
+            "generating produced no file, no stated failure and no paywall."
+                + " export sheet present: \(app.anyElement(A11yUI.EvidenceExport.root).exists),"
+                + " rental screen present: \(app.anyElement(A11yUI.ItemDetail.root).exists),"
+                + " sheets: \(app.sheets.count), alerts: \(app.alerts.count)."
+                + " On screen: " + app.identifiedElements()
         )
         XCTAssertTrue(
             app.anyElement(A11yUI.EvidenceExport.share).exists,
