@@ -66,7 +66,6 @@ struct RecordConfirmationSheet: View {
                             .textInputAutocapitalization(.characters)
                             .autocorrectionDisabled()
                             .fontDesign(.monospaced)
-                            .multilineTextAlignment(.trailing)
                             .disabled(noNumberGiven)
                             .accessibilityIdentifier(A11yID.Confirmation.number)
                             .accessibilityLabel(

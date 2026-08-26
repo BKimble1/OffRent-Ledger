@@ -151,11 +151,17 @@ struct RentalFormView: View {
             // on appear puts them behind the pinned Save bar with nothing on screen suggesting
             // they are there. The UI suite found it by being unable to reach the company row at
             // all; a person would have found it by concluding the app could not do it.
+            // The label sits beside the field, and the field keeps the leading alignment it
+            // always had.
+            //
+            // Right-aligning it looked tidier and broke editing: in a half-width field the caret
+            // lands where you tap, so tapping the middle of "Skid Steer Loader" and typing put
+            // the new text *inside* the name rather than after it. The edit test caught it; on a
+            // device it is somebody's rental renamed to something they never typed.
             HStack(spacing: Space.base) {
                 FieldLabel("Equipment", isRequired: true)
                 TextField("What is it?", text: $draft.equipmentName)
                     .submitLabel(.next)
-                    .multilineTextAlignment(.trailing)
                     .accessibilityIdentifier(A11yID.AddRental.equipmentName)
                     .accessibilityLabel("Equipment name, required")
             }

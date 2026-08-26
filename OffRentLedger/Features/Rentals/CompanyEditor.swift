@@ -47,7 +47,6 @@ struct CompanyEditorView: View {
                         TextField("Company name", text: $name)
                             .textContentType(.organizationName)
                             .focused($nameIsFocused)
-                            .multilineTextAlignment(.trailing)
                             .accessibilityIdentifier(A11yID.Company.name)
                             .accessibilityLabel("Company name, required")
                     }
