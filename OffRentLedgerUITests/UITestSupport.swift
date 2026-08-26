@@ -258,68 +258,71 @@ extension XCUIApplication {
             )
             return
         }
-        // The bars are where the platform put them, not where an iPhone puts them.
+        // What is actually in the way, by its own frame.
         //
-        // These fractions describe a phone: status bar above, tab bar and home indicator below.
-        // iPadOS 18 draws the tab bar at the *top* of the window instead, so on an iPad the
-        // bottom band reserved space against nothing while the top band was measured against a
-        // bar that is genuinely there. `itemDetail.exportEvidence` sat at y 962 of an
-        // 1180-point window with nothing underneath it at all, was swiped at six times, and was
-        // then reported as unreachable.
+        // Two rounds of CI went into classifying the tab bar as "top" or "bottom" and applying a
+        // band of reserved screen accordingly. Both were wrong, because the classification was
+        // wrong: on an iPad the bar's container does not report where its contents are, and the
+        // phone's fractions then got applied to a window laid out the other way up. The export
+        // button sat at y 962 of an 1180-point window with nothing beneath it, was judged too
+        // low, and was swiped at until the loop gave up.
         //
-        // An iPhone run is unchanged. Its tab bar is in the bottom half of the window, so the
-        // branch below is not taken and the two fractions are the ones that have been green for
-        // weeks.
-        var clearOfTop = frame.height * 0.15
-        var clearOfBottom = frame.height * 0.82
-
-        // Measured from a tab *button*, not from the tab bar itself.
+        // So this stops classifying. A control is in the way if it *overlaps* the element —
+        // which needs no guess about which end of the screen anything is at, and is the actual
+        // question. The tab bar is measured through its buttons, which have real frames on both
+        // idioms; toolbars are included because a keyboard accessory bar is equally opaque.
         //
-        // The bar's own frame is not dependable. Asking it where it is put the export button
-        // through two rounds of CI: on an iPad the container it reports does not sit where its
-        // contents do, so "is this bar at the top or the bottom" came back wrong and the phone's
-        // fractions were applied to a window laid out the other way up. The button sat at
-        // y 962–1014 of an 1180-point window with nothing under it at all, was judged too low,
-        // and was swiped at until the loop gave up.
-        //
-        // A button inside the bar has a real position — the accessibility dumps show them at
-        // y 36–72 on an iPad and against the bottom edge on a phone — so that is what gets
-        // measured. `firstMatch` because an iPad reports each of them twice, and reading `frame`
-        // on an ambiguous element throws.
-        let tabButton = tabBars.buttons.firstMatch
-        if tabButton.exists {
-            let box = tabButton.frame
-            if box.midY < frame.midY {
-                // Above the content: reserve down to the bar, and keep a band at the foot for a
-                // pinned Save or Accept bar, which is not a tab bar and is in no query.
-                clearOfTop = max(box.maxY, frame.height * 0.06)
-                clearOfBottom = frame.height * 0.90
-            } else {
-                // Below the content, which is the phone. Unchanged from the fractions that have
-                // been green for weeks, but now measured rather than assumed.
-                clearOfTop = frame.height * 0.15
-                clearOfBottom = min(box.minY, frame.height * 0.82)
+        // The original hazard is still covered, and more exactly than before: `isHittable`
+        // returns true for a control whose centre is inside the tab bar, and an overlap test
+        // rejects that before it can be tapped.
+        func obstructions() -> [CGRect] {
+            var boxes: [CGRect] = []
+            for query in [tabBars.buttons, toolbars.buttons] {
+                let count = query.count
+                for index in 0..<count {
+                    let candidate = query.element(boundBy: index)
+                    if candidate.exists { boxes.append(candidate.frame) }
+                }
             }
+            return boxes
         }
+
+        var lastBox = CGRect.zero
+        var lastBlocker: CGRect?
         for _ in 0..<8 {
             let box = element.frame
+            lastBox = box
             let scroller = scrollableContainer() ?? self
-            if box.maxY > clearOfBottom { scroller.swipeUp(); continue }
-            if box.minY < clearOfTop { scroller.swipeDown(); continue }
+
+            // Off the screen entirely: bring it back before asking anything else about it.
+            if box.maxY > frame.maxY { scroller.swipeUp(); continue }
+            if box.minY < frame.minY { scroller.swipeDown(); continue }
+
+            if let blocker = obstructions().first(where: { $0.intersects(box) }) {
+                lastBlocker = blocker
+                // Away from whatever is covering it, whichever end that is.
+                if blocker.midY < box.midY { scroller.swipeDown() } else { scroller.swipeUp() }
+                continue
+            }
+            lastBlocker = nil
+
             if element.isHittable {
                 element.tap()
                 return
             }
-            // Positioned correctly and still not hittable: a bar animating in, or a transition
-            // that has not settled. Waiting is the right move — the previous version fell
-            // through to `swipeDown()` here, which scrolled a correctly placed control *away*
-            // and then had to chase it back, oscillating until it ran out of tries and reported
-            // that the element never came clear. It had come clear four times.
+
+            // On screen, uncovered, and still not hittable: something is animating. Waiting is
+            // right; swiping would move a correctly placed control away and then have to chase
+            // it, which is how this loop used to exhaust its tries.
             _ = element.waitForExistence(timeout: 1)
         }
+
         XCTFail(
             """
             element never came clear of the bars at the edges of the screen.
+            element \(lastBox), window \(frame)
+            blocked by \(lastBlocker.map(String.init(describing:)) ?? "nothing")
+            hittable \(element.isHittable)
             Identified elements on screen:
             \(identifiedElements())
             """,
