@@ -272,15 +272,34 @@ extension XCUIApplication {
         // weeks.
         var clearOfTop = frame.height * 0.15
         var clearOfBottom = frame.height * 0.82
-        // `firstMatch`, not `element`: an iPad reports the tab bar's contents twice, and reading
-        // `frame` on an ambiguous element throws the same "multiple matching elements" this file
-        // already had to fix once for `tab`.
-        let bar = tabBars.firstMatch
-        if bar.exists, bar.frame.midY < frame.midY {
-            clearOfTop = max(bar.frame.maxY, frame.height * 0.06)
-            // Still a band rather than the whole window: a pinned Save or Accept bar lives at
-            // the bottom on every device, tab bar or no tab bar.
-            clearOfBottom = frame.height * 0.90
+
+        // Measured from a tab *button*, not from the tab bar itself.
+        //
+        // The bar's own frame is not dependable. Asking it where it is put the export button
+        // through two rounds of CI: on an iPad the container it reports does not sit where its
+        // contents do, so "is this bar at the top or the bottom" came back wrong and the phone's
+        // fractions were applied to a window laid out the other way up. The button sat at
+        // y 962–1014 of an 1180-point window with nothing under it at all, was judged too low,
+        // and was swiped at until the loop gave up.
+        //
+        // A button inside the bar has a real position — the accessibility dumps show them at
+        // y 36–72 on an iPad and against the bottom edge on a phone — so that is what gets
+        // measured. `firstMatch` because an iPad reports each of them twice, and reading `frame`
+        // on an ambiguous element throws.
+        let tabButton = tabBars.buttons.firstMatch
+        if tabButton.exists {
+            let box = tabButton.frame
+            if box.midY < frame.midY {
+                // Above the content: reserve down to the bar, and keep a band at the foot for a
+                // pinned Save or Accept bar, which is not a tab bar and is in no query.
+                clearOfTop = max(box.maxY, frame.height * 0.06)
+                clearOfBottom = frame.height * 0.90
+            } else {
+                // Below the content, which is the phone. Unchanged from the fractions that have
+                // been green for weeks, but now measured rather than assumed.
+                clearOfTop = frame.height * 0.15
+                clearOfBottom = min(box.minY, frame.height * 0.82)
+            }
         }
         for _ in 0..<8 {
             let box = element.frame

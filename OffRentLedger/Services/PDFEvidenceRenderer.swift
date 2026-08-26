@@ -43,35 +43,43 @@ struct PDFEvidenceRenderer: EvidenceRendering {
             }
         }
 
-        let renderer = UIGraphicsPDFRenderer(
-            bounds: CGRect(origin: .zero, size: pageSize),
-            format: metadata(for: packet)
-        )
-
         let title = EvidencePacketBuilder.headline(for: packet)
 
-        // Twice, so the footer can say "Page 2 of 5" rather than "Page 2" and leave the reader
-        // wondering whether they have all of it. The first pass draws into a buffer nobody keeps
-        // and exists only to count; the layout is a pure function of the packet, and the footer
-        // is drawn at a fixed position without moving the cursor, so both passes paginate
-        // identically.
-        var pageCount = 0
-        _ = renderer.pdfData { context in
-            var layout = PageLayout(
-                context: context, pageSize: pageSize, margin: margin,
-                documentTitle: title, totalPages: nil
+        // Rendered twice, so the footer can say "Page 2 of 5" rather than "Page 2" and leave the
+        // reader wondering whether they are holding all of it. The first pass exists only to
+        // count; the layout is a pure function of the packet, and the footer is drawn at a fixed
+        // position without moving the cursor, so both passes paginate identically.
+        //
+        // A *fresh renderer* for each pass, which is the part that is not obvious. Asking one
+        // `UIGraphicsPDFRenderer` for `pdfData` twice returns an empty `Data` the second time,
+        // and an empty document here is thrown as `renderFailed` — so the two-pass version shipped
+        // as an export that failed outright rather than one with better footers. Caught by
+        // `EvidencePDFTests`, which is the reason that file exists.
+        func draw(totalPages: Int?, count: inout Int) -> Data {
+            let renderer = UIGraphicsPDFRenderer(
+                bounds: CGRect(origin: .zero, size: pageSize),
+                format: metadata(for: packet)
             )
-            drawEverything(packet, images: images, into: &layout)
-            pageCount = layout.pageNumber
+            var pages = 0
+            let data = renderer.pdfData { context in
+                var layout = PageLayout(
+                    context: context, pageSize: pageSize, margin: margin,
+                    documentTitle: title, totalPages: totalPages
+                )
+                drawEverything(packet, images: images, into: &layout)
+                pages = layout.pageNumber
+            }
+            count = pages
+            return data
         }
 
-        let data = renderer.pdfData { context in
-            var layout = PageLayout(
-                context: context, pageSize: pageSize, margin: margin,
-                documentTitle: title, totalPages: pageCount
-            )
-            drawEverything(packet, images: images, into: &layout)
-        }
+        var counted = 0
+        _ = draw(totalPages: nil, count: &counted)
+
+        var drawn = 0
+        // If the counting pass produced nothing, `totalPages` stays nil and the footers read
+        // "Page 2" — worse, and still a readable document. Better than refusing to export.
+        let data = draw(totalPages: counted > 0 ? counted : nil, count: &drawn)
 
         guard !data.isEmpty else { throw EvidenceRenderError.renderFailed }
         return data
