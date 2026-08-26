@@ -592,6 +592,87 @@ def check_decimal_parsing_pins_the_locale() -> None:
             )
 
 
+def check_swift_testing_comments_are_literals() -> None:
+    """A swift-testing comment must be a string *literal*, not a `String` expression.
+
+    `#expect(condition, message)` takes a `Comment?`, and `Comment` is
+    `ExpressibleByStringInterpolation` — so `"a \(b)"` converts and `"a " + "b"` does not. The
+    two read identically, the second compiles nowhere, and the compiler reports it as
+
+        cannot convert value of type 'String' to expected argument type 'Comment?'
+
+    pointing at the argument rather than at the plus sign, twenty minutes into a CI run that had
+    already built the app twice. XCTest's `XCTAssert*` take `@autoclosure () -> String` and are
+    happy either way, which is exactly why the mistake is easy to make in a repository that uses
+    both frameworks.
+
+    The fix is always the same shape: one interpolated multi-line literal with a `\` continuation
+    where the line needs to break.
+    """
+    check("Every swift-testing comment is a literal, not a joined String")
+
+    def argument_list(source: str, start: int) -> str | None:
+        """The balanced text inside the parentheses that begin at `start`."""
+        depth, quoted, index = 0, False, start
+        while index < len(source):
+            character = source[index]
+            if character == '"' and source[index - 1] != "\\":
+                quoted = not quoted
+            elif not quoted:
+                if character == "(":
+                    depth += 1
+                elif character == ")":
+                    depth -= 1
+                    if depth == 0:
+                        return source[start + 1:index]
+            index += 1
+        return None
+
+    def split_top_level(text: str) -> list[str]:
+        parts, depth, quoted, current = [], 0, False, []
+        for index, character in enumerate(text):
+            if character == '"' and (index == 0 or text[index - 1] != "\\"):
+                quoted = not quoted
+            if not quoted:
+                if character in "([{":
+                    depth += 1
+                elif character in ")]}":
+                    depth -= 1
+                elif character == "," and depth == 0:
+                    parts.append("".join(current))
+                    current = []
+                    continue
+            current.append(character)
+        parts.append("".join(current))
+        return parts
+
+    for directory in TESTS:
+        for path in swift_files(directory):
+            source = path.read_text()
+            relative = path.relative_to(ROOT).as_posix()
+            for match in re.finditer(r"#(expect|require)\s*\(", source):
+                open_paren = match.end() - 1
+                arguments = argument_list(source, open_paren)
+                if arguments is None:
+                    continue
+                parts = split_top_level(arguments)
+                if len(parts) < 2:
+                    continue
+                comment = parts[-1]
+                # A joined literal is the only shape seen in practice, and the only one this can
+                # identify without a type checker: a `+` outside every bracket and quote, in an
+                # argument that also carries a string.
+                stripped = split_top_level(comment.replace("+", ","))
+                if '"' in comment and len(stripped) > 1:
+                    line = source[: match.start()].count("\n") + 1
+                    fail(
+                        "testing-comment",
+                        f"{relative}:{line} builds a #{match.group(1)} comment by joining "
+                        "strings; `Comment` converts from a literal only. Use one interpolated "
+                        'multi-line literal with a trailing `\\` where the line breaks.',
+                    )
+
+
 def check_tests_do_not_sleep_for_a_result() -> None:
     check("No test waits on the clock for an async result")
     # `Task.sleep` in a test is a guess about how fast the machine is. Six of them in
@@ -2001,6 +2082,7 @@ def main() -> int:
         check_app_intents_metadata_is_literal,
         check_tests_import_foundation,
         check_tests_do_not_sleep_for_a_result,
+        check_swift_testing_comments_are_literals,
         check_decimal_parsing_pins_the_locale,
         check_no_unsafe_unwraps,
         check_fatal_error_is_confined,

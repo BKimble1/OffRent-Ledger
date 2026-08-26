@@ -61,20 +61,29 @@ struct AppStoreFixtureTests {
         let context = try seeded()
         for described in Fixture.machines {
             let item = try machine(described.vendorEquipmentIdentifier, in: context)
+            // One interpolated literal, not two joined with `+`. swift-testing's `Comment` is
+            // `ExpressibleByStringInterpolation`, so a literal converts and a `String`
+            // *expression* does not — and the error names the argument type rather than the
+            // concatenation, which is a long way from the plus sign that caused it.
             #expect(
                 item.status == described.status,
-                "\(described.vendorEquipmentIdentifier) is \(item.status.rawValue), "
-                + "expected \(described.status.rawValue)"
+                """
+                \(described.vendorEquipmentIdentifier) is \(item.status.rawValue), \
+                expected \(described.status.rawValue)
+                """
             )
         }
     }
 
     @Test func everyJobsiteHasACoordinateSoTheMapFrameHasSomethingToDraw() throws {
         let context = try seeded()
-        for site in try context.fetch(StoreQueries.allJobSites()) {
+        let sites: [JobSite] = try context.fetch(StoreQueries.allJobSites())
+        let rentals: [RentalItem] = try items(in: context)
+
+        for site in sites {
             #expect(site.coordinate != nil, "\(site.name) has no coordinate")
         }
-        for item in try items(in: context) as [RentalItem] {
+        for item in rentals {
             #expect(item.agreement?.jobSite?.coordinate != nil,
                     "\(item.equipmentName) cannot be placed on the map")
         }
@@ -85,7 +94,8 @@ struct AppStoreFixtureTests {
         // *its agreement* carries one. Two machines on one contract would make the widget say
         // "2 to review" beside an app listing one.
         let context = try seeded()
-        let agreementIDs = try items(in: context).compactMap { $0.agreement?.id }
+        let rentals: [RentalItem] = try items(in: context)
+        let agreementIDs: [UUID] = rentals.compactMap { $0.agreement?.id }
         #expect(Set(agreementIDs).count == agreementIDs.count)
     }
 
@@ -178,8 +188,9 @@ struct AppStoreFixtureTests {
 
     @Test func theSnapshotTheWidgetWouldRenderMatchesTheStore() throws {
         let context = try seeded()
+        let rentals: [RentalItem] = try items(in: context)
         var inputs: [SnapshotItemInput] = []
-        for item in try items(in: context) as [RentalItem] {
+        for item in rentals {
             let invoices: [VendorInvoice] = item.agreement?.invoices ?? []
             var awaiting = false
             for invoice in invoices {
@@ -227,7 +238,8 @@ struct AppStoreFixtureTests {
         let second = try seeded()
 
         func fingerprint(_ context: ModelContext) throws -> [String] {
-            try items(in: context)
+            let rentals: [RentalItem] = try items(in: context)
+            return rentals
                 .sorted { $0.id.uuidString < $1.id.uuidString }
                 .map { item in
                     let estimate = item.cachedEstimatedRunningCost.map { "\($0)" } ?? "-"
@@ -262,18 +274,21 @@ struct AppStoreFixtureTests {
 
     @Test func nothingInTheFixtureCouldBelongToAnybody() throws {
         let context = try seeded()
-        for vendor in try context.fetch(StoreQueries.allVendors()) {
+        let vendors: [Vendor] = try context.fetch(StoreQueries.allVendors())
+        for vendor in vendors {
             #expect(vendor.email?.hasSuffix(".invalid") == true)
             #expect(vendor.phone?.contains("5550") == true)
         }
     }
 
-    @Test func theLaunchArgumentIsIgnoredWhenNothingAskedForAFreshStore() throws {
-        // `RootView.seedIfRequested` refuses to seed unless the launch also asked for an
-        // in-memory store or a reset, so `-offrent-seed-appstore` on somebody's real store is
-        // inert rather than destructive.
+    @Test func theCaptureLaunchArgumentsAreSpeltTheWayEverythingElseSpellsThem() {
+        // Three files hardcode these strings — `scripts/capture_appstore_screenshots.sh`,
+        // `marketing/screenshots/README.md` and `AppStoreCaptureUITests` — and none of them can
+        // see this constant. A rename here is a capture script that silently launches the app
+        // with an argument nothing reads, seeds nothing, and photographs an empty Today.
         #expect(LaunchArgument.seedAppStoreFixture == "-offrent-seed-appstore")
-        let overrides = AppDependencies.testOverrides()
-        #expect(overrides.seedAppStore == false, "this test bundle did not pass the flag")
+        #expect(LaunchArgument.openScanReview == "-offrent-open-scan-review")
+        #expect(LaunchArgument.fixedNow == "-offrent-fixed-now")
+        #expect(AppStoreCaptureFixture.fixedNowISO8601 == "2026-05-09T15:00:00Z")
     }
 }
