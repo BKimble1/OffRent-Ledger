@@ -415,9 +415,13 @@ struct InvoiceReviewView: View {
                     .accessibilityIdentifier(A11yID.Audit.resolveInvoice)
 
                     if let block = acceptanceBlock {
+                        // The reason a disabled button is disabled, in the colour that says read
+                        // me. As grey micro text under a greyed-out control it read as decoration,
+                        // and "I cannot tap Accept" with the explanation already on screen is what
+                        // that gets you.
                         Text(block.explanation)
-                            .font(Typography.micro)
-                            .foregroundStyle(.secondary)
+                            .font(Typography.rowDetail)
+                            .foregroundStyle(Palette.attentionText)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier(A11yID.Audit.resolveBlockedReason)

@@ -232,6 +232,11 @@ extension View {
     /// The page.
     func offRentScreen() -> some View {
         background(Palette.background.ignoresSafeArea())
+            // Dragging the content puts the keyboard away. Every scrolling screen in the app, from
+            // one place — it was on exactly one of them, so on every other screen a decimal pad
+            // could only be dismissed by finding the Done key above it, and a *text* keyboard,
+            // which has no Done, could not be dismissed at all without tapping something else.
+            .scrollDismissesKeyboard(.interactively)
     }
 
     /// The page, for a `Form` or a `List`.
@@ -243,6 +248,7 @@ extension View {
         scrollContentBackground(.hidden)
             .background(Palette.background.ignoresSafeArea())
             .listRowBackground(Palette.raised)
+            .scrollDismissesKeyboard(.interactively)
     }
 
     /// Guarantees a hit target at least 44pt tall without changing visual size.

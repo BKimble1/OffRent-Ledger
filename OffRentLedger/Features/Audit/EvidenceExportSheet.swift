@@ -34,10 +34,7 @@ struct EvidenceExportSheet: View {
                         ProUpsellRow(
                             feature: .evidencePDFExport,
                             reason: .evidenceExport,
-                            onTap: { reason in
-                                dismiss()
-                                router.presentedSheet = .paywall(reason: reason)
-                            }
+                            onTap: { reason in showPaywall(reason) }
                         )
                     }
                 }
@@ -106,7 +103,7 @@ struct EvidenceExportSheet: View {
                     .disabled(isGenerating || item == nil)
                     .minimumTapTarget()
 
-                    if let generated {
+                    if let generated, FileManager.default.fileExists(atPath: generated.path) {
                         ShareLink(item: generated) {
                             Label("Share the packet", systemImage: "square.and.arrow.up")
                         }
@@ -249,6 +246,25 @@ struct EvidenceExportSheet: View {
         )
     }
 
+    /// Closes this sheet, then opens the paywall — in that order, and not in the same turn.
+    ///
+    /// `dismiss()` followed immediately by setting the router's sheet is the reason "Generate the
+    /// packet" appeared to do nothing at all: two presentations changing in one run loop, and the
+    /// second one lost. From the user's side the export sheet simply closed and no paywall ever
+    /// came, which reads exactly like a broken button.
+    ///
+    /// Handing the router the request one turn later lets the dismissal finish first.
+    @MainActor
+    private func showPaywall(_ reason: PaywallReason) {
+        dismiss()
+        Task { @MainActor in
+            // A yield rather than a delay: it runs after the dismissal transaction is committed,
+            // with nothing arbitrary to tune and nothing to be flaky on a slower device.
+            await Task.yield()
+            router.presentedSheet = .paywall(reason: reason)
+        }
+    }
+
     private func generate() async {
         guard let item, let packet = buildPacket(for: item) else {
             failure = "This rental is missing a vendor, so a packet cannot be assembled."
@@ -257,8 +273,7 @@ struct EvidenceExportSheet: View {
         guard EntitlementPolicy.isAllowed(
             .evidencePDFExport, entitlement: dependencies.effectiveEntitlement
         ) else {
-            dismiss()
-            router.presentedSheet = .paywall(reason: .evidenceExport)
+            showPaywall(.evidenceExport)
             return
         }
 

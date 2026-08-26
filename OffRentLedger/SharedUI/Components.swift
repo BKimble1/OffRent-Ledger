@@ -771,6 +771,12 @@ struct StickyActionBar<Content: View>: View {
                 .padding(.top, Space.base)
                 .padding(.bottom, Space.snug)
         }
+        // Full width, always.
+        //
+        // A `VStack` sizes to its content, so a bar whose content did not itself stretch drew a
+        // short strip floating in the middle of the screen with the page showing either side of
+        // it. It is a bar; it spans the bar's width.
+        .frame(maxWidth: .infinity)
         .background(Palette.raised)
     }
 }

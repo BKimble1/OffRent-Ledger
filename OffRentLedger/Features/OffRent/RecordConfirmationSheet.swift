@@ -57,8 +57,12 @@ struct RecordConfirmationSheet: View {
                 // initialiser is `Section(_:content:)` and has no footer variant. A header
                 // closure is the form that takes both.
                 Section {
-                    LabeledContent {
-                        TextField("Number", text: $confirmationNumber)
+                    HStack(spacing: Space.base) {
+                        // The mark follows the toggle underneath. Leaving it on permanently would
+                        // be wrong half the time, and a required mark that is sometimes a lie is
+                        // worse than none.
+                        FieldLabel("Number", isRequired: !noNumberGiven)
+                        TextField("Confirmation number", text: $confirmationNumber)
                             .textInputAutocapitalization(.characters)
                             .autocorrectionDisabled()
                             .fontDesign(.monospaced)
@@ -70,11 +74,6 @@ struct RecordConfirmationSheet: View {
                                     ? "Confirmation number, not applicable"
                                     : "Confirmation number, required"
                             )
-                    } label: {
-                        // The mark follows the toggle underneath. Leaving it on permanently would
-                        // be wrong half the time, and a required mark that is sometimes a lie is
-                        // worse than none.
-                        FieldLabel("Confirmation number", isRequired: !noNumberGiven)
                     }
 
                     Toggle("The vendor did not give a number", isOn: $noNumberGiven)

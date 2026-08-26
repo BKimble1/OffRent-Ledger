@@ -101,14 +101,19 @@ struct JobsiteMapEditor: View {
             .mapControls { MapCompass(); MapScaleView() }
             .onMapCameraChange { context in visibleRegion = context.region }
             // A tap anywhere puts the pin there. It is the whole answer to "this site has no
-            // address" — and it is only armed while the user has asked for it, so an ordinary
-            // pan on a map they are reading does not move a pin they already placed.
+            // address". A pan does not fire this, so reading the map does not move the pin.
             // The coordinate space is stated rather than defaulted. `onTapGesture` has an
             // overload taking no parameters and one taking a `CGPoint`, and leaving the type
             // checker to pick between them from a closure's arity is the kind of ambiguity that
             // compiles here and not on the next toolchain.
             .onTapGesture(coordinateSpace: .local) { screenPoint in
-                guard isDroppingByHand else { return }
+                // A tap on the map puts the pin there. Always, with nothing to arm first.
+                //
+                // It used to require pressing "Drop a pin" beforehand, and the flag it set was
+                // cleared by the first tap — so tapping the map did nothing at all until you
+                // found that button, and having found it you got exactly one placement before it
+                // went dead again. Tapping a map to mark a spot is what a map is for, and a
+                // pin placed here is still only a proposal: nothing is written until Confirm.
                 guard let coordinate = proxy.convert(screenPoint, from: .local) else { return }
                 dropPin(at: coordinate)
             }
@@ -210,7 +215,7 @@ struct JobsiteMapEditor: View {
             } label: {
                 HStack(spacing: Space.snug) {
                     Image(systemName: "mappin.and.ellipse")
-                    Text(isDroppingByHand ? "Tap the map to place the pin" : "Drop a pin instead")
+                    Text(pinned == nil ? "Or tap the map to drop a pin" : "Tap the map to move the pin")
                     Spacer(minLength: 0)
                 }
                 .font(Typography.rowDetail)
@@ -437,12 +442,14 @@ struct JobsiteMapEditor: View {
         centre(on: place.latitude, longitude: place.longitude)
     }
 
+    /// Gets the search out of the way so the map is tappable.
+    ///
+    /// It used to arm a mode that a tap then disarmed. The tap needs no arming now, so all this
+    /// does is put the keyboard and the results list away — which is what was actually stopping
+    /// somebody reaching the map with a search open.
     private func beginManualPin() {
-        isDroppingByHand.toggle()
-        if isDroppingByHand {
-            searchIsFocused = false
-            resultsAreVisible = false
-        }
+        searchIsFocused = false
+        resultsAreVisible = false
     }
 
     private func dropPin(at coordinate: CLLocationCoordinate2D) {

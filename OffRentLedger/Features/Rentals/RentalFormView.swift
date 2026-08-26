@@ -151,14 +151,13 @@ struct RentalFormView: View {
             // on appear puts them behind the pinned Save bar with nothing on screen suggesting
             // they are there. The UI suite found it by being unable to reach the company row at
             // all; a person would have found it by concluding the app could not do it.
-            LabeledContent {
+            HStack(spacing: Space.base) {
+                FieldLabel("Equipment", isRequired: true)
                 TextField("What is it?", text: $draft.equipmentName)
                     .submitLabel(.next)
                     .multilineTextAlignment(.trailing)
                     .accessibilityIdentifier(A11yID.AddRental.equipmentName)
                     .accessibilityLabel("Equipment name, required")
-            } label: {
-                FieldLabel("Equipment", isRequired: true)
             }
             TextField("Class or description (optional)", text: $draft.equipmentClass)
                 .accessibilityIdentifier(A11yID.AddRental.equipmentClass)
