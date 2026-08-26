@@ -100,6 +100,23 @@ final class DeepLinkRoutingTests: XCTestCase {
         XCTAssertNil(router.presentedSheet, "the queue holds one request, not a standing order")
     }
 
+    func testTheSecondRequestInTheSameWindowWinsRatherThanTheFirst() {
+        let router = AppRouter()
+        let identifier = UUID()
+        router.presentedSheet = .addRental
+
+        // Two taps before the first sheet has finished closing. `presentedSheet` is already nil
+        // after the first request, so nothing about it says a handover is still pending.
+        router.handle(.recordConfirmation(itemID: identifier))
+        router.handle(.addRental)
+        router.sheetDidDismiss()
+
+        XCTAssertEqual(
+            router.presentedSheet, .addRental,
+            "the later request is the one the user meant; the earlier one must not overwrite it"
+        )
+    }
+
     func testALinkWithNoSheetShowingPresentsImmediately() {
         let router = AppRouter()
 

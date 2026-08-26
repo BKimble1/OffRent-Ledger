@@ -61,12 +61,18 @@ final class AppRouter {
     /// device: the handover happens when the dismissal has actually finished, not when a timer
     /// guesses it has.
     func present(_ sheet: AppSheet) {
-        guard presentedSheet != nil else {
-            presentedSheet = sheet
+        // `queuedSheet != nil` as well as `presentedSheet != nil`: between asking the sheet that
+        // is up to close and its `onDismiss` arriving, `presentedSheet` is already nil while the
+        // dismissal is still in flight. A second request in that window would assign straight
+        // into the closing sheet's place and then be overwritten by the first one when the
+        // handover finally ran. Queueing it instead means the last request wins, which is what
+        // somebody who tapped two reminders in a row meant.
+        guard presentedSheet == nil, queuedSheet == nil else {
+            queuedSheet = sheet
+            presentedSheet = nil
             return
         }
-        queuedSheet = sheet
-        presentedSheet = nil
+        presentedSheet = sheet
     }
 
     /// Called from the root sheet's `onDismiss`.
