@@ -25,3 +25,4 @@ Package.resolved
 
 # Generated deployment archive — rebuild with scripts/package_website.py
 dist/
+__pycache__/

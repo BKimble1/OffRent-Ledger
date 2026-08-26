@@ -39,6 +39,22 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<!--
+	  iPad supports all four orientations. It has to: there is no UIRequiresFullScreen key in
+	  this file, so the app is eligible for Split View and Slide Over, and iPadOS will only put
+	  a multitasking app on screen if it can follow the window into every orientation. A
+	  portrait-only iPad app is also rejected on sight in App Review's iPad pass.
+
+	  Portrait-upside-down is listed for iPad only. On iPhone it is deliberately absent — a
+	  phone that flips upside down puts the sticky Save bar over the home indicator.
+	-->
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>

@@ -74,7 +74,18 @@ extension XCUIApplication {
         }
     }
 
-    func tab(_ identifier: String) -> XCUIElement { tabBars.buttons[identifier] }
+    /// A tab-bar button, wherever the platform decided to put the tab bar.
+    ///
+    /// iPadOS 18 draws the tab bar as a floating control at the top of the window rather than a
+    /// bar along the bottom, and it is not always reported under `tabBars`. The title is the
+    /// app's either way, so a button carrying it is the tab. The bar is still tried first, so an
+    /// iPhone run resolves exactly as it did before.
+    func tab(_ identifier: String) -> XCUIElement {
+        let inTabBar = tabBars.buttons[identifier]
+        if inTabBar.exists { return inTabBar }
+        let anywhere = buttons[identifier]
+        return anywhere.exists ? anywhere : inTabBar
+    }
 
     /// An element addressed by its identifier, whatever type UIKit chose to back it with.
     ///
@@ -283,7 +294,14 @@ extension XCUIApplication {
     func dismissKeyboard() {
         guard keyboards.count > 0 else { return }
 
-        for candidate in [toolbars.buttons["Done"], keyboards.buttons["Done"]] where candidate.exists {
+        // "Hide keyboard" is the iPad key — the one in the bottom-right corner of the software
+        // keyboard. There is no equivalent on iPhone, so listing it costs an iPhone run nothing.
+        let candidates = [
+            toolbars.buttons["Done"],
+            keyboards.buttons["Done"],
+            keyboards.buttons["Hide keyboard"],
+        ]
+        for candidate in candidates where candidate.exists {
             candidate.tap()
             if keyboards.count == 0 { return }
         }

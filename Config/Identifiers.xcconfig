@@ -34,7 +34,7 @@ OFFRENT_BUILD_NUMBER = 1
 // MARK: - Platform
 
 // iPhone only for v1. "1" is iPhone; adding "2" would ship an untested iPad layout.
-OFFRENT_DEVICE_FAMILY = 1
+OFFRENT_DEVICE_FAMILY = 1,2
 OFFRENT_DEPLOYMENT_TARGET = 18.0
 
 // MARK: - Signing

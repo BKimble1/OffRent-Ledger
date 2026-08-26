@@ -163,3 +163,80 @@ jobs:
             OffRentLedgerUITests.xcresult
           retention-days: 14
           if-no-files-found: ignore
+
+  # iPad is a separate job rather than another step, for two reasons. It runs at the same time as
+  # the iPhone suite instead of adding a quarter of an hour to a job that is already long, and a
+  # failure here is legible as "iPad" in the checks list rather than as the ninth `-only-testing`
+  # on a step called "UI tests".
+  #
+  # The app ships as a universal binary (`OFFRENT_DEVICE_FAMILY = 1,2`), so this is not optional
+  # polish: `IPadLayoutUITests` is the only test in the repository that can see that setting, and
+  # an iPhone-only binary running letterboxed on an iPad fails its first assertion.
+  ipad:
+    name: iPad
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest installed Xcode
+        run: |
+          set -e
+          NEWEST=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$NEWEST" ]; then
+            sudo xcode-select -switch "$NEWEST"
+          fi
+          echo "Using $(xcode-select -p)"
+
+      - name: Build app and widget for the simulator
+        run: |
+          set -o pipefail
+          STATUS=0
+          xcodebuild clean build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild-ipad.log || STATUS=$?
+          bash scripts/ci/summarize_test_log.sh xcodebuild-ipad.log
+          exit $STATUS
+
+      # The layout suite plus the whole core workflow. The layout suite proves the window, the
+      # orientations and the readable column; the workflow suite proves a contractor can actually
+      # get from an empty app to an accepted invoice on an iPad, which is the part a screenshot
+      # of a nicely centred column would not tell anybody.
+      - name: UI tests on an iPad
+        run: |
+          set -o pipefail
+          STATUS=0
+          DEVICE_ID=$(bash scripts/ci/find_simulator.sh iPad)
+          echo "Running iPad UI tests on simulator $DEVICE_ID"
+          # Name the model in the log. "id=UUID" in a failure message names nothing.
+          xcrun simctl list devices available | grep "$DEVICE_ID" || true
+          xcodebuild test \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$DEVICE_ID" \
+            -only-testing:OffRentLedgerUITests/IPadLayoutUITests \
+            -only-testing:OffRentLedgerUITests/CoreWorkflowUITests \
+            -resultBundlePath OffRentLedgerIPadUITests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild-ipad-uitests.log || STATUS=$?
+          bash scripts/ci/summarize_test_log.sh xcodebuild-ipad-uitests.log
+          exit $STATUS
+
+      - name: Upload logs and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-logs
+          path: |
+            *.log
+            OffRentLedgerIPadUITests.xcresult
+          retention-days: 14
+          if-no-files-found: ignore

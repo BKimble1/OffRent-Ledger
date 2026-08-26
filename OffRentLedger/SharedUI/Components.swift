@@ -770,6 +770,9 @@ struct StickyActionBar<Content: View>: View {
                 .padding(.horizontal, Space.comfortable)
                 .padding(.top, Space.base)
                 .padding(.bottom, Space.snug)
+                // The bar spans the window; the buttons in it do not. A thousand-point-wide
+                // Save is a target nobody is aiming at.
+                .frame(maxWidth: Layout.readableWidth)
         }
         // Full width, always.
         //

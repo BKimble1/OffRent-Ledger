@@ -1,6 +1,6 @@
 # OffRent Ledger
 
-**Idlery Services LLC** · native iPhone app · iOS 18+ · Swift and SwiftUI
+**Idlery Services LLC** · native iPhone and iPad app · iOS 18+ · Swift and SwiftUI
 
 > Know what every equipment rental is costing, capture the vendor's off-rent confirmation, track
 > pickup, and check the final invoice — across every rental yard.
@@ -14,10 +14,12 @@ an evidence tool. It opens your phone dialler, it reminds you to get a confirmat
 keeps what you recorded together — you make the call. That sentence is a product invariant, not a
 disclaimer: it is enforced in the copy, in the state machine, and in a build-time check.
 
-**The app was written on Linux, with no macOS, no Xcode and no iOS SDK.** It compiles: the app
-and the widget build clean on Xcode 26.4 in CI, and the simulator unit tests run there. It has
-never been launched, on a simulator or a device, and no UI test has run.
-[`TEST_MATRIX.md`](TEST_MATRIX.md) says exactly what was executed, where, and what was not;
+**The app was written on Linux, with no macOS, no Xcode and no iOS SDK.** It compiles and it
+runs: the app and the widget build clean on Xcode 26.4 in CI, and the unit and UI suites execute
+there on a booted simulator — the UI suite launches the app and drives the whole workflow.
+Nothing here has been driven by hand on a physical device, and no purchase has been made against
+a real StoreKit account. [`TEST_MATRIX.md`](TEST_MATRIX.md) says exactly what was executed,
+where, and what was not;
 [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) §1 is the first thing to do.
 
 ---

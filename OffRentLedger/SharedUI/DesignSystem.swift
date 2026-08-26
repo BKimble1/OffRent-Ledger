@@ -160,6 +160,15 @@ enum Radius {
 }
 
 enum Layout {
+    /// The widest a column of content is allowed to get.
+    ///
+    /// An iPhone never reaches it — the largest is 430pt — so this changes nothing there. On an
+    /// iPad it stops a rental row spanning a thousand points with the equipment name at one end
+    /// and the figure at the other, which is unreadable and looks like a phone app that was
+    /// simply allowed to fill the screen. `List` and `Form` inset themselves on iPad; the
+    /// hand-rolled scroll screens did not, and this is where they get it.
+    static let readableWidth: CGFloat = 700
+
     /// Apple's minimum comfortable target. Everything tappable clears it.
     static let minimumTapTarget: CGFloat = 44
     static let controlHeight: CGFloat = 48
@@ -231,7 +240,11 @@ extension View {
 
     /// The page.
     func offRentScreen() -> some View {
-        background(Palette.background.ignoresSafeArea())
+        // Constrained, then centred in whatever is left. The background still fills the window,
+        // so a wide screen shows the page colour either side rather than a hard edge.
+        frame(maxWidth: Layout.readableWidth)
+            .frame(maxWidth: .infinity)
+            .background(Palette.background.ignoresSafeArea())
             // Dragging the content puts the keyboard away. Every scrolling screen in the app, from
             // one place — it was on exactly one of them, so on every other screen a decimal pad
             // could only be dismissed by finding the Done key above it, and a *text* keyboard,
@@ -246,9 +259,28 @@ extension View {
     /// them. Most list-shaped screens in this app are real `List`s for that reason.
     func offRentFormBackground() -> some View {
         scrollContentBackground(.hidden)
-            .background(Palette.background.ignoresSafeArea())
             .listRowBackground(Palette.raised)
+            // The same column `offRentScreen` uses, for the same reason. An inset-grouped list
+            // on a 12.9-inch iPad in landscape is thirteen hundred points wide, and a row with
+            // its label at the left edge and its value at the right edge is unreadable long
+            // before it is ugly. Constrain the list, then centre it, then paint the page colour
+            // behind the whole window so the margins are page rather than void.
+            .frame(maxWidth: Layout.readableWidth)
+            .frame(maxWidth: .infinity)
+            .background(Palette.background.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
+    }
+
+    /// A sheet that needs room: a map you drop a pin on, or a form seven sections long.
+    ///
+    /// An iPad presents a sheet as a form sheet roughly 540 points across. That is right for a
+    /// confirmation and wrong for the jobsite map, where the thing being asked for is a pin in
+    /// the correct part of a site. `.page` gives the sheet most of the window instead.
+    ///
+    /// iPhone sheets are already the full width of the screen and the system does not apply
+    /// presentation sizing there, so nothing about the phone layout changes.
+    func offRentRoomySheet() -> some View {
+        presentationSizing(.page)
     }
 
     /// Guarantees a hit target at least 44pt tall without changing visual size.
@@ -347,6 +379,12 @@ struct OffRentPrimaryButtonStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.82 : 1)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
             .respectfulAnimation(Motion.quick, value: configuration.isPressed)
+            // An iPad with a trackpad or a Magic Keyboard has a pointer, and a pointer that
+            // does not react to a button leaves the person guessing whether it is a button.
+            // The shape is given explicitly so the effect follows the rounded fill rather than
+            // the label's bounding box. No effect on a touch-only device.
+            .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: Radius.control))
+            .hoverEffect(.lift)
     }
 }
 
@@ -376,6 +414,8 @@ struct OffRentSecondaryButtonStyle: ButtonStyle {
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.55 : 1)
             .respectfulAnimation(Motion.quick, value: configuration.isPressed)
+            .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: Radius.control))
+            .hoverEffect(.highlight)
     }
 }
 

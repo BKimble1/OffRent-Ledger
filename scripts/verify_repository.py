@@ -1635,6 +1635,77 @@ def check_ocr_fixtures_exist() -> None:
         fail("fixtures", "OCRFixtures/README.md must state that the fixtures are synthetic")
 
 
+def check_ipad_support_is_declared() -> None:
+    """The app is universal, rotates on iPad, and the layout cap the tests measure is the real one.
+
+    Three separate things quietly stop being true on their own:
+
+    - `TARGETED_DEVICE_FAMILY` losing its `2` turns the app back into an iPhone binary that runs
+      letterboxed on an iPad. Nothing else in the build fails.
+    - Landscape disappearing from the iPad orientations makes the app ineligible for Split View
+      and Slide Over, and App Review's iPad pass rejects a portrait-only iPad app on sight.
+    - `IPadLayoutUITests` keeps its own copy of `Layout.readableWidth`, because the UI test target
+      drives the app as a black box and cannot link the design system. A cap widened in the app
+      and not in the test is a test that passes while the layout it was written to protect is
+      gone.
+    """
+    check("iPad is declared, rotates, and its layout cap matches the app's")
+
+    config = (ROOT / "Config" / "Identifiers.xcconfig").read_text()
+    family = re.search(r"^OFFRENT_DEVICE_FAMILY\s*=\s*(.+)$", config, re.M)
+    if not family:
+        fail("ipad-family", "Config/Identifiers.xcconfig declares no OFFRENT_DEVICE_FAMILY")
+    elif "2" not in [part.strip() for part in family.group(1).split(",")]:
+        fail(
+            "ipad-family",
+            f"OFFRENT_DEVICE_FAMILY is {family.group(1).strip()!r}, which excludes iPad; "
+            "an iPhone-only binary runs letterboxed there",
+        )
+
+    plist = (ROOT / "Config" / "OffRentLedger-Info.plist").read_text()
+    if "UISupportedInterfaceOrientations~ipad" not in plist:
+        fail(
+            "ipad-orientation",
+            "Config/OffRentLedger-Info.plist declares no UISupportedInterfaceOrientations~ipad, "
+            "so the iPad inherits the iPhone's portrait-only list",
+        )
+    else:
+        ipad_block = plist.split("UISupportedInterfaceOrientations~ipad", 1)[1].split("</array>", 1)[0]
+        for orientation in ["LandscapeLeft", "LandscapeRight"]:
+            if orientation not in ipad_block:
+                fail(
+                    "ipad-orientation",
+                    f"the iPad orientation list omits UIInterfaceOrientation{orientation}; "
+                    "Split View needs every orientation",
+                )
+    # The key element, not the string: this file's own comment explains why the key is absent,
+    # and a substring search matched the explanation and failed the build on it.
+    if "<key>UIRequiresFullScreen</key>" in plist:
+        fail(
+            "ipad-orientation",
+            "UIRequiresFullScreen opts the app out of Split View and Slide Over; "
+            "remove it, or update this check and IPadLayoutUITests to match the new intent",
+        )
+
+    design = (APP_SOURCES / "SharedUI" / "DesignSystem.swift").read_text()
+    app_width = re.search(r"static let readableWidth: CGFloat = ([\d.]+)", design)
+    tests = (UI_TESTS / "IPadLayoutUITests.swift")
+    if not app_width:
+        fail("ipad-width", "Layout.readableWidth is gone from DesignSystem.swift")
+    elif not tests.exists():
+        fail("ipad-width", "OffRentLedgerUITests/IPadLayoutUITests.swift is missing")
+    else:
+        test_width = re.search(r"readableWidth: CGFloat = ([\d.]+)", tests.read_text())
+        if not test_width:
+            fail("ipad-width", "IPadLayoutUITests no longer declares readableWidth")
+        elif float(test_width.group(1)) != float(app_width.group(1)):
+            fail(
+                "ipad-width",
+                f"IPadLayoutUITests measures against {test_width.group(1)} points while "
+                f"Layout.readableWidth is {app_width.group(1)}",
+            )
+
+
 def check_call_sites_resolve() -> None:
     check("Initialiser and static-call sites match their declarations")
     # The app layer has never been compiled. This is the nearest thing available to a type check
@@ -1835,6 +1906,7 @@ def main() -> int:
         check_ocr_fixtures_exist,
         check_saves_are_not_silent,
         check_tests_live_inside_a_test_case,
+        check_ipad_support_is_declared,
         check_call_sites_resolve,
         check_every_ui_suite_actually_runs,
         check_github_workflows,

@@ -81,6 +81,7 @@ struct JobsiteMapEditor: View {
             .task(id: query) { await search() }
         }
         .accessibilityIdentifier(A11yID.Jobsite.root)
+        .offRentRoomySheet()
     }
 
     // MARK: - Map

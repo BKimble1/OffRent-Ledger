@@ -55,6 +55,8 @@ struct AddRentalView: View {
                     }
                 }
         }
+        // Seven sections is a lot to read through a 540-point form sheet on an iPad.
+        .offRentRoomySheet()
     }
 
     /// Save, where the thumb is, on a form seven sections long.

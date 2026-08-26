@@ -11,6 +11,11 @@ Each of these was considered and excluded because it crosses a v1 boundary in
 | Multi-user company accounts, crew invitations | multi-tenant; requires a backend, auth, and a privacy policy rewrite | v2 |
 | Telematics / meter-hour ingestion | telematics boundary | Never for v1; would also break the "no overtime calculation" rule |
 | Automatic cheapest-rate optimisation | interprets vendor contract clauses the app cannot see | Only if vendors publish machine-readable terms |
-| iPad and landscape layouts | iPhone-first v1 | v1.1 |
 | Localization beyond en-US | US-only v1 | v1.2 |
 | Cloud sync / CloudKit | "no server" | v2, opt-in, would need a new privacy label |
+
+## No longer out of scope
+
+| Idea | Where it landed |
+|---|---|
+| iPad and landscape layouts | Shipped. `TARGETED_DEVICE_FAMILY = 1,2`, all four orientations on iPad, and a readable-width column so a list row is not thirteen hundred points wide. `IPadLayoutUITests` runs on a booted iPad simulator in CI's `ipad` job alongside the full core workflow. |

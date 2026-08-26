@@ -362,6 +362,8 @@ struct AttachInvoiceSheet: View {
                 Text((scanError ?? "") + "\n\nYou can still enter the invoice by hand.")
             }
         }
+        // Invoice lines are a table. A table needs width, and an iPad form sheet has none spare.
+        .offRentRoomySheet()
     }
 
     private struct ScanSession: Identifiable {

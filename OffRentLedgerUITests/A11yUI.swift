@@ -184,6 +184,7 @@ enum A11yUI {
     }
 
     enum Settings {
+        static let root = "settings.root"
         static let subscription = "settings.subscription"
         static let autoFillScans = "settings.autoFillScans"
         static let dataAndPrivacy = "settings.dataAndPrivacy"
