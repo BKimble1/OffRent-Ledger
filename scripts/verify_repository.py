@@ -1635,6 +1635,61 @@ def check_ocr_fixtures_exist() -> None:
         fail("fixtures", "OCRFixtures/README.md must state that the fixtures are synthetic")
 
 
+def check_notifications_are_delivered_and_read() -> None:
+    """A reminder that carries a destination must have something that reads it, and installs it.
+
+    `NotificationScheduler` writes a deep link into every reminder's `userInfo`. For the whole
+    life of the feature nothing read it, because no object was ever installed as
+    `UNUserNotificationCenter.delegate` — so a reminder naming a machine opened the app on
+    whatever screen it was last left on, and the payload was built correctly and thrown away.
+
+    The second half is worse for anyone evaluating the app. Without `willPresent`, iOS suppresses
+    a notification entirely while the app is in the foreground, and Settings has a "Send a test
+    reminder" button whose obvious use is to tap it and watch. It showed nothing, for a reason
+    nothing on screen could explain.
+
+    Neither failure is visible in code review — every piece looks right on its own — and neither
+    can fail a build. So the three parts are checked here: the payload is written, something
+    implements the delegate and handles both messages, and the delegate is actually assigned.
+    """
+    check("A reminder's destination is read, and reminders show with the app open")
+
+    sources = list(swift_files(APP_SOURCES))
+    joined = {path: without_comments(path.read_text()) for path in sources}
+    text = "\n".join(joined.values())
+
+    writes_payload = "NotificationPayloadKey.deepLink" in text
+    if not writes_payload:
+        # Nothing to read, so nothing to require.
+        return
+
+    if "UNUserNotificationCenterDelegate" not in text:
+        fail(
+            "notification-delegate",
+            "reminders carry a deep link in userInfo and nothing implements "
+            "UNUserNotificationCenterDelegate, so tapping one goes nowhere",
+        )
+        return
+
+    if "didReceive response" not in text:
+        fail(
+            "notification-delegate",
+            "nothing implements didReceive, so a tapped reminder's destination is never read",
+        )
+    if "willPresent notification" not in text:
+        fail(
+            "notification-delegate",
+            "nothing implements willPresent, so iOS suppresses reminders while the app is open "
+            "— including the test reminder in Settings",
+        )
+    if not re.search(r"UNUserNotificationCenter\.current\(\)\.delegate\s*=", text):
+        fail(
+            "notification-delegate",
+            "a delegate exists but is never assigned to UNUserNotificationCenter.current(), so "
+            "none of it runs",
+        )
+
+
 def check_nothing_dismisses_and_presents_in_one_turn() -> None:
     """`dismiss()` and a new presentation in the same run loop, and the second one is dropped.
 
@@ -2159,6 +2214,7 @@ def main() -> int:
         check_no_alert_shares_a_chain_with_a_sheet,
         check_memberwise_initialisers_are_reachable,
         check_nothing_dismisses_and_presents_in_one_turn,
+        check_notifications_are_delivered_and_read,
         check_call_sites_resolve,
         check_every_ui_suite_actually_runs,
         check_github_workflows,

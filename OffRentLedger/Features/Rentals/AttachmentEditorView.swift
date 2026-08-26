@@ -222,12 +222,8 @@ struct AttachmentEditorView: View {
         isSaving = true
         defer { isSaving = false }
 
-        asset.displayName = trimmedName
-        asset.caption = caption.nilIfBlank
-
-        if let failure = PersistentStore.save(context, describing: "This attachment") {
-            // Back out, so the screen and the store cannot disagree about what the caption says.
-            context.rollback()
+        let service = AttachmentEditingService(context: context)
+        if let failure = service.rename(asset, to: trimmedName, caption: caption) {
             saveFailure = failure
             return
         }
@@ -236,22 +232,18 @@ struct AttachmentEditorView: View {
     }
 
     private func delete(_ asset: EvidenceAsset) {
-        // The paths are read before the record goes, because reading them off a deleted model is
-        // not something to rely on.
-        let paths = [asset.relativePath, asset.thumbnailRelativePath].compactMap { $0 }
-        context.delete(asset)
-
         // The record first, then the files. A failed save would otherwise leave a record
         // pointing at a photograph that is already gone — a rental claiming evidence it cannot
-        // produce, which is the one thing this app must never do.
-        if let failure = PersistentStore.save(context, describing: "That removal") {
-            context.rollback()
-            saveFailure = failure
-            return
+        // produce, which is the one thing this app must never do. The service does the record
+        // and hands back what is now unreferenced.
+        switch AttachmentEditingService(context: context).remove(asset) {
+        case let .failure(message):
+            saveFailure = message
+        case let .success(paths):
+            Task { [fileStore = dependencies.fileStore] in
+                for path in paths { await fileStore.delete(relativePath: path) }
+            }
+            dismiss()
         }
-        Task { [fileStore = dependencies.fileStore] in
-            for path in paths { await fileStore.delete(relativePath: path) }
-        }
-        dismiss()
     }
 }

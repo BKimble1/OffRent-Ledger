@@ -126,6 +126,17 @@ enum A11yUI {
         static let evidenceExport = "evidenceExport.failure"
     }
 
+    enum Attachment {
+        static let root = "attachment.editor"
+        static let openRow = "attachment.row"
+        static let name = "attachment.name"
+        static let caption = "attachment.caption"
+        static let save = "attachment.save"
+        static let delete = "attachment.delete"
+        static let confirmDelete = "attachment.confirmDelete"
+        static let preview = "attachment.preview"
+    }
+
     enum EvidenceExport {
         static let root = "evidenceExport.root"
         static let generate = "evidenceExport.generate"
