@@ -160,6 +160,7 @@ enum A11yUI {
         static let root = "audit.root"
         static let possibleMismatches = "audit.possibleMismatches"
         static let possibleVariance = "audit.possibleVariance"
+        static let acceptMismatch = "audit.acceptMismatch"
         static let recordFollowUp = "audit.recordFollowUp"
         static let followUpReason = "audit.followUpReason"
         static let resolveInvoice = "audit.resolveInvoice"

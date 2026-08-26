@@ -12,6 +12,89 @@ final class InvoiceAcceptanceUITests: XCTestCase {
 
     override func setUp() { continueAfterFailure = false }
 
+    /// "Accept this" on a single finding takes that finding off the screen.
+    ///
+    /// The screenshot showed the opposite. The row was still there after the tap, wearing the
+    /// same two buttons, so the only readable outcome was that nothing had happened — and the
+    /// natural next move is to record a follow-up instead, which is what the report said had
+    /// been happening.
+    ///
+    /// The cause was two answers to one question on the same screen: the list was drawn from
+    /// every finding the comparison produces, while the Accept bar counted only the ones nobody
+    /// had dealt with yet. Accepting a finding moved the second number and left the first alone.
+    /// So this asserts both — the row goes, *and* the invoice becomes acceptable, which is the
+    /// only proof that the list and the bar are now reading the same set.
+    func testAcceptingOneFindingRemovesItAndUnblocksTheInvoice() {
+        let app = XCUIApplication.launched()
+
+        app.tab(A11yUI.Tab.rentals).tap()
+        app.openRental(named: "Skid Steer Loader")
+        app.expect(app.buttons[A11yUI.ItemDetail.markDone]).tap()
+        app.expect(app.buttons[A11yUI.ItemDetail.recordConfirmation]).tap()
+        app.expect(app.textFields[A11yUI.Confirmation.number]).tap()
+        app.typeText("OR-44921")
+        app.setOn(app.switches[A11yUI.Confirmation.affirmation])
+        app.expect(app.buttons[A11yUI.Confirmation.save]).tap()
+        app.expect(app.buttons[A11yUI.ItemDetail.recordPickup]).tap()
+        app.expect(app.buttons[A11yUI.Pickup.save]).tap()
+
+        // One day more than the confirmation supports: 6 x 285 = 1710 expected, 1995 invoiced.
+        app.expect(app.buttons[A11yUI.ItemDetail.attachInvoice]).tap()
+        AttachInvoiceRobot(app: app).fill(total: "1995.00", rentalSubtotal: "1995.00")
+
+        let acceptInvoice = app.expect(app.buttons[A11yUI.Audit.resolveInvoice], timeout: 8)
+        XCTAssertFalse(
+            acceptInvoice.isEnabled,
+            "the invoice must not be acceptable while a mismatch is unaddressed"
+        )
+
+        // Every finding, not only the first. How many the comparison produces for one extra day
+        // is its business, and a test that accepts one row and then demands an enabled Accept
+        // bar would be asserting that number rather than the behaviour.
+        let findings = app.buttons.matching(identifier: A11yUI.Audit.acceptMismatch)
+        app.expect(findings.firstMatch, timeout: 8)
+        var remaining = findings.count
+        XCTAssertGreaterThan(
+            remaining, 0, "an over-billed invoice must surface at least one finding"
+        )
+
+        // The cap is the initial count. A list that refuses to shrink would otherwise spin here
+        // until the whole job times out, and a test that hangs says less than one that fails.
+        for _ in 0..<remaining {
+            guard remaining > 0 else { break }
+            let before = remaining
+            app.tapInContent(findings.firstMatch)
+
+            // `count` re-runs the query against a fresh snapshot each time, so this polls at the
+            // speed of the accessibility tree rather than on a timer.
+            let deadline = Date().addingTimeInterval(8)
+            while findings.count == before && Date() < deadline {}
+            remaining = findings.count
+
+            XCTAssertLessThan(
+                remaining, before,
+                """
+                accepting a finding left it on the list. That is the whole defect: the row \
+                redraws identically, so the only readable outcome of the tap is that nothing \
+                happened.
+                """
+            )
+        }
+
+        // And now the bar agrees with the list. This is the second half of the same bug — the
+        // two were counting different sets, so the screen could show no outstanding findings
+        // while Accept stayed disabled, or the reverse.
+        wait(
+            for: [
+                expectation(
+                    for: NSPredicate(format: "isEnabled == true"),
+                    evaluatedWith: acceptInvoice
+                )
+            ],
+            timeout: 8
+        )
+    }
+
     /// §12.13: accepted from Audit, counts move, and it is still accepted after a relaunch.
     func testAValidInvoiceIsAcceptedAndStaysAcceptedAfterRelaunch() {
         let app = XCUIApplication()
