@@ -44,6 +44,38 @@ final class AppRouter {
     /// Set when something asks for a modal that is not a navigation destination.
     var presentedSheet: AppSheet?
 
+    /// A sheet asked for while another one was still up, waiting for it to go.
+    private var queuedSheet: AppSheet?
+
+    /// Presents a sheet, waiting for whatever is already up to close first.
+    ///
+    /// Assigning straight to `presentedSheet` is fine for a button: a button on the screen
+    /// behind a sheet cannot be tapped, so there is never a sheet to replace. A tapped reminder
+    /// is not a button. It arrives while the user is somewhere — possibly mid-sheet — and
+    /// `.sheet(item:)` does not reliably swap one sheet for another; the binding changes and
+    /// SwiftUI keeps showing the one it already has. That would be a notification that opens the
+    /// app and then appears to ignore what it was about.
+    ///
+    /// So the request is parked and `sheetDidDismiss` delivers it, which is the same shape the
+    /// welcome cover in `RootView` uses. No interval to tune, nothing to go flaky on a slower
+    /// device: the handover happens when the dismissal has actually finished, not when a timer
+    /// guesses it has.
+    func present(_ sheet: AppSheet) {
+        guard presentedSheet != nil else {
+            presentedSheet = sheet
+            return
+        }
+        queuedSheet = sheet
+        presentedSheet = nil
+    }
+
+    /// Called from the root sheet's `onDismiss`.
+    func sheetDidDismiss() {
+        guard let queued = queuedSheet else { return }
+        queuedSheet = nil
+        presentedSheet = queued
+    }
+
     func handle(url: URL) -> Bool {
         guard let link = DeepLink(url: url) else { return false }
         handle(link)
@@ -81,7 +113,7 @@ final class AppRouter {
 
         case .addRental:
             selectedTab = .rentals
-            presentedSheet = .addRental
+            present(.addRental)
 
         case let .rentalItem(id):
             selectedTab = .rentals
@@ -95,7 +127,7 @@ final class AppRouter {
             selectedTab = .rentals
             rentalsPath = NavigationPath()
             rentalsPath.append(RentalDestination.item(id: itemID))
-            presentedSheet = .recordConfirmation(itemID: itemID)
+            present(.recordConfirmation(itemID: itemID))
 
         case let .invoiceReview(invoiceID):
             selectedTab = .audit

@@ -47,7 +47,7 @@ struct RootView: View {
         // The colour scheme is set on the scene in `OffRentLedgerApp`, not here — from there it
         // also reaches the launch splash and the store-recovery screen, which sit outside this
         // view.
-        .sheet(item: $router.presentedSheet) { sheet in
+        .sheet(item: $router.presentedSheet, onDismiss: { router.sheetDidDismiss() }) { sheet in
             sheetContent(for: sheet)
         }
         // The welcome covers the shell rather than replacing it, so dismissing it reveals an app

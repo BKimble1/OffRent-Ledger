@@ -12,6 +12,10 @@ import SwiftData
 /// operations with different failure modes, so this returns the paths and the caller deletes
 /// them once the record is safely gone — never before, or a failed save leaves a rental claiming
 /// a photograph it cannot produce.
+/// `@MainActor` for the same reason its peers are: it saves through `PersistentStore`, which is
+/// main-actor isolated, and `ModelContext` is not `Sendable`. `RentalWorkflowService` and
+/// `ExportService` are declared the same way.
+@MainActor
 struct AttachmentEditingService {
 
     let context: ModelContext

@@ -1706,10 +1706,16 @@ def check_nothing_dismisses_and_presents_in_one_turn() -> None:
     The fix each time is the same: hand the work to the next turn with `Task { @MainActor in
     await Task.yield() ... }`. A yield rather than a sleep, so there is no interval to tune and
     nothing to go flaky on a slower device.
+
+    `AppRouter.present` counts as presenting here and is not a way out of it. Its queue only
+    waits when the router's *own* sheet is up; a screen that has just called `dismiss()` on a
+    sheet somebody else presented — `EvidenceExportSheet` is presented by `RentalItemDetailView`,
+    not by the router — leaves `presentedSheet` nil, so `present` assigns straight away and the
+    drop is back.
     """
     check("Nothing dismisses a screen and presents another in the same turn")
     presenting = re.compile(
-        r"(router\.presentedSheet\s*=\s*\.|router\.handle\(|"
+        r"(router\.presentedSheet\s*=\s*\.|router\.handle\(|router\.present\(|"
         r"showing[A-Z]\w*\s*=\s*true|presenting[A-Z]\w*\s*=\s*true)"
     )
     for path in swift_files(APP_SOURCES):
@@ -2112,6 +2118,82 @@ def check_result_failures_are_errors() -> None:
                     "AttachmentEditingService.Removal does.",
                 )
 
+def check_main_actor_work_is_isolated() -> None:
+    """A type that saves has to be on the main actor, and Swift 6 will not let it be otherwise.
+
+    `PersistentStore` is `@MainActor`, and `ModelContext` is not `Sendable`. Every screen in this
+    app inherits that isolation for free — `View` is main-actor isolated, so a struct that
+    conforms to it can call anything main-actor without saying so. A plain service struct cannot,
+    and the compiler's message ("call to main actor-isolated static method in a synchronous
+    nonisolated context") arrives only from a real Swift 6 build.
+
+    `AttachmentEditingService` shipped a CI round without it, which is exactly the shape of thing
+    a Linux `swiftc -parse` sweep cannot see: parsing does not run the actor-isolation checker,
+    so the file is syntactically perfect and semantically impossible.
+
+    `RentalWorkflowService`, `ExportService` and `SeedFixtures` all say `@MainActor` outright.
+    Anything else that persists has to as well.
+    """
+    check("Everything that saves is on the main actor")
+
+    def body_of(source: str, brace: int) -> str:
+        depth = 0
+        for index in range(brace, len(source)):
+            if source[index] == "{":
+                depth += 1
+            elif source[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    return source[brace + 1 : index]
+        return source[brace:]
+
+    # Types that carry main-actor isolation without writing it down. `View`, `App`, `Scene` and
+    # `ViewModifier` are declared `@MainActor` in SwiftUI, so their conformers are too.
+    inherited = {
+        "View", "App", "Scene", "ViewModifier", "UIViewRepresentable",
+        "UIViewControllerRepresentable", "PreviewProvider",
+    }
+
+    declaration = re.compile(
+        r"^[ \t]*((?:@[\w()., :]+[ \t]*\n[ \t]*)*)"
+        r"(?:final |private |fileprivate |internal |public |package )*"
+        r"(struct|enum|class|actor)[ \t]+(\w+)([^{\n]*)\{",
+        re.M,
+    )
+    saving = re.compile(r"\bPersistentStore\s*\.\s*save\b")
+
+    for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
+        source = without_comments(path.read_text())
+        for match in declaration.finditer(source):
+            attributes, keyword, name, conformances = match.groups()
+            body = body_of(source, match.end() - 1)
+            if not saving.search(body):
+                continue
+            if "@MainActor" in attributes:
+                continue
+            # An actor has isolation of its own; saving from one is a different conversation and
+            # not something this app does.
+            if keyword == "actor":
+                continue
+            names = {
+                part.strip().split("<")[0].split(".")[-1]
+                for part in conformances.lstrip(": ").split(",")
+                if part.strip()
+            }
+            if names & inherited:
+                continue
+            # A save inside a member that is annotated itself is fine.
+            if re.search(r"@MainActor[ \t]*\n?[ \t]*(?:private |static )*func", body):
+                continue
+            line = source[: match.start()].count("\n") + 1
+            fail(
+                "main-actor-isolation",
+                f"{path.relative_to(ROOT).as_posix()}:{line} — {keyword} {name} calls "
+                "PersistentStore.save but is not @MainActor and does not inherit main-actor "
+                "isolation from View. Swift 6 rejects this; a Linux parse sweep cannot see it. "
+                "Annotate it @MainActor, the way RentalWorkflowService and ExportService are.",
+            )
+
 def check_call_sites_resolve() -> None:
     check("Initialiser and static-call sites match their declarations")
     # The app layer has never been compiled. This is the nearest thing available to a type check
@@ -2318,6 +2400,7 @@ def main() -> int:
         check_no_alert_shares_a_chain_with_a_sheet,
         check_memberwise_initialisers_are_reachable,
         check_result_failures_are_errors,
+        check_main_actor_work_is_isolated,
         check_nothing_dismisses_and_presents_in_one_turn,
         check_notifications_are_delivered_and_read,
         check_call_sites_resolve,

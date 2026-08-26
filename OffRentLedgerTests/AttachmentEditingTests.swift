@@ -11,6 +11,7 @@ import XCTest
 /// the store was up to SwiftData's autosave and nothing on screen said either way; and the only
 /// way to remove anything was an invisible swipe. Both are worth pinning at the level that
 /// decides what the store holds, rather than at the level that decides what a screen looks like.
+@MainActor
 final class AttachmentEditingTests: XCTestCase {
 
     private var context: ModelContext!
