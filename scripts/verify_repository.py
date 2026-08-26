@@ -2008,6 +2008,110 @@ def check_ipad_support_is_declared() -> None:
             )
 
 
+def check_result_failures_are_errors() -> None:
+    """`Result`'s second parameter has to conform to `Error`. Nothing local says so.
+
+    This app deliberately passes most failures around as the sentence it will show a person —
+    `PersistentStore.save` returns `String?`, not a thrown error — so reaching for
+    `Result<[String], String>` reads perfectly naturally right up until the compiler refuses it.
+    It did: `AttachmentEditingService.remove` was written that way and cost a full macOS CI round
+    to find out, because a Linux `swiftc -parse` sweep only parses and never resolves a generic
+    constraint.
+
+    Every failure type declared in this repository is checked against its own conformances, and
+    the standard-library value types that certainly do not conform are named outright. A type
+    this repository does not declare — one from a framework — is left alone rather than guessed
+    at.
+    """
+    check("Every Result carries a failure type that can be an error")
+
+    sources = swift_files(APP_SOURCES, SHARED_SOURCES, WIDGET_SOURCES, *TESTS)
+
+    # What each locally-declared type inherits from, and which of those are errors. A protocol
+    # that refines Error makes its adopters errors too, so this settles by fixed point rather
+    # than by a single pass.
+    inherits: dict[str, set[str]] = {}
+    declaration = re.compile(
+        r"^\s*(?:public\s+|internal\s+|private\s+|fileprivate\s+|final\s+|@\w+\s+)*"
+        r"(?:struct|enum|class|protocol|actor)\s+(\w+)\s*(?:<[^>]*>)?\s*:\s*([^{]+)\{"
+    )
+    extension = re.compile(r"^\s*extension\s+(\w+)\s*:\s*([^{]+)\{")
+    declared: set[str] = set()
+    naming = re.compile(
+        r"^\s*(?:public\s+|internal\s+|private\s+|fileprivate\s+|final\s+|@\w+\s+)*"
+        r"(?:struct|enum|class|protocol|actor)\s+(\w+)\b"
+    )
+    for path in sources:
+        for line in without_comments(path.read_text()).splitlines():
+            if found := naming.match(line):
+                declared.add(found.group(1))
+            for pattern in (declaration, extension):
+                if match := pattern.match(line):
+                    name = match.group(1)
+                    parents = {
+                        part.strip().split("<")[0].split(".")[-1]
+                        for part in match.group(2).split(",")
+                        if part.strip()
+                    }
+                    inherits.setdefault(name, set()).update(parents)
+
+    errors = {"Error", "LocalizedError", "CustomNSError", "RecoverableError", "DecodingError"}
+    growing = True
+    while growing:
+        growing = False
+        for name, parents in inherits.items():
+            if name not in errors and parents & errors:
+                errors.add(name)
+                growing = True
+
+    # Standard-library types this repository cannot make into errors without an extension it
+    # does not have. Anything else unknown is a framework type and is not guessed at.
+    never = {
+        "String", "Int", "Int32", "Int64", "Double", "Float", "Bool", "Data", "Date",
+        "Decimal", "URL", "UUID", "Character", "Void", "Never",
+    }
+
+    for path in sources:
+        text = without_comments(path.read_text())
+        for number, line in enumerate(text.splitlines(), start=1):
+            for start in (found.end() for found in re.finditer(r"\bResult\s*<", line)):
+                depth, index = 1, start
+                arguments, current = [], ""
+                while index < len(line) and depth > 0:
+                    character = line[index]
+                    if character in "<([":
+                        depth += 1
+                    elif character in ">)]":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    if character == "," and depth == 1:
+                        arguments.append(current)
+                        current = ""
+                    else:
+                        current += character
+                    index += 1
+                if depth != 0:
+                    continue  # Split across lines; the next sweep will not see it either way.
+                arguments.append(current)
+                if len(arguments) != 2:
+                    continue
+                failure = arguments[1].strip().split("<")[0].split(".")[-1]
+                failure = failure.removeprefix("[").removesuffix("]")
+                if failure in never:
+                    reason = f"`{failure}` does not conform to Error"
+                elif failure in declared and failure not in errors:
+                    reason = f"`{failure}` is declared here and does not conform to Error"
+                else:
+                    continue
+                fail(
+                    "result-failure-type",
+                    f"{path.relative_to(ROOT).as_posix()}:{number} writes "
+                    f"Result<..., {failure}> and {reason}, so this will not compile. Return a "
+                    "named enum of the two outcomes instead, the way "
+                    "AttachmentEditingService.Removal does.",
+                )
+
 def check_call_sites_resolve() -> None:
     check("Initialiser and static-call sites match their declarations")
     # The app layer has never been compiled. This is the nearest thing available to a type check
@@ -2213,6 +2317,7 @@ def main() -> int:
         check_the_pdf_does_not_use_dynamic_colours,
         check_no_alert_shares_a_chain_with_a_sheet,
         check_memberwise_initialisers_are_reachable,
+        check_result_failures_are_errors,
         check_nothing_dismisses_and_presents_in_one_turn,
         check_notifications_are_delivered_and_read,
         check_call_sites_resolve,

@@ -85,9 +85,9 @@ final class AttachmentEditingTests: XCTestCase {
 
         let service = AttachmentEditingService(context: context)
         switch service.remove(asset) {
-        case let .failure(message):
+        case let .failed(message):
             XCTFail("removing should have succeeded: \(message)")
-        case let .success(paths):
+        case let .removed(paths):
             // Both the file and its thumbnail. Leaving the thumbnail behind is a photograph the
             // user believes they deleted, still on the phone.
             XCTAssertEqual(Set(paths), ["evidence/one.jpg", "thumbs/one.jpg"])
@@ -103,9 +103,9 @@ final class AttachmentEditingTests: XCTestCase {
         XCTAssertNil(PersistentStore.save(context, describing: "setup"))
 
         switch AttachmentEditingService(context: context).remove(asset) {
-        case let .failure(message):
+        case let .failed(message):
             XCTFail("removing should have succeeded: \(message)")
-        case let .success(paths):
+        case let .removed(paths):
             XCTAssertEqual(paths, ["evidence/one.jpg"])
         }
     }

@@ -237,9 +237,9 @@ struct AttachmentEditorView: View {
         // produce, which is the one thing this app must never do. The service does the record
         // and hands back what is now unreferenced.
         switch AttachmentEditingService(context: context).remove(asset) {
-        case let .failure(message):
+        case let .failed(message):
             saveFailure = message
-        case let .success(paths):
+        case let .removed(paths):
             Task { [fileStore = dependencies.fileStore] in
                 for path in paths { await fileStore.delete(relativePath: path) }
             }
