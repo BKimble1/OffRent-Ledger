@@ -183,6 +183,14 @@ extension XCUIApplication {
 
     /// Every element currently on screen that carries an accessibility identifier, with its type.
     ///
+    /// Read this with care on an iPad. `debugDescription` is a snapshot of what the platform
+    /// chooses to expose, and with a sheet presented it can list nothing but the dismiss region
+    /// — while `descendants(matching:)` still finds every root behind it. A failure message
+    /// built from this alone said "the screen is empty" twice in a row about a screen that was
+    /// entirely intact, and two commits were spent acting on that. Where a message needs to say
+    /// whether something is *there*, query it and print the answer; use this for the extra
+    /// context around it.
+    ///
     /// A full `debugDescription` of a busy screen runs to several hundred lines of unnamed
     /// containers; these are the lines that decide whether a test is looking for the right thing.
     func identifiedElements() -> String {

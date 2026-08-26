@@ -52,7 +52,16 @@ final class CoreWorkflowUITests: XCTestCase {
         // thing.
         let paywall = app.anyElement(A11yUI.Paywall.root)
         let deadline = Date().addingTimeInterval(30)
-        while !preview.exists && !stated.exists && !paywall.exists && Date() < deadline {}
+        while !preview.exists && !stated.exists && !paywall.exists && Date() < deadline {
+            // Scrolling while waiting, because waiting alone can never work here.
+            //
+            // Preview and Share are added to the same section as Generate once a file exists,
+            // and a `Form` builds its rows lazily. On an iPad this sheet is 650 points tall and
+            // those two rows land below its fold — where a row is not merely off-screen, it has
+            // never been built, so `exists` stays false however long the loop runs. On an iPhone
+            // the sheet is full height, they are already on screen, and the first check exits.
+            (app.scrollableContainer() ?? app).swipeUp()
+        }
 
         if paywall.exists {
             XCTFail("generating opened the paywall, so this run is not entitled to export")
