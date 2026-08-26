@@ -122,25 +122,33 @@ correctly persisted store reproduces it exactly.
 
 ## B. Executed on the simulator — the app-target suite
 
-Run by the `Verify` workflow, `xcodebuild test -only-testing:OffRentLedgerTests` against
-the iOS 26.4 simulator. These need SwiftData, UIKit, UserNotifications and a bundle, so this
-machine cannot run them; CI can.
+Run by the `Verify` workflow, `xcodebuild test -only-testing:OffRentLedgerTests` against an
+iPhone and an iPad simulator. These need SwiftData, UIKit, UserNotifications and a bundle, so
+this machine cannot run them; CI can.
 
-**Run 1: 45 tests, 44 passed, 1 failed** — a real defect in the file store (below).
-**Run 2: 45 tests, 41 passed, 4 failed** — the file-store fix held, and four tests that had
-passed in run 1 failed in run 2 without any change to the code they cover. They waited on the
-clock rather than on the condition; run 2's machine was slower (309s vs 200s for the same step)
-and 200ms was no longer enough. Also below.
+**88 tests across 13 suites.** Last fully green: the "Unit tests" step of run
+[32983157504](https://github.com/BKimble1/OffRent-Ledger/actions/runs/32983157504) at commit
+`654b2be`. The two historic failures described below are kept because of what they found, not
+because they are current.
 
-| Suite | Tests | Result | Covers |
-|---|---:|---|---|
-| `PersistenceTests` | 8 | ✅ pass | SwiftData relationships, cascade vs nullify, unknown-status degradation, archive round trip, additive import |
-| `WorkflowServiceTests` | 8 | ✅ pass | Accrual stops on done and backdates to the vendor's time; refused transitions write no event; reopen restarts accrual; estimate cache |
-| `FileStoreTests` | 7 | ⚠️ 6 pass, 1 failed | Downscaling, digests, **reconcile never removes a referenced file**, path traversal refused |
-| `ScanReviewCommitTests` | 7 | ⚠️ run 1 pass, run 2 flaked | **Running the whole scan pipeline and discarding it writes nothing** |
-| `EntitlementBehaviourTests` | 4 | ✅ pass | Free limit against a real store; resolving frees the slot; lapsed Pro keeps everything working |
-| `NotificationSchedulerTests` | 5 | ✅ pass | Add/cancel diffing; no authorisation request from synchronising |
-| `CopyTests` + `FixtureParityTests` | 6 | ✅ pass | Required copy present, banned copy absent, stub matches the committed fixture |
+| Suite | Tests | Covers |
+|---|---:|---|
+| `MigrationTests` | 15 | V1→V2→V3→V4, every stage lightweight; a store written by an earlier schema opens |
+| `DeepLinkRoutingTests` | 9 | Where each link lands; a foreign URL is refused; the sheet queue holds one request and the later one wins |
+| `PersistenceTests` | 8 | SwiftData relationships, cascade vs nullify, unknown-status degradation, archive round trip, additive import |
+| `WorkflowServiceTests` | 8 | Accrual stops on done and backdates to the vendor's time; refused transitions write no event; reopen restarts accrual; estimate cache |
+| `FileStoreTests` | 7 | Downscaling, digests, **reconcile never removes a referenced file**, path traversal refused |
+| `ScanReviewCommitTests` | 7 | **Running the whole scan pipeline and discarding it writes nothing** |
+| `CopyAndFixtureTests` | 6 | Required copy present, banned copy absent, stub matches the committed fixture |
+| `AttachmentEditingTests` | 5 | Renaming and captioning survive a refetch; a blank name falls back rather than blanking the record; a failed save restores what was there; removal reports the file paths, and only once the record is gone |
+| `EvidencePDFTests` | 5 | The packet is not blank and its text is not clipped — pages are rasterised and the pixels read back |
+| `LaunchScreenTests` | 5 | The shipping Info.plist declares a launch screen and names both keys; the splash draws the mark at the size the launch image does |
+| `NotificationSchedulerTests` | 5 | Add/cancel diffing; no authorisation request from synchronising; a test reminder survives a reschedule |
+| `EntitlementBehaviourTests` | 4 | Free limit against a real store; resolving frees the slot; lapsed Pro keeps everything working |
+| `ScanIntelligenceTests` | 4 | The model guardrail: a value not printed on the page is dropped; a rule-based suggestion always wins |
+
+Two historic failures are worth keeping, because each was a real defect the suite caught before
+it shipped:
 
 ### The failure, and what it found
 

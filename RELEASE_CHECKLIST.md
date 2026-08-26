@@ -187,44 +187,54 @@ that proves the new signal works, and it is the one no simulator test can make.
       the Shortcuts suggestions must describe the restored data, not what was there before.
 
 
-## 3. Apple accounts and signing — none of this exists yet
+## 3. Apple accounts and signing — done, and proved by a build Apple accepted
 
-- [ ] Confirm `com.idlery.offrent` is available, or choose another and change
-      `OFFRENT_BUNDLE_PREFIX` in `Config/Identifiers.xcconfig` (one edit).
-- [ ] Confirm the team. `OFFRENT_DEVELOPMENT_TEAM` currently reads `7GNFT94A9L`, **carried over
-      from the owner's existing CoreCredit project and not verified against anything for this
-      app**. Decide whether Idlery Services LLC should have its own account.
-- [ ] Create App IDs: `com.idlery.offrent` and `com.idlery.offrent.widget`, both with the App
-      Groups capability.
-- [ ] Create the App Group `group.com.idlery.offrent` and assign it to both.
-- [ ] Create the App Store Connect app record.
-- [ ] Create the subscription group `OffRent Ledger Pro` with:
+This section used to read "none of this exists yet", with every box empty. It is out of date, and
+in the direction that matters: it made the work still outstanding harder to find.
+
+A build reaching TestFlight and reporting `processingState = VALID` is not a claim — it is Apple
+saying it accepted a signed archive for this bundle. That single fact proves most of this list,
+because the upload could not have happened otherwise:
+
+- [x] `com.idlery.offrent` is registered and is this app's identifier.
+- [x] The team is correct for this app. `OFFRENT_DEVELOPMENT_TEAM` reads `7GNFT94A9L`, and an
+      archive signed against it was accepted. It was carried over from the owner's CoreCredit
+      project; it is now verified by use rather than by assumption.
+- [x] Both App IDs exist — `com.idlery.offrent` and `com.idlery.offrent.widget`. The widget ships
+      inside the archive, so a missing App ID would have failed the export.
+- [x] The App Group `group.com.idlery.offrent` exists and is assigned to both. Entitlements have
+      to match a profile Apple issued, or signing fails.
+- [x] The App Store Connect app record exists. Builds are attached to it.
+- [x] An App Store Connect API key with the **App Manager** role exists, and `ASC_KEY_ID`,
+      `ASC_ISSUER_ID` and `ASC_PRIVATE_KEY` are set as repository secrets. Below App Manager the
+      archive fails on provisioning; it does not.
+- [x] The **TestFlight** workflow runs and uploads. Its build number comes from App Store Connect
+      itself — the highest it holds for this bundle, plus one — so it cannot be wrong-footed by a
+      build from another pipeline.
+
+There is still no certificate or provisioning-profile secret, and there should not be. The
+workflow archives with `-allowProvisioningUpdates` and the same API key, so Xcode issues and
+downloads what it needs. Three secrets to rotate instead of five, and no `.p8` or `.p12` sitting
+in a repository setting.
+
+**What a successful upload does not prove, and what is therefore still open:**
+
+- [ ] The subscription group `OffRent Ledger Pro` and its two products, configured in App Store
+      Connect:
       - `com.idlery.offrent.pro.monthly` — auto-renewable, 1 month, US $14.99
       - `com.idlery.offrent.pro.annual` — auto-renewable, 1 year, US $119.99
-      - Localised display names and descriptions, and a review screenshot for each.
-- [ ] Create an App Store Connect API key with the **App Manager** role
-      (**Users and Access → Integrations → Keys**). Apple lets you download the `.p8` once.
-- [ ] Add three repository secrets under **Settings → Secrets and variables → Actions**:
-      - `ASC_KEY_ID` — the 10-character key id
-      - `ASC_ISSUER_ID` — the issuer UUID on the same page
-      - `ASC_PRIVATE_KEY` — the whole `.p8`, BEGIN and END lines included
 
-      `APP_STORE_CONNECT_*` are accepted as aliases.
+      An upload never touches these. The app reads prices from `Product.displayPrice` and shows
+      nothing if StoreKit returns no products, so a build can be perfectly valid and still have a
+      paywall with nothing on it. This is the single most likely cause of a rejection under
+      guideline 3.1.2, and it cannot be checked from here.
+- [ ] Localised display name, description and a review screenshot for each product. Apple's
+      reviewer sees these, and a missing review screenshot is a rejection on its own.
+- [ ] Assign the processed build to a tester group. The workflow uploads and stops: it does not
+      assign testers and does not submit for review.
 
-      There is no certificate or provisioning-profile secret to add. The workflow archives with
-      `-allowProvisioningUpdates` and the same key, so Xcode issues and downloads what it needs.
-      Below App Manager it cannot, and the archive fails on provisioning rather than on anything
-      in the source.
 - [ ] Optionally add `APPLE_TEAM_ID`. Without it the export falls back to the team id in
-      `Config/Identifiers.xcconfig`.
-- [ ] Run the **TestFlight** workflow from the Actions tab. Its first step refuses to start until
-      all three secrets exist, rather than failing twenty minutes later on a signing error that
-      says nothing useful.
-- [ ] Assign the processed build to a tester group in App Store Connect. The workflow uploads and
-      stops; it does not assign testers and does not submit for review.
-
-After a successful signed archive, the app is **TestFlight-ready**.
-
+      `Config/Identifiers.xcconfig`, which is what has been happening.
 ---
 
 ## 4. Legal, privacy and metadata
@@ -299,15 +309,31 @@ Only then is the app **App-Store-ready**.
 
 ---
 
-## Known outstanding blockers, as of the build that produced this repository
+## What is actually still in the way
 
-| # | Blocker | Owner |
-|---|---|---|
-| 1 | The app has never been compiled. No macOS or Xcode was available. | Whoever opens it in Xcode |
-| 2 | `BKimble1/OffRent-Ledger` had to be created by hand — the GitHub App in that session could not create repositories (403). | Repository owner |
-| 3 | Bundle ID availability, Team ID correctness, App Store Connect record: all unverified. | Repository owner |
-| 4 | Production subscription products do not exist. | Repository owner |
-| 5 | `offrent.idlery.com` does not exist. The app correctly claims nothing. | Repository owner |
-| 6 | "OffRent Ledger" trademark clearance unknown. | Counsel |
-| 7 | Final app icon and marketing artwork outstanding. | Designer |
-| 8 | Terms of Use sections 10, 11 and 13 need legal review. | Counsel |
+This table used to be "as of the build that produced this repository", and four of its eight rows
+have since been settled — by CI compiling and testing the app on every push, and by builds Apple
+accepted. Leaving them listed buried the ones that still matter.
+
+**Settled, and how:**
+
+| Was | Settled by |
+|---|---|
+| The app has never been compiled. | `verify.yml` builds the app and the widget for an iPhone and an iPad simulator on every push, and runs both test suites on each. |
+| `BKimble1/OffRent-Ledger` had to be created by hand. | It exists and is the origin this pushes to. |
+| Bundle ID availability, Team ID correctness, App Store Connect record. | An archive signed with `7GNFT94A9L` for `com.idlery.offrent` was accepted by App Store Connect and reported `VALID`. See §3. |
+| Final app icon outstanding. | The owner's artwork is installed and checked for size and alpha by `verify_repository.py`. Screenshots are still outstanding — see below. |
+
+**Still in the way:**
+
+| # | Blocker | Owner | Why it cannot be closed from here |
+|---|---|---|---|
+| 1 | The two subscription products do not demonstrably exist in App Store Connect. | Repository owner | An upload never touches them. The paywall reads `Product.displayPrice` and shows nothing when StoreKit returns no products, so the build can be valid and the paywall empty. Most likely single cause of a 3.1.2 rejection. |
+| 2 | No Sandbox purchase, restore, refund or upgrade/downgrade has been exercised. | Repository owner | Needs a real Apple Account and a real transaction. The local `.storekit` file is a simulator fixture and proves nothing about any of it. |
+| 3 | Nothing has run on real hardware. | Repository owner | Camera, OCR against real contracts, notification delivery and the tap that follows it, widget and Lock Screen rendering, sharing a PDF out. A simulator cannot do these. |
+| 4 | `offrent.idlery.com` does not exist. | Repository owner | The app claims nothing — `legalURLsAreLive` is `false` and the legal screens render bundled Markdown. App Store Connect still wants a live privacy policy URL at submission. |
+| 5 | App Store screenshots. | Designer | Required by App Store Connect; not required for TestFlight. |
+| 6 | "OffRent Ledger" trademark clearance unknown. | Counsel | |
+| 7 | Terms of Use sections 10, 11 and 13 need legal review. | Counsel | |
+
+Blockers 1 through 4 are between TestFlight and submission. None of them blocks TestFlight itself.
