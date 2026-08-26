@@ -20,7 +20,10 @@ struct OffRentSummaryWidget: Widget {
         // up, so there is deliberately no field here that could name a machine, a jobsite or a
         // rental company — the guarantee is structural rather than a rule to remember.
         .supportedFamilies([
-            .systemSmall, .systemMedium, .systemLarge,
+            // `.systemExtraLarge` is the iPad-only home screen family. It is listed because the
+            // app is universal and an iPad home screen offers it; WidgetKit simply never offers
+            // it on an iPhone. It draws the large layout, which already fits.
+            .systemSmall, .systemMedium, .systemLarge, .systemExtraLarge,
             .accessoryRectangular, .accessoryCircular, .accessoryInline,
         ])
     }
@@ -83,6 +86,22 @@ struct SummaryWidgetView: View {
     private var isAccessory: Bool {
         switch family {
         case .accessoryRectangular, .accessoryCircular, .accessoryInline: true
+        default: false
+        }
+    }
+
+    /// The families with room for a row of three figures rather than one.
+    private var hasRoomForAllThreeCounts: Bool {
+        switch family {
+        case .systemMedium, .systemLarge, .systemExtraLarge: true
+        default: false
+        }
+    }
+
+    /// The families with room to say what to do next underneath the figures.
+    private var hasRoomForTheNextStep: Bool {
+        switch family {
+        case .systemLarge, .systemExtraLarge: true
         default: false
         }
     }
@@ -197,7 +216,7 @@ struct SummaryWidgetView: View {
 
             Spacer(minLength: 0)
 
-            if family == .systemMedium || family == .systemLarge {
+            if hasRoomForAllThreeCounts {
                 HStack(spacing: 14) {
                     stat("\(snapshot.openItemCount)", "open")
                     stat("\(snapshot.awaitingPickupCount)", "awaiting pickup")
@@ -207,7 +226,7 @@ struct SummaryWidgetView: View {
                 stat("\(snapshot.openItemCount)", snapshot.openItemCount == 1 ? "open rental" : "open rentals")
             }
 
-            if family == .systemLarge {
+            if hasRoomForTheNextStep {
                 Divider()
                 // The large family has room to say what to do next rather than only what is
                 // true. Still aggregate — it names no machine and no rental company.

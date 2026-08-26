@@ -1635,6 +1635,38 @@ def check_ocr_fixtures_exist() -> None:
         fail("fixtures", "OCRFixtures/README.md must state that the fixtures are synthetic")
 
 
+def check_one_colour_scheme_decision() -> None:
+    """The app decides its colour scheme in exactly one place.
+
+    `preferredColorScheme` is a preference that travels up the view tree, so when two of them are
+    on the same path the outer one wins and the inner one silently does nothing. That happened:
+    a `.light` was added at the scene root while `RootView` was still applying the user's
+    Settings › Appearance choice, which turned that picker into a control with no effect. Nothing
+    fails, nothing logs, and the only way to notice is to tap Dark and watch nothing happen.
+
+    Screens that are deliberately one appearance — a scanner overlay, say — would need an
+    exemption here rather than a second unconditional call.
+    """
+    check("The colour scheme is decided in exactly one place")
+    found: list[str] = []
+    for path in swift_files(APP_SOURCES):
+        source = without_comments(path.read_text())
+        for match in re.finditer(r"\.preferredColorScheme\(", source):
+            line = source[: match.start()].count("\n") + 1
+            found.append(f"{path.relative_to(ROOT).as_posix()}:{line}")
+    if len(found) > 1:
+        fail(
+            "colour-scheme",
+            "more than one .preferredColorScheme is applied to the app "
+            f"({', '.join(found)}); the outer one wins and the others do nothing",
+        )
+    elif not found:
+        fail(
+            "colour-scheme",
+            "nothing applies .preferredColorScheme, so Settings › Appearance cannot work",
+        )
+
+
 def check_ipad_support_is_declared() -> None:
     """The app is universal, rotates on iPad, and the layout cap the tests measure is the real one.
 
@@ -1907,6 +1939,7 @@ def main() -> int:
         check_saves_are_not_silent,
         check_tests_live_inside_a_test_case,
         check_ipad_support_is_declared,
+        check_one_colour_scheme_decision,
         check_call_sites_resolve,
         check_every_ui_suite_actually_runs,
         check_github_workflows,

@@ -126,6 +126,15 @@ enum AppearanceSetting {
     static let light = "light"
     static let dark = "dark"
 
+    /// What a fresh install gets: light, whatever the phone is set to.
+    ///
+    /// The whole visual layer was designed against warm white and graphite, and that is the one
+    /// somebody sees first. `Match iOS` and `Dark` are still there for anyone who wants them —
+    /// every text token clears 4.5:1 on all three dark surfaces too, which
+    /// `check_text_colours_meet_contrast` measures in both modes — but a phone set to dark
+    /// should not be the reason a new user's first screen is one nobody chose for them.
+    static let installDefault = light
+
     static func colorScheme(for value: String) -> ColorScheme? {
         switch value {
         case light: .light

@@ -173,7 +173,8 @@ struct SubscriptionSettingsView: View {
 }
 
 struct AppearanceSettingsView: View {
-    @AppStorage(AppearanceSetting.storageKey) private var appearance = AppearanceSetting.system
+    @AppStorage(AppearanceSetting.storageKey)
+    private var appearance = AppearanceSetting.installDefault
 
     var body: some View {
         List {

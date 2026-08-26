@@ -8,7 +8,6 @@ struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @Environment(OnboardingState.self) private var onboarding
-    @AppStorage(AppearanceSetting.storageKey) private var appearance = AppearanceSetting.system
 
     /// Guards the once-per-launch check below. Without it, every `.task` re-entry would
     /// re-present a walkthrough the user has just dismissed.
@@ -45,7 +44,9 @@ struct RootView: View {
                 .tag(AppTab.settings)
         }
         .tint(Palette.accent)
-        .preferredColorScheme(AppearanceSetting.colorScheme(for: appearance))
+        // The colour scheme is set on the scene in `OffRentLedgerApp`, not here — from there it
+        // also reaches the launch splash and the store-recovery screen, which sit outside this
+        // view.
         .sheet(item: $router.presentedSheet) { sheet in
             sheetContent(for: sheet)
         }
