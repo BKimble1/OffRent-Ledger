@@ -94,8 +94,22 @@ struct FixtureParityTests {
             #expect(stub.document.rawText.contains(line), "stub drifted: \(line)")
         }
 
+        // The company, case-insensitively. A letterhead prints SUMMIT RENTAL CO. and the record
+        // it has to agree with is "Summit Rental Co." — the same rental company, shouted. The
+        // skid-steer fixture does the same thing with CEDAR RIDGE EQUIPMENT RENTAL LLC, because
+        // that is what a recogniser reads off the top of a contract. The assertion is about
+        // which yard the scan names, not about which of the two was in caps.
+        //
+        // Everything below it is an identifier, and identifiers are compared exactly: EX-118 is
+        // not the same unit as ex-118, and a fixture that disagreed with the record about the
+        // case of a unit number would be a real disagreement.
         let machine = AppStoreCaptureFixture.miniExcavator
-        #expect(stub.document.rawText.contains(machine.company.name))
+        #expect(
+            stub.document.rawText.range(
+                of: machine.company.name, options: [.caseInsensitive, .diacriticInsensitive]
+            ) != nil,
+            "the scanned contract names a different rental company from the fixture's"
+        )
         #expect(fixture.contains(machine.vendorEquipmentIdentifier))
         #expect(fixture.contains(machine.serialNumber))
         #expect(fixture.contains(machine.agreementNumber))
