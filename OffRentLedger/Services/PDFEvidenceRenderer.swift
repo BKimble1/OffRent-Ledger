@@ -348,6 +348,27 @@ private struct PageLayout {
         static let rule = UIColor(red: 0.780, green: 0.770, blue: 0.740, alpha: 1)
     }
 
+    /// Written out rather than relying on the memberwise initialiser.
+    ///
+    /// Swift gives a struct's *memberwise* init the access level of its most restrictive stored
+    /// property, and this type has two private ones. So the synthesised init was private, and
+    /// the two call sites twenty lines up — in this same file, but outside the type — would not
+    /// compile. That is a build failure with no local equivalent: `swiftc -parse` does not do
+    /// access control, so nothing on this machine could have caught it.
+    init(
+        context: UIGraphicsPDFRendererContext,
+        pageSize: CGSize,
+        margin: CGFloat,
+        documentTitle: String,
+        totalPages: Int?
+    ) {
+        self.context = context
+        self.pageSize = pageSize
+        self.margin = margin
+        self.documentTitle = documentTitle
+        self.totalPages = totalPages
+    }
+
     private var contentWidth: CGFloat { pageSize.width - margin * 2 }
     /// The footer sits below this, so content never lands on top of the page number.
     private var footerHeight: CGFloat { 28 }

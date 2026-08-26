@@ -1635,6 +1635,79 @@ def check_ocr_fixtures_exist() -> None:
         fail("fixtures", "OCRFixtures/README.md must state that the fixtures are synthetic")
 
 
+def check_memberwise_initialisers_are_reachable() -> None:
+    """A struct with a private stored property has a private memberwise initialiser.
+
+    Swift gives the synthesised memberwise initialiser the access level of the type's most
+    restrictive stored property — and a default value does not save it. Add one `private var` to
+    a struct that other code constructs by listing its members and every one of those call sites
+    stops compiling, including ones in the same file, because `private` is scoped to the
+    declaration rather than the file.
+
+    It cost a build. `PageLayout` in the PDF renderer gained `private var isFresh = false` and
+    `private(set) var pageNumber = 0`, both with defaults, and the two calls twenty lines above
+    it failed with "initializer is inaccessible due to 'private' protection level".
+
+    There is no local equivalent: `swiftc -parse` does not do access control, and the only real
+    type-checker in this project runs in CI twenty minutes away. So the shape is checked here.
+
+    Property-wrapped storage is exempt and has to be — `@State private var` is on almost every
+    view in the app, and those views are constructed by member constantly. The wrapper owns the
+    storage, and Swift does not let it restrict the initialiser.
+    """
+    check("Every struct constructed by member is constructible from where it is called")
+
+    def body_of(source: str, brace: int) -> str:
+        """The text between a type's opening brace and its matching close."""
+        depth = 0
+        for index in range(brace, len(source)):
+            if source[index] == "{":
+                depth += 1
+            elif source[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    return source[brace + 1 : index]
+        return source[brace:]
+
+    declaration = re.compile(r"^[ \t]*(?:private |fileprivate |internal |public )?struct (\w+)[^{\n]*\{", re.M)
+    # `private` at the start of the line only: anything with an attribute in front of it is
+    # property-wrapped storage, which does not restrict the memberwise initialiser.
+    #
+    # The whole line is captured so a *computed* property can be told apart from a stored one. A
+    # computed `private var` has no bearing on the initialiser at all, and this app is full of
+    # them — three in `EstimateLabel` alone, which is constructed by member on the next screen.
+    private_storage = re.compile(
+        r"^[ \t]+(?:private|fileprivate)(?:\(set\))?[ \t]+(?:var|let)[ \t]+\w+[^\n]*$", re.M
+    )
+    explicit_init = re.compile(r"^[ \t]+(?:private |fileprivate |public )?init[ \t]*\(", re.M)
+
+    for path in swift_files(APP_SOURCES, WIDGET_SOURCES):
+        source = without_comments(path.read_text())
+        for match in declaration.finditer(source):
+            name = match.group(1)
+            body = body_of(source, match.end() - 1)
+            stored = [
+                line.group(0)
+                for line in private_storage.finditer(body)
+                # A brace on the declaration line means a computed property or an observer.
+                if "{" not in line.group(0)
+            ]
+            if not stored:
+                continue
+            if explicit_init.search(body):
+                continue
+            call = re.search(rf"\b{name}\([ \t\n]*\w+:", source)
+            if not call:
+                continue
+            line = source[: call.start()].count("\n") + 1
+            fail(
+                "memberwise-access",
+                f"{path.relative_to(ROOT).as_posix()}:{line} builds {name} from its members, but "
+                f"{name} has a private stored property and no explicit init — Swift makes the "
+                "memberwise initialiser private and the call will not compile",
+            )
+
+
 def check_no_alert_shares_a_chain_with_a_sheet() -> None:
     """An `.alert` and a `.sheet` on one modifier chain, and the sheet stops presenting.
 
@@ -2042,6 +2115,7 @@ def main() -> int:
         check_one_colour_scheme_decision,
         check_the_pdf_does_not_use_dynamic_colours,
         check_no_alert_shares_a_chain_with_a_sheet,
+        check_memberwise_initialisers_are_reachable,
         check_call_sites_resolve,
         check_every_ui_suite_actually_runs,
         check_github_workflows,
