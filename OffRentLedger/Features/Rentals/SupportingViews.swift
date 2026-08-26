@@ -623,20 +623,33 @@ struct EvidenceManagerView: View {
 
     private func delete(_ offsets: IndexSet) {
         guard let item = items.first, let assets = item.assets else { return }
-        let doomed = offsets.map { assets[$0] }
-        let paths = doomed.flatMap { [$0.relativePath, $0.thumbnailRelativePath].compactMap { $0 } }
-        for asset in doomed { context.delete(asset) }
-        // Files are removed after the record, not before: a failed save would otherwise leave a
-        // record pointing at a file that is already gone. Which is why the save's answer is now
-        // read rather than discarded — the whole ordering was pointless while nothing could tell
-        // whether the save had worked.
-        if let failure = PersistentStore.save(context, describing: "That change") {
-            attachmentFailure = failure
-            return
+        let service = AttachmentEditingService(context: context)
+        var unreferenced: [String] = []
+        var failure: String?
+
+        // Through the service, not a second copy of it. This used to delete and save inline,
+        // which was the same ordering — the record first, then the files, so a failed save can
+        // never leave a rental pointing at a photograph that is already gone — but without the
+        // rollback. A failed save left the assets marked deleted in the context, so the list
+        // showed them gone while the store still held them, until something refetched.
+        //
+        // One removal at a time, each with its own save. A batch that stops halfway leaves what
+        // already committed committed, which is right: those are gone, and the message says what
+        // did not happen rather than implying nothing did.
+        for asset in offsets.map({ assets[$0] }) {
+            switch service.remove(asset) {
+            case let .removed(paths):
+                unreferenced += paths
+            case let .failed(message):
+                failure = message
+            }
+            if failure != nil { break }
         }
-        attachmentFailure = nil
+
+        attachmentFailure = failure
+        guard !unreferenced.isEmpty else { return }
         Task { [fileStore = dependencies.fileStore] in
-            for path in paths { await fileStore.delete(relativePath: path) }
+            for path in unreferenced { await fileStore.delete(relativePath: path) }
         }
     }
 }
