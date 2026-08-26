@@ -212,6 +212,11 @@ enum A11yUI {
     enum Settings {
         static let root = "settings.root"
         static let subscription = "settings.subscription"
+        static let subscriptionRoot = "settings.subscription.root"
+        static let subscriptionPlan = "settings.subscription.plan"
+        static let subscriptionSeePro = "settings.subscription.seePro"
+        static let subscriptionRestore = "settings.subscription.restore"
+        static let subscriptionManage = "settings.subscription.manage"
         static let autoFillScans = "settings.autoFillScans"
         static let dataAndPrivacy = "settings.dataAndPrivacy"
         static let backupAndTransfer = "settings.backupAndTransfer"

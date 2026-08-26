@@ -102,8 +102,23 @@ final class EntitlementUITests: XCTestCase {
 
         app.tab(A11yUI.Tab.settings).tap()
         app.expect(app.anyElement(A11yUI.Settings.subscription)).tap()
-        app.expect(app.buttons["See Pro options"]).tap()
+        app.expect(app.anyElement(A11yUI.Settings.subscriptionRoot))
 
+        // The screen says what plan you are on, in words, before offering to change it. It used
+        // to print the raw StoreKit product identifier here.
+        XCTAssertTrue(
+            app.anyElement(A11yUI.Settings.subscriptionPlan).exists,
+            "the subscription screen does not say what plan this is"
+        )
+        XCTAssertTrue(
+            app.anyElement(A11yUI.Settings.subscriptionRestore).exists,
+            "Restore purchases must be reachable here — Apple requires it and so does anybody "
+                + "who changes phone"
+        )
+
+        // By identifier rather than by title, so renaming the button is a copy change and not a
+        // broken test.
+        app.tapInContent(app.anyElement(A11yUI.Settings.subscriptionSeePro))
         app.expect(app.anyElement(A11yUI.Paywall.root))
         selectPlan(A11yUI.Paywall.annual, in: app)
         XCTAssertTrue(
