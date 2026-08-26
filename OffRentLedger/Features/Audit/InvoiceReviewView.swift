@@ -258,8 +258,13 @@ struct InvoiceReviewView: View {
     }
 
     private func findingsSection() -> some View {
-        section(title: "Possible mismatches found") {
-            ForEach(Array(unaddressedFindings.enumerated()), id: \.element.id) { index, finding in
+        // Resolved once, not per row. `unaddressedFindings` walks the invoice's discrepancies and
+        // filters the comparison each time it is read; calling it inside the loop *and* in the
+        // separator test made this the slowest body in the app to type-check, at 1226ms against
+        // the repository's 300ms limit.
+        let findings: [DiscrepancyValue] = unaddressedFindings
+        return section(title: "Possible mismatches found") {
+            ForEach(Array(findings.enumerated()), id: \.element.id) { index, finding in
                 VStack(alignment: .leading, spacing: Space.snug) {
                     Text(finding.type.displayName).font(Typography.rowTitle)
                     if let expected = finding.expectedAmount, let invoiced = finding.invoicedAmount {
@@ -287,7 +292,7 @@ struct InvoiceReviewView: View {
                 }
                 .padding(.horizontal, Space.comfortable)
                 .padding(.vertical, Space.base)
-                if index < comparison.findings.count - 1 { RowDivider(inset: Space.comfortable) }
+                if index < findings.count - 1 { RowDivider(inset: Space.comfortable) }
             }
         }
     }
