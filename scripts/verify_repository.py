@@ -2214,6 +2214,71 @@ def check_main_actor_work_is_isolated() -> None:
                 "Annotate it @MainActor, the way RentalWorkflowService and ExportService are.",
             )
 
+def check_no_live_query_is_built_once_per_row() -> None:
+    """A `@Query` view used as a `NavigationLink` destination inside a `ForEach`.
+
+    `NavigationLink { SomeView(...) } label: { ... }` builds its destination *eagerly*, and again
+    every time the list updates. One row is a construction; a `ForEach` is one per row, forever.
+    Give that destination a `@Query` whose `#Predicate` is built in `init` and each construction
+    makes a fresh `FetchDescriptor` — one SwiftData cannot recognise as the previous one, so it
+    fetches again and publishes again, and the view graph stops settling.
+
+    That is a spinning main thread. On a real iPhone it is a watchdog kill, `0x8BADF00D`, which
+    arrives as a crash report saying only that the app failed to terminate gracefully — with the
+    main thread parked in `AG::Graph::UpdateStack::update`. It shipped in build 21 and a tester
+    hit it by tapping an attachment.
+
+    The value-based form is not affected: `NavigationLink(value:)` with `navigationDestination`
+    builds the destination once, at push time, which is why the nine other screens doing the same
+    thing with `@Query` have been fine. An editor reached from a row wants one fetch, not a live
+    query — see `AttachmentEditorView.fetchOnce`.
+    """
+    check("No live-query screen is rebuilt once per row")
+
+    def block(source: str, start: int) -> str:
+        depth, index = 0, source.index("{", start)
+        for position in range(index, len(source)):
+            if source[position] == "{":
+                depth += 1
+            elif source[position] == "}":
+                depth -= 1
+                if depth == 0:
+                    return source[index : position + 1]
+        return source[index:]
+
+    # Which view types declare a live `@Query`.
+    querying: set[str] = set()
+    declaration = re.compile(
+        r"^\s*(?:public |internal |private |fileprivate )?struct (\w+)\s*:[^{\n]*\bView\b[^{\n]*\{",
+        re.M,
+    )
+    for path in swift_files(APP_SOURCES):
+        source = without_comments(path.read_text())
+        for match in declaration.finditer(source):
+            if re.search(r"^\s*@Query\b", block(source, match.end() - 1), re.M):
+                querying.add(match.group(1))
+
+    if not querying:
+        return
+
+    constructed = re.compile(r"NavigationLink\s*\{\s*(?:if let \w+\s*\{\s*)?(\w+)\s*\(")
+    for path in swift_files(APP_SOURCES):
+        source = without_comments(path.read_text())
+        for found in re.finditer(r"\bForEach\s*[\(\{]", source):
+            body = block(source, found.start())
+            for link in constructed.finditer(body):
+                if link.group(1) in querying:
+                    line = source[: found.start()].count("\n") + 1
+                    fail(
+                        "query-per-row",
+                        f"{path.relative_to(ROOT).as_posix()}:{line} builds "
+                        f"{link.group(1)} as a NavigationLink destination inside a ForEach, and "
+                        f"{link.group(1)} declares a @Query. The destination is constructed "
+                        "eagerly once per row and again on every update, so the query refetches "
+                        "and the view graph never settles — a spinning main thread, and a "
+                        "watchdog kill on device. Fetch once instead, or navigate by value.",
+                    )
+
 def check_call_sites_resolve() -> None:
     check("Initialiser and static-call sites match their declarations")
     # The app layer has never been compiled. This is the nearest thing available to a type check
@@ -2421,6 +2486,7 @@ def main() -> int:
         check_memberwise_initialisers_are_reachable,
         check_result_failures_are_errors,
         check_main_actor_work_is_isolated,
+        check_no_live_query_is_built_once_per_row,
         check_nothing_dismisses_and_presents_in_one_turn,
         check_notifications_are_delivered_and_read,
         check_call_sites_resolve,

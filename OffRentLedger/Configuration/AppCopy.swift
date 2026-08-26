@@ -102,6 +102,13 @@ enum AppCopy {
         rental beyond the free limit.
         """
 
+    /// Shown when an attachment's record is here and its bytes are not — a restore that
+    /// missed them, or a file evicted from the device.
+    static let attachmentFileMissing = """
+        The file is no longer on this iPhone. The rental still has the record of it, \
+        including when it was taken.
+        """
+
     static let subscriptionTerms = """
         Payment is charged to your Apple Account at confirmation. The subscription renews \
         automatically unless you turn off auto-renew at least 24 hours before the period ends. \

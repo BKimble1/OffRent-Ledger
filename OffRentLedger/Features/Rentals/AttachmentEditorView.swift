@@ -26,11 +26,23 @@ struct AttachmentEditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
-    @Query private var assets: [EvidenceAsset]
+    /// Fetched once, not observed.
+    ///
+    /// This was a `@Query` whose `#Predicate` was built in `init`. That is the shape SwiftData
+    /// churns on: a `NavigationLink { AttachmentEditorView(...) }` inside a `ForEach` constructs
+    /// its destination eagerly and again on every list update, each construction makes a fresh
+    /// `FetchDescriptor`, and a descriptor SwiftData cannot recognise as the previous one is a
+    /// reason to fetch again and publish again. The view graph then never settles — which is a
+    /// spinning main thread, and on a real iPhone a watchdog kill (0x8BADF00D) reported as a
+    /// crash when somebody taps an attachment.
+    ///
+    /// An editor does not need live results. It reads the record once, edits a copy of the two
+    /// fields in `@State`, and leaves when it has saved or removed it.
+    @State private var asset: EvidenceAsset?
+    @State private var hasFetched = false
 
     @State private var name = ""
     @State private var caption = ""
-    @State private var hasLoaded = false
     @State private var isSaving = false
     @State private var saveFailure: String?
     @State private var confirmingDelete = false
@@ -39,12 +51,6 @@ struct AttachmentEditorView: View {
     /// Why the bytes could not be read, when they could not be.
     @State private var previewFailure: String?
 
-    init(assetID: UUID) {
-        self.assetID = assetID
-        _assets = Query(filter: #Predicate<EvidenceAsset> { $0.id == assetID })
-    }
-
-    private var asset: EvidenceAsset? { assets.first }
 
     /// A name is the only thing here that cannot be blank: it is what a reader of the evidence
     /// packet sees against the photograph, and "" against a photograph is worse than a generated
@@ -56,9 +62,12 @@ struct AttachmentEditorView: View {
         Group {
             if let asset {
                 content(for: asset)
-            } else {
+            } else if hasFetched {
                 // Deleted from under this screen — from the list behind it, or by deleting the
                 // rental. Saying so beats an empty form that saves into nothing.
+                //
+                // Only after the fetch has run. Saying it before that would be claiming the
+                // attachment is gone when the truth is that nothing has looked for it yet.
                 EmptyStateView(
                     symbol: "paperclip",
                     title: "This attachment is no longer here",
@@ -66,13 +75,16 @@ struct AttachmentEditorView: View {
                     actionTitle: "Back to the rental",
                     action: { dismiss() }
                 )
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .offRentFormBackground()
         .navigationTitle("Attachment")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier(A11yID.Attachment.root)
-        .onAppear(perform: load)
+        .onAppear(perform: fetchOnce)
     }
 
     // MARK: - Content
@@ -81,7 +93,7 @@ struct AttachmentEditorView: View {
         Form {
             Section {
                 Button {
-                    showingPreview = true
+                    openPreview(for: asset)
                 } label: {
                     HStack(spacing: Space.comfortable) {
                         EvidenceThumbnail(asset: asset, fileStore: dependencies.fileStore)
@@ -196,26 +208,6 @@ struct AttachmentEditorView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .task(id: showingPreview) {
-            guard showingPreview, fullSize == nil else { return }
-            previewFailure = nil
-            let store = dependencies.fileStore
-            let url = store.url(forRelativePath: asset.relativePath)
-            let data = await Task.detached(priority: .userInitiated) {
-                try? Data(contentsOf: url)
-            }.value
-            if let data {
-                fullSize = data
-            } else {
-                // The record and the bytes are separate things and either can outlive the other.
-                // Saying which one is gone is the difference between a bug report and a person
-                // knowing their photograph is not coming back.
-                previewFailure = """
-                    The file is no longer on this iPhone. The rental still has the record of it, \
-                    including when it was taken.
-                    """
-            }
-        }
     }
 
     private var saveBar: some View {
@@ -239,11 +231,48 @@ struct AttachmentEditorView: View {
 
     // MARK: - Actions
 
-    private func load() {
-        guard !hasLoaded, let asset else { return }
-        hasLoaded = true
-        name = asset.displayName
-        caption = asset.caption ?? ""
+    /// One fetch, on appearance, and the fields are filled from what it found.
+    ///
+    /// The version this replaces read a `@Query` and filled the fields from a separate
+    /// `onAppear`. When the query had not resolved yet that guard fell through *without*
+    /// recording that it had run, and `onAppear` does not fire twice — so the name field stayed
+    /// empty, Save stayed disabled, and the screen asked for a name for an attachment that
+    /// already had one. Fetching and filling in the same place cannot drift apart.
+    private func fetchOnce() {
+        guard !hasFetched else { return }
+        hasFetched = true
+        let wanted = assetID
+        var descriptor = FetchDescriptor<EvidenceAsset>(
+            predicate: #Predicate<EvidenceAsset> { $0.id == wanted }
+        )
+        descriptor.fetchLimit = 1
+        let found = try? context.fetch(descriptor).first
+        asset = found
+        guard let found else { return }
+        name = found.displayName
+        caption = found.caption ?? ""
+    }
+
+    /// Opens the preview and reads the bytes for it.
+    ///
+    /// Reading them here rather than in a `task(id: showingPreview)` on the same chain as the
+    /// sheet keeps one flag from driving two things at once. The sheet shows progress until the
+    /// bytes arrive, and says which of the record and the file is missing when they do not.
+    private func openPreview(for asset: EvidenceAsset) {
+        showingPreview = true
+        guard fullSize == nil else { return }
+        previewFailure = nil
+        let url = dependencies.fileStore.url(forRelativePath: asset.relativePath)
+        Task {
+            let data = await Task.detached(priority: .userInitiated) {
+                try? Data(contentsOf: url)
+            }.value
+            if let data {
+                fullSize = data
+            } else {
+                previewFailure = AppCopy.attachmentFileMissing
+            }
+        }
     }
 
     private func save() {
