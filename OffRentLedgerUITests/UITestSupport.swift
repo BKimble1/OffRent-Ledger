@@ -329,6 +329,22 @@ extension XCUIApplication {
                 element.tap()
                 return
             }
+            // Only into the element, and only if the element is really somewhere.
+            //
+            // A coordinate tap checks nothing, which is the point of it and also its hazard:
+            // aimed at a proxy with an empty or off-window frame it lands in empty space, and
+            // empty space over a presented sheet is the region that dismisses it. That happened
+            // — a run threw away the screen it was testing and then reported that the screen had
+            // done nothing.
+            guard !box.isEmpty, frame.intersects(box) else {
+                XCTFail(
+                    "element reports a frame with nowhere on it to tap: \(box) against a window "
+                        + "of \(frame). That usually means the query matched a proxy rather than "
+                        + "the control — prefer the specific element type over `anyElement` here.",
+                    file: file, line: line
+                )
+                return
+            }
             element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             return
         }
