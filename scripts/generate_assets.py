@@ -43,7 +43,13 @@ COLOURS = {
     "ReviewColor":       ((0.443, 0.373, 0.671), (0.663, 0.596, 0.882)),
     "SettledColor":      ((0.196, 0.471, 0.318), (0.400, 0.749, 0.541)),
     "WaitingColor":      ((0.310, 0.396, 0.478), (0.573, 0.663, 0.749)),
-    "LaunchBackground":  ((0.949, 0.937, 0.914), (0.063, 0.067, 0.075)),
+    # Light in both appearances, deliberately.
+    #
+    # `UILaunchScreen` is drawn by iOS before a line of SwiftUI runs, so `preferredColorScheme`
+    # cannot reach it. With a dark variant here, a phone in dark mode showed a near-black launch
+    # screen and then a warm-white app — a flash between two different products. Same colour in
+    # both slots and the seam disappears.
+    "LaunchBackground":  ((0.949, 0.937, 0.914), (0.949, 0.937, 0.914)),
     "WidgetBackground":  ((0.949, 0.937, 0.914), (0.063, 0.067, 0.075)),
 
     # Surfaces.

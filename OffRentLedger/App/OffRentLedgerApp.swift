@@ -53,6 +53,18 @@ struct OffRentLedgerApp: App {
                     }
                 }
             }
+            // One appearance, and it is the light one.
+            //
+            // The whole visual layer was designed and contrast-checked against warm white and
+            // graphite: `check_text_colours_meet_contrast` measures every text token on the three
+            // light surfaces. The dark palette existed but nothing was drawn or measured for it,
+            // and on a phone set to dark the results showed — including the Idlery wordmark on
+            // the splash, which is a dark mark and simply vanished against a near-black ground.
+            //
+            // Following the system setting is the right default for an app that has done the work
+            // in both. Until this one has, saying which one it is beats rendering a version of
+            // itself nobody checked.
+            .preferredColorScheme(.light)
             .environment(dependencies)
             .environment(router)
             .environment(onboarding)

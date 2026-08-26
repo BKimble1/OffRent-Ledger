@@ -110,6 +110,43 @@ final class InvoiceAcceptanceTests: XCTestCase {
             XCTAssertGreaterThan(block.explanation.count, 30, "\(block)")
         }
     }
+
+    // MARK: - Accepting an invoice on a rental that is already filed away
+
+    /// Archived is past Resolved, and `.resolve` only moves a rental *into* Resolved.
+    ///
+    /// The invoice screen used to run that transition unconditionally when the user accepted an
+    /// invoice. On an archived rental the state machine refused — "Resolve is not available while
+    /// this item is Archived" — and the refusal rolled the acceptance back, so the button could
+    /// never work. These two facts are why the screen now only resolves when resolving would
+    /// actually move the rental forward.
+    func testArchivedIsPastResolved() {
+        XCTAssertGreaterThan(
+            RentalItemStatus.archived.order, RentalItemStatus.resolved.order,
+            "a rental is archived after it is resolved, so resolving it again is not a step forward"
+        )
+    }
+
+    func testResolveIsNotAvailableFromArchived() {
+        let intents = StatusTransitionService.availableIntents(for: .archived)
+        XCTAssertFalse(
+            intents.contains { if case .resolve = $0 { return true } else { return false } },
+            "an archived rental cannot be resolved, which is why the invoice screen must not try"
+        )
+    }
+
+    /// And the acceptance decision itself does not care about the rental's status: an invoice with
+    /// a total and nothing outstanding is acceptable whatever the rental has since become.
+    func testAnInvoiceStaysAcceptableWhateverTheRentalStatusIs() {
+        let input = InvoiceAcceptanceInput(
+            openRecordedDiscrepancies: 0,
+            unaddressedFindings: 0,
+            lineCount: 0,
+            invoiceTotal: Decimal(string: "25.00", locale: Locale(identifier: "en_US_POSIX"))!,
+            currentStatus: .notReviewed
+        )
+        XCTAssertTrue(InvoiceAcceptance.canAccept(input))
+    }
 }
 
 private extension Result where Success == Void, Failure == InvoiceAcceptanceBlock {

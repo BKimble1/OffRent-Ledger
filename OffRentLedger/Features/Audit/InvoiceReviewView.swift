@@ -72,7 +72,7 @@ struct InvoiceReviewView: View {
                     varianceSection(comparison)
                     comparisonSection(comparison)
                     if !comparison.reviewFlags.isEmpty { reviewFlagsSection(comparison) }
-                    if !comparison.findings.isEmpty { findingsSection(comparison) }
+                    if !unaddressedFindings.isEmpty { findingsSection() }
                 }
                 linesSection
                 recordedFindingsSection
@@ -244,9 +244,22 @@ struct InvoiceReviewView: View {
         }
     }
 
-    private func findingsSection(_ comparison: InvoiceComparison) -> some View {
+    /// The findings with nothing recorded against them yet.
+    ///
+    /// The same list the Accept button counts. It used to draw `comparison.findings` — *every*
+    /// finding, addressed or not — while the button counted only the unaddressed ones. So tapping
+    /// "Accept this" recorded the discrepancy, unblocked Accept, and left the card exactly where
+    /// it was with its buttons still live. It looked like nothing had happened, and tapping again
+    /// filed a second record of the same thing. Two views of one question have to be one list.
+    private var unaddressedFindings: [DiscrepancyValue] {
+        guard let comparison else { return [] }
+        let recorded = Set((invoice?.discrepancies ?? []).map(\.type))
+        return comparison.unaddressedFindings(recordedTypes: recorded)
+    }
+
+    private func findingsSection() -> some View {
         section(title: "Possible mismatches found") {
-            ForEach(Array(comparison.findings.enumerated()), id: \.element.id) { index, finding in
+            ForEach(Array(unaddressedFindings.enumerated()), id: \.element.id) { index, finding in
                 VStack(alignment: .leading, spacing: Space.snug) {
                     Text(finding.type.displayName).font(Typography.rowTitle)
                     if let expected = finding.expectedAmount, let invoiced = finding.invoicedAmount {
@@ -531,11 +544,7 @@ struct InvoiceReviewView: View {
     }
 
     /// Findings on screen that nothing has been recorded against yet.
-    private var unaddressedFindingCount: Int {
-        guard let comparison else { return 0 }
-        let recorded = Set((invoice?.discrepancies ?? []).map(\.type))
-        return comparison.unaddressedFindings(recordedTypes: recorded).count
-    }
+    private var unaddressedFindingCount: Int { unaddressedFindings.count }
 
     private func accept(_ finding: DiscrepancyValue) {
         guard let invoice else { return }
@@ -615,7 +624,15 @@ struct InvoiceReviewView: View {
         // The half that was missing. An accepted invoice closes the rental out: that is what
         // moves it off the Audit tab's "awaiting review" list, off Today's "invoices to review",
         // and into Resolved. Without it the user's tap changed a column nothing displayed.
-        if let item {
+        // Only move the rental if resolving would actually move it forward.
+        //
+        // `.resolve` exists to take a rental *into* Resolved. A rental that is already Resolved,
+        // or Archived past it, cannot take that transition — the state machine refuses, and the
+        // refusal rolled the acceptance back. So on an archived rental "Accept this invoice" could
+        // never work: it raised "Resolve is not available while this item is Archived" and left
+        // the invoice exactly as it was. Archiving is filing, not a lock, and accepting an invoice
+        // is a statement about the invoice.
+        if let item, item.status.order < RentalItemStatus.resolved.order {
             let workflow = RentalWorkflowService(context: context, clock: dependencies.clock)
             let resolved = workflow.apply(
                 .resolve(openDiscrepancyCount: invoice.openDiscrepancyCount),
