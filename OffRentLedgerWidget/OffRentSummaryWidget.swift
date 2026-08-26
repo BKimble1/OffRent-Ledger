@@ -121,6 +121,11 @@ struct SummaryWidgetView: View {
                 emptyState
             }
         }
+        // At the root, so every family links the same way. It used to be set inside three of the
+        // five branches, which left the lock-screen accessories with WidgetKit's default — they
+        // opened the app on whatever tab it was last left on rather than on Today, which is the
+        // tab the figure they are showing comes from.
+        .widgetURL(DeepLink.today.url)
         .containerBackground(for: .widget) {
             // An accessory widget is drawn onto the wallpaper and must not paint a panel behind
             // itself; a home screen one should.
@@ -248,7 +253,6 @@ struct SummaryWidgetView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .widgetURL(DeepLink.today.url)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityDescription(snapshot))
     }
@@ -286,7 +290,6 @@ struct SummaryWidgetView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .widgetURL(DeepLink.today.url)
         .accessibilityLabel("\(SharedBranding.displayName). Open the app to start tracking a rental.")
     }
 
@@ -305,7 +308,6 @@ struct SummaryWidgetView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .widgetURL(DeepLink.today.url)
         .accessibilityLabel(
             "\(SharedBranding.displayName). The widget is part of Pro. Your rentals are still "
             + "in the app. Tap to open it."

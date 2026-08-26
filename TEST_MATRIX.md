@@ -27,7 +27,7 @@ Run with `swift test` against the root `Package.swift`, which compiles
 `OffRentLedger/Domain` and `OffRentShared` — **the same files the Xcode app target compiles**,
 not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SWIFT_VERSION`.
 
-**323 tests. 323 passed. 0 failed.** Last run 2026-08-25 against commit `8eb4c7b`.
+**421 tests. 421 passed. 0 failed.** Last run 2026-08-26 against commit `654b2be`.
 
 | Suite | Tests | Result | What it covers |
 |---|---:|---|---|
@@ -71,8 +71,8 @@ could not have: that the walkthrough ends.
 
 | Check | Result |
 |---|---|
-| `python3 scripts/verify_repository.py` | ✅ 48 invariant checks, 0 problems |
-| `python3 scripts/check_swift_call_sites.py` | ✅ 115 types with initialisers and 168 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
+| `python3 scripts/verify_repository.py` | ✅ 62 invariant checks, 0 problems |
+| `python3 scripts/check_swift_call_sites.py` | ✅ 404 types parsed, 123 with initialisers checked and 198 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
 | `python3 scripts/generate_website.py --check` | ✅ the site matches its generator; privacy and terms render from the app's own Markdown |

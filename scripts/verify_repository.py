@@ -1420,7 +1420,7 @@ def check_slow_type_check_warnings_enabled() -> None:
 
 
 def check_scheme_is_shared() -> None:
-    check("The scheme is shared and runs both test bundles")
+    check("The scheme is shared, tests locally against StoreKit, and archives without it")
     path = ROOT / "OffRentLedger.xcodeproj" / "xcshareddata" / "xcschemes" / "OffRentLedger.xcscheme"
     if not path.exists():
         fail("scheme", "no shared scheme; CI cannot build with -scheme")
@@ -1431,6 +1431,26 @@ def check_scheme_is_shared() -> None:
             fail("scheme", f"{bundle} is not in the scheme's Testables")
     if "OffRentLedger.storekit" not in text:
         fail("scheme", "the StoreKit configuration is not referenced; local purchase tests cannot run")
+
+    # And the other half, which matters more than the first: a local StoreKit configuration
+    # attached to Archive or Profile means the shipped binary transacts against a JSON file
+    # instead of the App Store. Nothing about the build fails. The app installs, the paywall
+    # appears, a purchase "succeeds" — against nothing. That is a TestFlight build where Pro can
+    # be had for free and a submission where Apple's reviewer buys a subscription that was never
+    # billed.
+    #
+    # Debug is where it belongs: Test so the purchase tests have deterministic products, and Run
+    # so a simulator can exercise the paywall without a sandbox account.
+    for action in ("ArchiveAction", "ProfileAction"):
+        block = re.search(rf"<{action}\b.*?(?:</{action}>|/>)", text, re.S)
+        if block and "StoreKitConfigurationFileReference" in block.group(0):
+            fail(
+                "scheme",
+                f"the scheme's {action} references the local StoreKit configuration. A build "
+                "made this way transacts against a JSON file rather than the App Store: the "
+                "paywall works, the purchase succeeds, and nothing is ever billed. Remove the "
+                "reference from that action — it belongs on Test and Run only.",
+            )
 
 
 def check_file_validity() -> None:

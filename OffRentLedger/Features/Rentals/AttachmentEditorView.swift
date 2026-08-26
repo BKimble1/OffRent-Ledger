@@ -36,6 +36,8 @@ struct AttachmentEditorView: View {
     @State private var confirmingDelete = false
     @State private var showingPreview = false
     @State private var fullSize: Data?
+    /// Why the bytes could not be read, when they could not be.
+    @State private var previewFailure: String?
 
     init(assetID: UUID) {
         self.assetID = assetID
@@ -173,19 +175,46 @@ struct AttachmentEditorView: View {
         } message: {
             Text("The file is deleted from this iPhone too. This cannot be undone.")
         }
+        // Three states, not one. The sheet presents the instant `showingPreview` becomes true,
+        // and the file is read *after* that — so a closure that only draws when the bytes have
+        // arrived presents an empty sheet and fills it in a moment later. When the read fails
+        // the empty sheet is all there ever is: a preview that opens onto nothing, with no way
+        // to tell whether the file is missing or the app is broken.
         .sheet(isPresented: $showingPreview) {
             if let fullSize {
                 PageViewer(data: fullSize, pageNumber: 1) { showingPreview = false }
+            } else if let previewFailure {
+                EmptyStateView(
+                    symbol: "exclamationmark.triangle",
+                    title: "This file could not be opened",
+                    message: previewFailure,
+                    actionTitle: "Close",
+                    action: { showingPreview = false }
+                )
+            } else {
+                ProgressView("Opening…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .task(id: showingPreview) {
             guard showingPreview, fullSize == nil else { return }
+            previewFailure = nil
             let store = dependencies.fileStore
-            let path = asset.relativePath
-            let url = store.url(forRelativePath: path)
-            fullSize = await Task.detached(priority: .userInitiated) {
+            let url = store.url(forRelativePath: asset.relativePath)
+            let data = await Task.detached(priority: .userInitiated) {
                 try? Data(contentsOf: url)
             }.value
+            if let data {
+                fullSize = data
+            } else {
+                // The record and the bytes are separate things and either can outlive the other.
+                // Saying which one is gone is the difference between a bug report and a person
+                // knowing their photograph is not coming back.
+                previewFailure = """
+                    The file is no longer on this iPhone. The rental still has the record of it, \
+                    including when it was taken.
+                    """
+            }
         }
     }
 
