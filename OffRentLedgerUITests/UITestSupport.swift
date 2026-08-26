@@ -52,12 +52,16 @@ extension XCUIApplication {
         case empty
         case walkthrough
         case freeLimit
+        /// The walkthrough rental with one attachment on it. The record exists; the file does
+        /// not, because XCUITest cannot take a photograph.
+        case attachment
 
         var arguments: [String] {
             switch self {
             case .empty: []
             case .walkthrough: ["-offrent-seed-walkthrough"]
             case .freeLimit: ["-offrent-seed-free-limit"]
+            case .attachment: ["-offrent-seed-attachment"]
             }
         }
     }

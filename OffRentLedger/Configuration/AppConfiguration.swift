@@ -103,6 +103,7 @@ enum LaunchArgument {
     static let resetState = "-offrent-reset-state"
     static let seedWalkthroughFixture = "-offrent-seed-walkthrough"
     static let seedFreeLimitFixture = "-offrent-seed-free-limit"
+    static let seedAttachmentFixture = "-offrent-seed-attachment"
     static let forceProEntitlement = "-offrent-force-pro"
     static let forceFreeEntitlement = "-offrent-force-free"
     static let disableAnimations = "-offrent-disable-animations"

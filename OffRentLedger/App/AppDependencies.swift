@@ -128,6 +128,7 @@ final class AppDependencies {
         var resetState = false
         var seedWalkthrough = false
         var seedFreeLimit = false
+        var seedAttachment = false
         var forcedEntitlement: EntitlementState?
         var disableAnimations = false
         var stubTextRecogniser = false
@@ -150,6 +151,7 @@ final class AppDependencies {
         overrides.resetState = has(LaunchArgument.resetState)
         overrides.seedWalkthrough = has(LaunchArgument.seedWalkthroughFixture)
         overrides.seedFreeLimit = has(LaunchArgument.seedFreeLimitFixture)
+        overrides.seedAttachment = has(LaunchArgument.seedAttachmentFixture)
         overrides.disableAnimations = has(LaunchArgument.disableAnimations)
         overrides.stubTextRecogniser = has(LaunchArgument.stubTextRecogniser)
 

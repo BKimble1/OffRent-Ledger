@@ -135,6 +135,7 @@ enum A11yUI {
         static let delete = "attachment.delete"
         static let confirmDelete = "attachment.confirmDelete"
         static let preview = "attachment.preview"
+        static let missingRequirement = "attachment.missingRequirement"
     }
 
     enum EvidenceExport {

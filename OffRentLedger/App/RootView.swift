@@ -171,7 +171,10 @@ struct RootView: View {
         // `-offrent-reset-state` deleted precisely nothing, and every on-disk scenario inherited
         // whatever the last one left behind.
         if overrides.resetState { SeedFixtures.wipe(context: context) }
-        if overrides.seedWalkthrough || overrides.seedFreeLimit {
+        if overrides.seedAttachment {
+            SeedFixtures.seedAttachment(context: context, clock: dependencies.clock)
+            PersistentStore.saveDerived(context, describing: "the attachment fixture")
+        } else if overrides.seedWalkthrough || overrides.seedFreeLimit {
             SeedFixtures.seedWalkthrough(context: context, clock: dependencies.clock)
             PersistentStore.saveDerived(context, describing: "the walkthrough fixtures")
         }

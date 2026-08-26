@@ -127,4 +127,29 @@ enum SeedFixtures {
     static func seedFreeLimit(context: ModelContext, clock: any Clock) {
         seedWalkthrough(context: context, clock: clock)
     }
+
+    static let attachmentID = UUID(uuidString: "A0000000-0000-4000-8000-000000000006")!
+
+    /// The walkthrough rental with one attachment on it, so the attachment editor is reachable.
+    ///
+    /// The bytes are deliberately not written. A UI test cannot take a photograph, and filing a
+    /// real image through the picker is not something XCUITest can drive — so the record exists
+    /// and the file does not, which is exactly the state the editor's preview has to handle
+    /// gracefully and the one place in the app where "the record and the bytes are separate
+    /// things" can actually be exercised. Renaming, captioning and removing do not read the file
+    /// at all, so they behave here exactly as they do against a real photograph.
+    @MainActor
+    static func seedAttachment(context: ModelContext, clock: any Clock) {
+        let item = seedWalkthrough(context: context, clock: clock)
+        let asset = EvidenceAsset(
+            id: attachmentID,
+            relativePath: "fixtures/delivery-condition.jpg",
+            mediaType: .image,
+            displayName: "Photo 1",
+            capturedAt: deliveryDate(calendar: clock.calendar),
+            caption: nil,
+            item: item
+        )
+        context.insert(asset)
+    }
 }
