@@ -163,6 +163,7 @@ enum A11yID {
     /// of them was reachable from a test. Registered so they can be.
     enum Failure {
         static let backupExport = "settings.backup.exportFailure"
+        static let evidenceExport = "evidenceExport.failure"
         static let deleteAllOutcome = "settings.deleteAllOutcome"
         static let attachmentSave = "attachments.saveFailure"
         static let companyDelete = "company.deleteFailure"

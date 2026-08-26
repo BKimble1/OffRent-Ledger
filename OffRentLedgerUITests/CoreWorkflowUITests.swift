@@ -36,16 +36,28 @@ final class CoreWorkflowUITests: XCTestCase {
         // arrival is the evidence that the render returned rather than threw. Twenty seconds
         // because the document is rasterised twice — once to count its pages so the footers can
         // say "of 4", once to draw it.
-        let preview = app.expect(app.buttons[A11yUI.EvidenceExport.previewOpen], timeout: 20)
+        // If generating failed, the screen says so. Reading that beats waiting twenty seconds
+        // for a control that was never going to arrive and then reporting only its absence.
+        let stated = app.anyElement(A11yUI.Failure.evidenceExport)
+        if stated.waitForExistence(timeout: 3) {
+            XCTFail("generating the packet failed: \(stated.label)")
+            return
+        }
+
+        // `anyElement`, not `buttons`. Whether a `NavigationLink` in a `Form` is exposed as a
+        // button or as the cell around it is the platform's decision rather than the app's, and
+        // it differs between an iPhone and an iPad — which is the note already written on
+        // `anyElement` itself.
+        let preview = app.expect(app.anyElement(A11yUI.EvidenceExport.previewOpen), timeout: 20)
         XCTAssertTrue(
-            app.buttons[A11yUI.EvidenceExport.share].exists,
+            app.anyElement(A11yUI.EvidenceExport.share).exists,
             "the packet generated but there is no way to send it"
         )
 
         app.tapInContent(preview)
         app.expect(app.anyElement(A11yUI.EvidenceExport.preview), timeout: 10)
         XCTAssertTrue(
-            app.buttons[A11yUI.EvidenceExport.previewShare].waitForExistence(timeout: 5),
+            app.anyElement(A11yUI.EvidenceExport.previewShare).waitForExistence(timeout: 5),
             "the preview opened with no way to share what is on it"
         )
     }

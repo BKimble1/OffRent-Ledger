@@ -131,8 +131,13 @@ struct EvidenceExportSheet: View {
 
                 if let failure {
                     Section {
+                        // Identified, so a test can report *why* an export failed instead of
+                        // timing out on a Share button that was never going to arrive. Every
+                        // other failure message in the app is registered for the same reason —
+                        // see the note on `A11yID.Failure`.
                         Label(failure, systemImage: "exclamationmark.triangle")
                             .foregroundStyle(Palette.attentionText)
+                            .accessibilityIdentifier(A11yID.Failure.evidenceExport)
                     }
                 }
             }

@@ -117,6 +117,15 @@ enum A11yUI {
         static let disclosure = "itemDetail.disclosure"
     }
 
+    /// The places a failure the user has to know about is drawn.
+    ///
+    /// Mirrors the app's own `A11yID.Failure`. A test that cannot see an error message can only
+    /// report that something it wanted never appeared, which is the least useful half of what
+    /// the screen was saying at the time.
+    enum Failure {
+        static let evidenceExport = "evidenceExport.failure"
+    }
+
     enum EvidenceExport {
         static let root = "evidenceExport.root"
         static let generate = "evidenceExport.generate"
