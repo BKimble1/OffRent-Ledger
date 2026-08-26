@@ -17,6 +17,7 @@ struct EvidenceExportSheet: View {
     @State private var userNotes = ""
     @State private var generated: URL?
     @State private var isGenerating = false
+    @State private var showingPreview = false
     @State private var failure: String?
 
     init(itemID: UUID) {
@@ -101,12 +102,25 @@ struct EvidenceExportSheet: View {
                         }
                     }
                     .disabled(isGenerating || item == nil)
+                    .accessibilityIdentifier(A11yID.EvidenceExport.generate)
                     .minimumTapTarget()
 
                     if let generated, FileManager.default.fileExists(atPath: generated.path) {
+                        // Read it before you send it. This is also the only place in the app that
+                        // displays the document it has just made — which is how it went unnoticed
+                        // that the packet was rendering blank.
+                        Button {
+                            showingPreview = true
+                        } label: {
+                            Label("Preview the packet", systemImage: "doc.text.magnifyingglass")
+                        }
+                        .accessibilityIdentifier(A11yID.EvidenceExport.previewOpen)
+                        .minimumTapTarget()
+
                         ShareLink(item: generated) {
                             Label("Share the packet", systemImage: "square.and.arrow.up")
                         }
+                        .accessibilityIdentifier(A11yID.EvidenceExport.share)
                         .minimumTapTarget()
                     }
                 } footer: {
@@ -133,6 +147,15 @@ struct EvidenceExportSheet: View {
             .onAppear {
                 let assets: [EvidenceAsset] = item?.assets ?? []
                 selectedAssetIDs = Set(assets.map(\.id))
+            }
+            // On the form, not on the `NavigationStack`, and nowhere near an `.alert`. A sheet
+            // and an alert on one modifier chain fight in this app — after the alert has shown
+            // once, the sheet stops presenting — which is why the failure here is drawn as a
+            // section in the form rather than raised as an alert.
+            .sheet(isPresented: $showingPreview) {
+                if let generated {
+                    EvidencePDFPreview(url: generated)
+                }
             }
         }
     }

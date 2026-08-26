@@ -1635,6 +1635,106 @@ def check_ocr_fixtures_exist() -> None:
         fail("fixtures", "OCRFixtures/README.md must state that the fixtures are synthetic")
 
 
+def check_no_alert_shares_a_chain_with_a_sheet() -> None:
+    """An `.alert` and a `.sheet` on one modifier chain, and the sheet stops presenting.
+
+    Established empirically in this app, twice. Once the alert has been shown and dismissed,
+    setting the sheet's flag does nothing at all — the button is tapped, the action runs, the
+    state changes, and no sheet appears. `InvoiceReviewView` carries the first diagnosis in a
+    comment; `RentalsView` had the same shape and it meant a free-tier user who had seen the
+    open-rental limit could then tap + › New rental company and watch nothing happen, for the
+    rest of the session, on the tab where companies and jobsites are made.
+
+    Nothing warns. Nothing logs. It survives review because reading the code it looks correct,
+    and it survives testing unless a test happens to raise the alert *first* and then open the
+    sheet. So it is checked here instead.
+
+    The fix in both cases was the same: put the alert on the control that raises it, not on the
+    scroll view or list that also owns the sheets.
+    """
+    check("No alert shares a modifier chain with a sheet")
+    opener = re.compile(r"^(\s*)\.(\w+)\s*[({]")
+    for path in swift_files(APP_SOURCES):
+        lines = without_comments(path.read_text()).splitlines()
+        chains: list[list[tuple[str, str, int]]] = []
+        current: list[tuple[str, str, int]] = []
+        for number, line in enumerate(lines, start=1):
+            match = opener.match(line)
+            if not match:
+                continue
+            indent, name = match.group(1), match.group(2)
+            if current and current[-1][0] == indent:
+                current.append((indent, name, number))
+            else:
+                if current:
+                    chains.append(current)
+                current = [(indent, name, number)]
+        if current:
+            chains.append(current)
+
+        for chain in chains:
+            names = {entry[1] for entry in chain}
+            if "alert" not in names:
+                continue
+            clash = names & {"sheet", "fullScreenCover"}
+            if not clash:
+                continue
+            where = ", ".join(
+                f"{entry[1]} at line {entry[2]}"
+                for entry in chain
+                if entry[1] in {"alert", "sheet", "fullScreenCover"}
+            )
+            fail(
+                "alert-sheet",
+                f"{path.relative_to(ROOT).as_posix()} puts an alert on the same chain as a "
+                f"{'/'.join(sorted(clash))} ({where}); once the alert has shown, the sheet "
+                "stops presenting. Move the alert onto the control that raises it",
+            )
+
+
+def check_the_pdf_does_not_use_dynamic_colours() -> None:
+    """Nothing the evidence packet draws with may resolve against the device's appearance.
+
+    `UIColor.label` and friends are *dynamic*: they resolve against whatever interface style is
+    current at the moment they are drawn. Inside a `UIGraphicsPDFRenderer` on a phone set to
+    dark, every one of them came out white — onto a PDF page, which is transparent unless a
+    background is drawn. White on nothing is nothing, and the report was "exporting the evidence
+    packet doesn't work and doesn't show anything". The file was never empty. It was invisible.
+
+    A PDF leaves the device. It has to be dark ink on white paper on the recipient's machine, in
+    their mail client's preview pane, and on a printer — none of which know or care what the
+    phone that made it was set to. So the renderer names its own colours, and this fails the
+    build if a dynamic one comes back.
+    """
+    check("The evidence PDF draws with fixed ink, not the device's appearance")
+    path = APP_SOURCES / "Services" / "PDFEvidenceRenderer.swift"
+    if not path.exists():
+        fail("pdf-ink", "PDFEvidenceRenderer.swift is missing")
+        return
+    source = without_comments(path.read_text())
+    dynamic = re.compile(
+        r"UIColor\.(label|secondaryLabel|tertiaryLabel|quaternaryLabel|separator|"
+        r"opaqueSeparator|systemBackground|secondarySystemBackground|placeholderText|"
+        r"link|systemFill|secondarySystemFill)\b"
+    )
+    for match in dynamic.finditer(source):
+        line = source[: match.start()].count("\n") + 1
+        fail(
+            "pdf-ink",
+            f"PDFEvidenceRenderer.swift:{line} draws with UIColor.{match.group(1)}, which "
+            "resolves to white in dark mode and makes the document invisible",
+        )
+
+    # And the paper itself. A page with no background drawn is transparent, which hands the same
+    # failure to any viewer that composites onto a dark surface.
+    if "Ink.paper.setFill()" not in source:
+        fail(
+            "pdf-ink",
+            "no page background is filled; a transparent PDF page hides dark text in any viewer "
+            "that composites it onto a dark surface",
+        )
+
+
 def check_one_colour_scheme_decision() -> None:
     """The app decides its colour scheme in exactly one place.
 
@@ -1940,6 +2040,8 @@ def main() -> int:
         check_tests_live_inside_a_test_case,
         check_ipad_support_is_declared,
         check_one_colour_scheme_decision,
+        check_the_pdf_does_not_use_dynamic_colours,
+        check_no_alert_shares_a_chain_with_a_sheet,
         check_call_sites_resolve,
         check_every_ui_suite_actually_runs,
         check_github_workflows,

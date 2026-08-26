@@ -48,25 +48,53 @@ struct PDFEvidenceRenderer: EvidenceRendering {
             format: metadata(for: packet)
         )
 
-        let data = renderer.pdfData { context in
-            var layout = PageLayout(context: context, pageSize: pageSize, margin: margin)
-            layout.beginPage()
+        let title = EvidencePacketBuilder.headline(for: packet)
 
-            draw(header: packet, into: &layout)
-            draw(parties: packet, into: &layout)
-            draw(equipment: packet, into: &layout)
-            draw(terms: packet, into: &layout)
-            draw(timeline: packet, into: &layout)
-            draw(confirmation: packet, into: &layout)
-            draw(pickup: packet, into: &layout)
-            draw(invoice: packet, into: &layout)
-            draw(assets: packet, images: images, into: &layout)
-            draw(notes: packet, into: &layout)
-            draw(disclaimer: packet, into: &layout)
+        // Twice, so the footer can say "Page 2 of 5" rather than "Page 2" and leave the reader
+        // wondering whether they have all of it. The first pass draws into a buffer nobody keeps
+        // and exists only to count; the layout is a pure function of the packet, and the footer
+        // is drawn at a fixed position without moving the cursor, so both passes paginate
+        // identically.
+        var pageCount = 0
+        _ = renderer.pdfData { context in
+            var layout = PageLayout(
+                context: context, pageSize: pageSize, margin: margin,
+                documentTitle: title, totalPages: nil
+            )
+            drawEverything(packet, images: images, into: &layout)
+            pageCount = layout.pageNumber
+        }
+
+        let data = renderer.pdfData { context in
+            var layout = PageLayout(
+                context: context, pageSize: pageSize, margin: margin,
+                documentTitle: title, totalPages: pageCount
+            )
+            drawEverything(packet, images: images, into: &layout)
         }
 
         guard !data.isEmpty else { throw EvidenceRenderError.renderFailed }
         return data
+    }
+
+    /// Every section, in order. One method so the counting pass and the drawing pass cannot
+    /// drift apart — a difference of a single section between them would put the wrong total in
+    /// the footer of every page.
+    private func drawEverything(
+        _ packet: EvidencePacket, images: [String: UIImage], into layout: inout PageLayout
+    ) {
+        layout.beginPage()
+        draw(header: packet, into: &layout)
+        draw(parties: packet, into: &layout)
+        draw(equipment: packet, into: &layout)
+        draw(terms: packet, into: &layout)
+        draw(timeline: packet, into: &layout)
+        draw(confirmation: packet, into: &layout)
+        draw(pickup: packet, into: &layout)
+        draw(invoice: packet, into: &layout)
+        draw(assets: packet, images: images, into: &layout)
+        draw(notes: packet, into: &layout)
+        draw(disclaimer: packet, into: &layout)
     }
 
     private func metadata(for packet: EvidencePacket) -> UIGraphicsPDFRendererFormat {
@@ -291,76 +319,236 @@ private struct PageLayout {
     let context: UIGraphicsPDFRendererContext
     let pageSize: CGSize
     let margin: CGFloat
+    /// Repeated at the top of every page after the first, so a loose page still says what it is.
+    let documentTitle: String
+    /// Nil during the counting pass, when the total is not yet known.
+    let totalPages: Int?
+
+    private(set) var pageNumber = 0
+    /// True when nothing has been drawn on this page yet, so `pageBreak` cannot make a blank one.
+    private var isFresh = false
     var y: CGFloat = 0
 
+    /// Fixed ink, deliberately not `UIColor.label`.
+    ///
+    /// A dynamic colour resolves against whatever interface style is current at the moment it is
+    /// drawn. Generating this document on a phone set to dark made every line of it *white* — on
+    /// a PDF page, which has no background of its own unless one is drawn. White on nothing is
+    /// nothing: "exporting the evidence packet doesn't work and doesn't show anything" was this,
+    /// and the file was never empty, only invisible.
+    ///
+    /// A PDF leaves the device. It is dark ink on white paper wherever it lands, on whatever the
+    /// reader's machine is set to, and on a printer. These are the app's own light-mode values,
+    /// measured against white: 16.5:1 for body, 6.5:1 for secondary, 5.5:1 for the accent.
+    enum Ink {
+        static let paper = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+        static let primary = UIColor(red: 0.110, green: 0.122, blue: 0.141, alpha: 1)
+        static let secondary = UIColor(red: 0.360, green: 0.370, blue: 0.390, alpha: 1)
+        static let accent = UIColor(red: 0.661, green: 0.312, blue: 0.067, alpha: 1)
+        static let rule = UIColor(red: 0.780, green: 0.770, blue: 0.740, alpha: 1)
+    }
+
     private var contentWidth: CGFloat { pageSize.width - margin * 2 }
-    private var bottom: CGFloat { pageSize.height - margin }
+    /// The footer sits below this, so content never lands on top of the page number.
+    private var footerHeight: CGFloat { 28 }
+    private var bottom: CGFloat { pageSize.height - margin - footerHeight }
+    /// The tallest a single block can be and still fit on a page of its own.
+    private var usableHeight: CGFloat { bottom - margin - 20 }
+
+    // MARK: - Pages
 
     mutating func beginPage() {
         context.beginPage()
+        pageNumber += 1
+
+        // Paper. Without this the page is transparent, and a viewer that composites it onto a
+        // dark background hides dark text just as effectively as the dynamic-colour bug did.
+        Ink.paper.setFill()
+        UIBezierPath(rect: CGRect(origin: .zero, size: pageSize)).fill()
+
         y = margin
+        drawFooter()
+        if pageNumber > 1 { drawContinuationHeader() }
+        isFresh = true
     }
 
-    mutating func pageBreak() { beginPage() }
+    /// Starts a new page unless this one is already empty, so a deliberate break cannot produce
+    /// a page with nothing but a footer on it.
+    mutating func pageBreak() { if !isFresh { beginPage() } }
+
+    private mutating func drawFooter() {
+        let text = totalPages.map { "Page \(pageNumber) of \($0)" } ?? "Page \(pageNumber)"
+        let footerY = pageSize.height - margin - 12
+
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: margin, y: footerY - 6))
+        path.addLine(to: CGPoint(x: pageSize.width - margin, y: footerY - 6))
+        Ink.rule.setStroke()
+        path.lineWidth = 0.5
+        path.stroke()
+
+        let font = UIFont.systemFont(ofSize: 8)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: Ink.secondary]
+        (documentTitle as NSString).draw(
+            with: CGRect(x: margin, y: footerY, width: contentWidth - 90, height: 12),
+            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+            attributes: attributes, context: nil
+        )
+        let right: [NSAttributedString.Key: Any] = {
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .right
+            return [.font: font, .foregroundColor: Ink.secondary, .paragraphStyle: paragraph]
+        }()
+        (text as NSString).draw(
+            with: CGRect(x: pageSize.width - margin - 90, y: footerY, width: 90, height: 12),
+            options: [.usesLineFragmentOrigin], attributes: right, context: nil
+        )
+    }
+
+    private mutating func drawContinuationHeader() {
+        let font = UIFont.systemFont(ofSize: 8, weight: .semibold)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: Ink.secondary]
+        (documentTitle.uppercased() as NSString).draw(
+            with: CGRect(x: margin, y: y, width: contentWidth, height: 12),
+            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+            attributes: attributes, context: nil
+        )
+        y += 16
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: margin, y: y))
+        path.addLine(to: CGPoint(x: pageSize.width - margin, y: y))
+        Ink.rule.setStroke()
+        path.lineWidth = 0.5
+        path.stroke()
+        y += 12
+    }
+
+    // MARK: - Drawing
 
     private mutating func ensure(_ height: CGFloat) {
         if y + height > bottom { beginPage() }
     }
 
-    private mutating func draw(_ text: String, font: UIFont, colour: UIColor, indent: CGFloat = 0) {
-        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colour]
-        let width = contentWidth - indent
-        let bounding = (text as NSString).boundingRect(
-            with: CGSize(width: width, height: .greatestFiniteMagnitude),
+    private func height(of text: String, font: UIFont, indent: CGFloat) -> CGFloat {
+        (text as NSString).boundingRect(
+            with: CGSize(width: contentWidth - indent, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: attributes,
+            attributes: [.font: font],
             context: nil
-        )
-        ensure(bounding.height + 4)
-        (text as NSString).draw(
-            with: CGRect(x: margin + indent, y: y, width: width, height: bounding.height),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: attributes,
-            context: nil
-        )
-        y += bounding.height + 4
+        ).height
     }
 
+    /// Draws one block that is known to fit on a page.
+    private mutating func drawBlock(
+        _ text: String, font: UIFont, colour: UIColor, indent: CGFloat
+    ) {
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colour]
+        let width = contentWidth - indent
+        let blockHeight = height(of: text, font: font, indent: indent)
+        ensure(blockHeight + 4)
+        (text as NSString).draw(
+            with: CGRect(x: margin + indent, y: y, width: width, height: blockHeight),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes, context: nil
+        )
+        y += blockHeight + 4
+        isFresh = false
+    }
+
+    /// Draws text of any length, continuing onto further pages rather than being cut off.
+    ///
+    /// The previous version measured the whole block, asked for one page's worth of room, and
+    /// then drew it anyway. Anything taller than a page was clipped at the foot and the rest was
+    /// simply gone — silently, with no marker, in a document whose entire purpose is to be a
+    /// complete record. The disclaimer and a long note are both capable of it.
+    ///
+    /// Splitting happens on the largest boundary that helps — paragraphs, then lines, then
+    /// sentences, then words — so a break lands somewhere a reader would accept.
+    private mutating func flow(
+        _ text: String, font: UIFont, colour: UIColor, indent: CGFloat = 0
+    ) {
+        guard !text.isEmpty else { return }
+        for piece in split(text, font: font, indent: indent) {
+            drawBlock(piece, font: font, colour: colour, indent: indent)
+        }
+    }
+
+    private func split(_ text: String, font: UIFont, indent: CGFloat) -> [String] {
+        if height(of: text, font: font, indent: indent) <= usableHeight { return [text] }
+        for separator in ["\n\n", "\n", ". ", " "] {
+            let parts = text.components(separatedBy: separator)
+            guard parts.count > 1 else { continue }
+            var chunks: [String] = []
+            var current = ""
+            for part in parts {
+                let candidate = current.isEmpty ? part : current + separator + part
+                if height(of: candidate, font: font, indent: indent) <= usableHeight {
+                    current = candidate
+                } else {
+                    if !current.isEmpty { chunks.append(current) }
+                    current = part
+                }
+            }
+            if !current.isEmpty { chunks.append(current) }
+            if chunks.count > 1 { return chunks }
+        }
+        // A single unbreakable run longer than a page. Nothing sensible left to do, and it
+        // cannot happen with any field this document draws.
+        return [text]
+    }
+
+    // MARK: - Typography
+
     mutating func title(_ text: String) {
-        draw(text, font: .systemFont(ofSize: 22, weight: .bold), colour: .label)
+        flow(text, font: .systemFont(ofSize: 22, weight: .bold), colour: Ink.primary)
+        // A short accent rule under the title, the one piece of colour in the document.
+        ensure(8)
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: margin, y: y + 2))
+        path.addLine(to: CGPoint(x: margin + 64, y: y + 2))
+        Ink.accent.setStroke()
+        path.lineWidth = 2
+        path.stroke()
+        y += 10
+        isFresh = false
     }
 
     mutating func subtitle(_ text: String) {
-        draw(text, font: .systemFont(ofSize: 13, weight: .semibold), colour: .label)
+        flow(text, font: .systemFont(ofSize: 13, weight: .semibold), colour: Ink.primary)
     }
 
     mutating func caption(_ text: String) {
-        draw(text, font: .systemFont(ofSize: 9), colour: .secondaryLabel)
+        flow(text, font: .systemFont(ofSize: 9), colour: Ink.secondary)
     }
 
     mutating func heading(_ text: String) {
-        y += 10
-        draw(text.uppercased(), font: .systemFont(ofSize: 10, weight: .bold), colour: .secondaryLabel)
+        y += 12
+        // Reserve the heading *and* a line of whatever follows it. A section title alone at the
+        // foot of a page reads as a mistake and makes the reader turn over to find out what it
+        // was introducing.
+        let font = UIFont.systemFont(ofSize: 10, weight: .bold)
+        ensure(height(of: text, font: font, indent: 0) + 4 + 22)
+        drawBlock(text.uppercased(), font: font, colour: Ink.secondary, indent: 0)
     }
 
     mutating func field(_ label: String, _ value: String) {
-        draw("\(label): \(value)", font: .systemFont(ofSize: 11), colour: .label)
+        flow("\(label): \(value)", font: .systemFont(ofSize: 11), colour: Ink.primary)
     }
 
     mutating func bullet(_ text: String) {
-        draw("•  \(text)", font: .systemFont(ofSize: 11), colour: .label)
+        flow("•  \(text)", font: .systemFont(ofSize: 11), colour: Ink.primary)
     }
 
     mutating func indentedNote(_ text: String) {
-        draw(text, font: .systemFont(ofSize: 9), colour: .secondaryLabel, indent: 16)
+        flow(text, font: .systemFont(ofSize: 9), colour: Ink.secondary, indent: 16)
     }
 
     mutating func note(_ text: String) {
-        draw(text, font: .italicSystemFont(ofSize: 9), colour: .secondaryLabel)
+        flow(text, font: .italicSystemFont(ofSize: 9), colour: Ink.secondary)
     }
 
     mutating func paragraph(_ text: String) {
-        draw(text, font: .systemFont(ofSize: 10), colour: .label)
+        flow(text, font: .systemFont(ofSize: 10), colour: Ink.primary)
     }
 
     mutating func rule() {
@@ -368,10 +556,11 @@ private struct PageLayout {
         let path = UIBezierPath()
         path.move(to: CGPoint(x: margin, y: y + 4))
         path.addLine(to: CGPoint(x: pageSize.width - margin, y: y + 4))
-        UIColor.separator.setStroke()
+        Ink.rule.setStroke()
         path.lineWidth = 0.5
         path.stroke()
         y += 12
+        isFresh = false
     }
 
     mutating func image(_ image: UIImage) {
@@ -381,6 +570,12 @@ private struct PageLayout {
         let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
         ensure(size.height + 8)
         image.draw(in: CGRect(x: margin, y: y, width: size.width, height: size.height))
+        // A hairline round the plate, so a pale scan does not bleed into the page.
+        let border = UIBezierPath(rect: CGRect(x: margin, y: y, width: size.width, height: size.height))
+        Ink.rule.setStroke()
+        border.lineWidth = 0.5
+        border.stroke()
         y += size.height + 8
+        isFresh = false
     }
 }

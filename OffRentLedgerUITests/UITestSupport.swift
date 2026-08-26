@@ -114,6 +114,30 @@ extension XCUIApplication {
         return query.firstMatch
     }
 
+    /// The frontmost scrollable container on screen, if there is one.
+    ///
+    /// `XCUIApplication.swipeUp()` swipes at the centre of the *window*. Where a sheet is up that
+    /// point is usually inside it and the right thing happens — but a downward swipe on an iPad
+    /// form sheet is also its dismiss gesture. `reveal` sweeps up eight times and then *down*
+    /// twelve times looking for a row, so on an iPad it could throw the sheet away and then
+    /// report, accurately and uselessly, that the element never appeared.
+    ///
+    /// Scrolling the container itself cannot dismiss anything, and it scrolls the thing the row
+    /// is actually in rather than whatever happens to be under the middle of the screen.
+    /// Searched back to front because the last match is the frontmost — the sheet, not the
+    /// screen behind it.
+    func scrollableContainer() -> XCUIElement? {
+        for query in [collectionViews, tables, scrollViews] {
+            let count = query.count
+            guard count > 0 else { continue }
+            for index in stride(from: count - 1, through: 0, by: -1) {
+                let candidate = query.element(boundBy: index)
+                if candidate.exists, candidate.isHittable { return candidate }
+            }
+        }
+        return nil
+    }
+
     /// An element addressed by its identifier, whatever type UIKit chose to back it with.
     ///
     /// Use this where the element type is the platform's decision rather than the app's: a `Form`
@@ -258,15 +282,21 @@ extension XCUIApplication {
             // the bottom on every device, tab bar or no tab bar.
             clearOfBottom = frame.height * 0.90
         }
-        for _ in 0..<6 {
+        for _ in 0..<8 {
             let box = element.frame
-            let tooLow = box.maxY > clearOfBottom
-            let tooHigh = box.minY < clearOfTop
-            if !tooLow, !tooHigh, element.isHittable {
+            let scroller = scrollableContainer() ?? self
+            if box.maxY > clearOfBottom { scroller.swipeUp(); continue }
+            if box.minY < clearOfTop { scroller.swipeDown(); continue }
+            if element.isHittable {
                 element.tap()
                 return
             }
-            if tooLow { swipeUp() } else { swipeDown() }
+            // Positioned correctly and still not hittable: a bar animating in, or a transition
+            // that has not settled. Waiting is the right move — the previous version fell
+            // through to `swipeDown()` here, which scrolled a correctly placed control *away*
+            // and then had to chase it back, oscillating until it ran out of tries and reported
+            // that the element never came clear. It had come clear four times.
+            _ = element.waitForExistence(timeout: 1)
         }
         XCTFail(
             """
@@ -301,8 +331,13 @@ extension XCUIApplication {
         line: UInt = #line
     ) -> XCUIElement {
         if element.exists { return element }
-        let first = direction == .below ? { self.swipeUp() } : { self.swipeDown() }
-        let second = direction == .below ? { self.swipeDown() } : { self.swipeUp() }
+        // The container rather than the window — see `scrollableContainer`. Re-resolved on each
+        // swipe because revealing a row can change which container is frontmost.
+        let scroller = { self.scrollableContainer() ?? self }
+        let first = direction == .below
+            ? { scroller().swipeUp() } : { scroller().swipeDown() }
+        let second = direction == .below
+            ? { scroller().swipeDown() } : { scroller().swipeUp() }
         for _ in 0..<8 {
             first()
             if element.exists { return element }

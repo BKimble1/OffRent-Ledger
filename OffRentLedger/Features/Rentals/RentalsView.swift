@@ -89,15 +89,15 @@ struct RentalsView: View {
         }
         .sheet(isPresented: $creatingCompany) { CompanyEditorView(existing: nil) }
         .sheet(isPresented: $creatingJobSite) { JobsiteMapEditor(existing: nil) }
-        .alert(
-            "Free plan limit",
-            isPresented: Binding(get: { limitAlert != nil }, set: { if !$0 { limitAlert = nil } })
-        ) {
-            Button("See Pro") { router.presentedSheet = .paywall(reason: .openItemLimit) }
-            Button("Not now", role: .cancel) {}
-        } message: {
-            Text(limitAlert?.message ?? "")
-        }
+        // The free-plan alert is *not* here. It lives on `addMenu`, the control that raises it.
+        //
+        // An `.alert` beside a `.sheet` on one modifier chain fight in this app, and the loser is
+        // the sheet: once the alert has been shown and dismissed, setting the sheet's flag does
+        // nothing at all. `InvoiceReviewView` found that the hard way and its comment says so.
+        //
+        // Here it meant a free-tier user who had hit the open-rental limit once could then tap
+        // + › New rental company, or + › New jobsite, and watch nothing happen — for the rest of
+        // the session, on the tab where those two records are made.
     }
 
     // MARK: - Filtering
@@ -344,6 +344,18 @@ struct RentalsView: View {
             Label("Add", systemImage: "plus")
         }
         .accessibilityIdentifier(A11yID.Rentals.addMenu)
+        // On the menu, because the menu is what raises it — and because an alert on the list's
+        // own chain stops the two sheets up there from ever presenting again. See the note by
+        // them.
+        .alert(
+            "Free plan limit",
+            isPresented: Binding(get: { limitAlert != nil }, set: { if !$0 { limitAlert = nil } })
+        ) {
+            Button("See Pro") { router.presentedSheet = .paywall(reason: .openItemLimit) }
+            Button("Not now", role: .cancel) {}
+        } message: {
+            Text(limitAlert?.message ?? "")
+        }
     }
 
     // MARK: - Actions
