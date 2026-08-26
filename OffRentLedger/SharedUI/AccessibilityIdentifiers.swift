@@ -31,6 +31,7 @@ enum A11yID {
         static let map = "map.canvas"
         static let close = "map.close"
         static let searchField = "map.search"
+        static let dismissKeyboard = "map.dismissKeyboard"
         static let searchResults = "map.searchResults"
         static let searchResult = "map.searchResult"
         static let legendToggle = "map.legendToggle"

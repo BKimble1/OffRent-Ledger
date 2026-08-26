@@ -47,6 +47,15 @@ struct OperationsMapView: View {
     /// so one keystroke rebuilt the entire index six times.
     @State private var allRecords: [MapRecord] = []
 
+    /// Whether the search field has the keyboard.
+    ///
+    /// A full-screen map is the one screen in the app with no scroll view, so
+    /// `scrollDismissesKeyboard` — which every other screen relies on — has nothing to act on
+    /// here. Dragging the map pans it. The only way out was the keyboard's own Search key, which
+    /// is not where anybody looks, and on an iPad with a hardware keyboard the software one does
+    /// not appear at all so there was nothing to look at.
+    @FocusState private var searchIsFocused: Bool
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
@@ -56,6 +65,15 @@ struct OperationsMapView: View {
             .safeAreaInset(edge: .bottom) { bottomPanel }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
+            // Done, above the keyboard. The map cannot use the scroll gesture every other
+            // screen uses to put the keyboard away, so it gets the explicit control instead.
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { searchIsFocused = false }
+                        .accessibilityIdentifier(A11yID.OperationsMap.dismissKeyboard)
+                }
+            }
         }
         .accessibilityIdentifier(A11yID.OperationsMap.root)
         .sheet(item: Binding(
@@ -163,6 +181,7 @@ struct OperationsMapView: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .submitLabel(.search)
+                .focused($searchIsFocused)
                 // The height comes from the text and its padding rather than from a number, so
                 // the pill grows at the accessibility sizes instead of clipping what is in it.
                 .padding(.vertical, Space.base - 1)
@@ -170,6 +189,7 @@ struct OperationsMapView: View {
             if !query.isEmpty {
                 Button {
                     query = ""
+                    searchIsFocused = false
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.tertiary)

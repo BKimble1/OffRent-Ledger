@@ -46,7 +46,10 @@ final class IPadLayoutUITests: XCTestCase {
         app.tab(A11yUI.Tab.today).tap()
         app.expect(app.anyElement(A11yUI.Today.root))
 
-        assertReadableColumn(app.expect(app.anyElement(A11yUI.Today.scanCard)), in: app,
+        // `reveal`, not `expect`. Today's content is a `LazyVStack`, so a card below the fold is
+        // not merely off-screen — it has never been built, and waiting for it would time out
+        // against a screen that is working perfectly.
+        assertReadableColumn(app.reveal(app.anyElement(A11yUI.Today.scanCard)), in: app,
                              describing: "the scan card on Today")
     }
 
@@ -74,13 +77,16 @@ final class IPadLayoutUITests: XCTestCase {
 
         XCUIDevice.shared.orientation = .landscapeLeft
         app.expect(app.anyElement(A11yUI.Today.root))
+        // Rotation is not instant and `frame` is read from a snapshot, so this polls rather than
+        // asserting against whatever the first snapshot after the request happened to say.
+        waitUntil { app.frame.width > portraitWidth }
         XCTAssertGreaterThan(
             app.frame.width, portraitWidth,
             "the window did not get wider, so the app never rotated into landscape"
         )
         // The wide case is the whole point of the cap: this is where an unconstrained screen
         // would be stretched to thirteen hundred points.
-        assertReadableColumn(app.expect(app.anyElement(A11yUI.Today.scanCard)), in: app,
+        assertReadableColumn(app.reveal(app.anyElement(A11yUI.Today.scanCard)), in: app,
                              describing: "the scan card on Today in landscape")
 
         // The tabs still work rotated. A tab bar that moved out from under the app's own
@@ -90,6 +96,7 @@ final class IPadLayoutUITests: XCTestCase {
 
         XCUIDevice.shared.orientation = .portrait
         app.expect(app.anyElement(A11yUI.Rentals.root))
+        waitUntil { app.frame.width <= portraitWidth }
         XCTAssertEqual(
             app.frame.width, portraitWidth, accuracy: 1,
             "the window did not return to its portrait size"
@@ -132,6 +139,17 @@ final class IPadLayoutUITests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// Polls a condition until it holds or the deadline passes, then returns either way.
+    ///
+    /// Deliberately not an assertion of its own: the caller asserts afterwards, so a failure
+    /// reports the actual width against the expected one rather than "waitUntil timed out".
+    /// Each `frame` read resolves a fresh snapshot, which is what paces the loop — there is no
+    /// sleep here, and no fixed delay standing in for a condition.
+    private func waitUntil(_ condition: () -> Bool, timeout: TimeInterval = 8) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() && Date() < deadline {}
+    }
 
     /// Fails unless the app really has an iPad-sized window.
     private func requireIPad(
