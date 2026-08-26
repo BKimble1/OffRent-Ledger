@@ -446,28 +446,50 @@ struct EvidenceManagerView: View {
             }
 
             if let item = items.first, let assets = item.assets, !assets.isEmpty {
-                Section("Attachments") {
+                Section {
+                    // A row that opens the attachment, rather than a row that *is* an editor.
+                    //
+                    // It used to be a caption field and a swipe. The field wrote into the model
+                    // and never saved, so a caption either persisted or did not with nothing on
+                    // screen either way; and the only way to remove anything was to swipe a row
+                    // whose middle was that same text field, which is a gesture fight and a
+                    // destructive action with no button. Both are on `AttachmentEditorView` now,
+                    // where they are visible and where saving says what it did.
                     ForEach(assets, id: \.id) { asset in
-                        VStack(alignment: .leading, spacing: 6) {
-                            EvidenceThumbnail(asset: asset, fileStore: dependencies.fileStore)
-                            TextField("Caption", text: Binding(
-                                get: { asset.caption ?? "" },
-                                set: { asset.caption = $0.nilIfBlank }
-                            ))
-                            Text(Formatters.dateAndTime(asset.capturedAt))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            if let digest = asset.sha256 {
-                                Text("SHA-256 \(digest.prefix(16))…")
-                                    .font(.caption2.monospaced())
-                                    .foregroundStyle(.secondary)
-                                Text(AppCopy.checksumExplanation)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                        NavigationLink {
+                            AttachmentEditorView(assetID: asset.id)
+                        } label: {
+                            HStack(spacing: Space.comfortable) {
+                                EvidenceThumbnail(asset: asset, fileStore: dependencies.fileStore)
+                                VStack(alignment: .leading, spacing: Space.hair) {
+                                    Text(asset.displayName)
+                                        .font(Typography.rowTitle)
+                                        .lineLimit(1)
+                                    if let caption = asset.caption, !caption.isEmpty {
+                                        Text(caption)
+                                            .font(Typography.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(2)
+                                    } else {
+                                        Text("No caption yet")
+                                            .font(Typography.caption)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    Text(Formatters.dateAndTime(asset.capturedAt))
+                                        .font(Typography.micro)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
+                        .accessibilityIdentifier(A11yID.Attachment.openRow)
                     }
+                    // Swipe still works for anyone who reaches for it. It is no longer the only
+                    // way, and the row it acts on is no longer an editable field.
                     .onDelete(perform: delete)
+                } header: {
+                    Text("Attachments")
+                } footer: {
+                    Text("Tap one to rename it, caption it, see it full size, or remove it.")
                 }
             }
         }

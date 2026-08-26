@@ -62,6 +62,22 @@ struct UserNotificationScheduler: NotificationScheduling {
         }
     }
 
+    /// Whether the system will actually deliver what this schedules.
+    ///
+    /// `.provisional` counts, and `.ephemeral` counts. Both are real grants — provisional
+    /// delivers quietly into the notification centre without ever having interrupted anybody —
+    /// and an app that reads them as "no permission" schedules nothing while the system was
+    /// perfectly willing to deliver. From the user's side that is reminders which do not arrive,
+    /// for a reason nothing on screen states.
+    ///
+    /// Only `.denied` and `.notDetermined` mean there is nothing to schedule.
+    private func canDeliver() async -> Bool {
+        switch await authorizationStatus() {
+        case .authorized, .provisional, .ephemeral: true
+        default: false
+        }
+    }
+
     func pendingIdentifiers() async -> Set<String> {
         Set(await center.pendingNotificationRequests().map(\.identifier))
     }
@@ -70,7 +86,7 @@ struct UserNotificationScheduler: NotificationScheduling {
     func synchronise(to planned: [PlannedReminder]) async -> ScheduleOutcome {
         // Never asks for permission. If the user has not granted it, there is nothing to
         // schedule and no reason to interrupt them.
-        guard await authorizationStatus() == .authorized else {
+        guard await canDeliver() else {
             await cancelAll()
             return .empty
         }
@@ -114,7 +130,7 @@ struct UserNotificationScheduler: NotificationScheduling {
     }
 
     func scheduleTestReminder(after seconds: TimeInterval) async -> Bool {
-        guard await authorizationStatus() == .authorized else { return false }
+        guard await canDeliver() else { return false }
         let content = UNMutableNotificationContent()
         content.title = "\(SharedBranding.displayName) reminders are working"
         content.body = """

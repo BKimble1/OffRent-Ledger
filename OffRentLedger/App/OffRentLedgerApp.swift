@@ -1,13 +1,18 @@
 import SwiftData
 import SwiftUI
+import UserNotifications
 
 @main
 struct OffRentLedgerApp: App {
 
     @State private var dependencies: AppDependencies
-    @State private var router = AppRouter()
+    @State private var router: AppRouter
     @State private var onboarding = OnboardingState()
     private let container: ModelContainer?
+
+    /// Held for the life of the app: `UNUserNotificationCenter.delegate` is a weak reference, and
+    /// a router that goes out of scope is a tapped reminder that opens the app and does nothing.
+    private let notifications: NotificationRouter
 
     init() {
         let dependencies = AppDependencies.live()
@@ -39,6 +44,22 @@ struct OffRentLedgerApp: App {
         _onboarding = State(initialValue: onboarding)
         #endif
         _dependencies = State(initialValue: dependencies)
+
+        // The router is built here rather than defaulted on the property, because the
+        // notification delegate needs the *same* instance and `@State`'s value cannot be read
+        // from an initialiser — it is not installed on a view yet.
+        let router = AppRouter()
+        _router = State(initialValue: router)
+
+        // Installed in `init`, not in a `.task`.
+        //
+        // A reminder tapped while the app is not running launches it, and the system delivers
+        // that tap during launch. A delegate installed once the first view has appeared is a
+        // delegate that was not there when it mattered, and the tap is lost — the app opens on
+        // whatever screen it was left on, which is exactly the bug this class exists to fix.
+        let notifications = NotificationRouter(router: router)
+        self.notifications = notifications
+        UNUserNotificationCenter.current().delegate = notifications
     }
 
     @AppStorage(AppearanceSetting.storageKey)

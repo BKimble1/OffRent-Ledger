@@ -148,6 +148,19 @@ enum A11yID {
         static let disclosure = "itemDetail.disclosure"
     }
 
+    /// Editing one attachment: its name, its caption, and removing it.
+    enum Attachment {
+        static let root = "attachment.editor"
+        static let openRow = "attachment.row"
+        static let name = "attachment.name"
+        static let caption = "attachment.caption"
+        static let save = "attachment.save"
+        static let delete = "attachment.delete"
+        static let confirmDelete = "attachment.confirmDelete"
+        static let preview = "attachment.preview"
+        static let missingRequirement = "attachment.missingRequirement"
+    }
+
     enum EvidenceExport {
         static let root = "evidenceExport.root"
         static let generate = "evidenceExport.generate"
@@ -277,6 +290,11 @@ enum A11yID {
     enum Settings {
         static let root = "settings.root"
         static let subscription = "settings.subscription"
+        static let subscriptionRoot = "settings.subscription.root"
+        static let subscriptionPlan = "settings.subscription.plan"
+        static let subscriptionSeePro = "settings.subscription.seePro"
+        static let subscriptionRestore = "settings.subscription.restore"
+        static let subscriptionManage = "settings.subscription.manage"
         static let reminders = "settings.reminders"
         static let autoFillScans = "settings.autoFillScans"
         static let remindersRoot = "settings.reminders.root"

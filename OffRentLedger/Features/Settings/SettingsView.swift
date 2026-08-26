@@ -97,78 +97,192 @@ struct SettingsView: View {
     }
 }
 
+/// Settings › Subscription.
+///
+/// It was a list of `DetailRow`s, one of which printed the raw StoreKit product identifier —
+/// `com.idlery.offrent.pro.monthly` — at a user who has no use for it and at a reviewer who reads
+/// it as an unfinished screen. What somebody actually wants here is four things: what they are on,
+/// what it costs them next and when, what Pro would add, and how to change or restore it.
+///
+/// The renewal date is still only ever shown when StoreKit has provided one. This app does not
+/// compute a renewal date of its own; a wrong date beside a real charge is indefensible.
 struct SubscriptionSettingsView: View {
     @Environment(AppDependencies.self) private var dependencies
     @Environment(AppRouter.self) private var router
     @Environment(\.openURL) private var openURL
+
     @State private var restoreMessage: String?
+    @State private var isRestoring = false
+
+    private var entitlement: EntitlementState { dependencies.effectiveEntitlement }
+
+    /// The plan in words. The identifier is a build detail and belongs nowhere near a person.
+    private var planName: String {
+        switch entitlement.productIdentifier {
+        case AppConfiguration.monthlyProductIdentifier: "Pro, billed monthly"
+        case AppConfiguration.annualProductIdentifier: "Pro, billed yearly"
+        default: entitlement.isPro ? "Pro" : "Free"
+        }
+    }
 
     var body: some View {
-        List {
-            Section {
-                let entitlement = dependencies.effectiveEntitlement
-                DetailRow(label: "Plan", value: entitlement.isPro ? "Pro" : "Free")
-                DetailRow(label: "Status", value: entitlement.reason.displayName)
-                if let date = entitlement.renewalOrExpirationDate {
-                    DetailRow(
-                        label: entitlement.isPro ? "Renews or expires" : "Expired",
-                        value: Formatters.mediumDate(date)
-                    )
-                }
-                if let product = entitlement.productIdentifier {
-                    DetailRow(label: "Product", value: product)
-                }
-            } header: {
-                Text("Your plan")
-            } footer: {
-                Text(
-                    dependencies.effectiveEntitlement.renewalOrExpirationDate == nil
-                        ? "The App Store has not told \(AppConfiguration.displayName) a renewal date, so none is shown. It is in your Apple Account settings."
-                        : AppCopy.subscriptionTerms
-                )
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.section) {
+                statusCard
+                whatProAdds
+                freePlan
+                actions
+                terms
             }
+            .padding(.horizontal, Space.comfortable)
+            .padding(.top, Space.base)
+            .padding(.bottom, Space.screenBottom)
+        }
+        .offRentScreen()
+        .navigationTitle("Subscription")
+        .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier(A11yID.Settings.subscriptionRoot)
+    }
 
-            Section("Free plan") {
+    // MARK: - Status
+
+    private var statusCard: some View {
+        VStack(alignment: .leading, spacing: Space.base) {
+            CardHeader(
+                title: planName,
+                subtitle: entitlement.reason.displayName,
+                symbol: entitlement.isPro ? "checkmark.seal.fill" : "person.crop.circle",
+                tint: entitlement.isPro ? Palette.settled : Palette.accent
+            )
+
+            if let date = entitlement.renewalOrExpirationDate {
+                RowDivider()
                 DetailRow(
-                    label: "Open rentals",
-                    value: "\(EntitlementPolicy.freeOpenItemLimit) at a time"
+                    label: entitlement.isPro ? "Renews or expires" : "Expired",
+                    value: Formatters.mediumDate(date)
                 )
-                Text(AppCopy.entitlementLossReassurance)
-                    .font(.footnote)
+            } else {
+                RowDivider()
+                Text("""
+                    The App Store has not told \(AppConfiguration.displayName) a renewal date, so \
+                    none is shown here. Your Apple Account settings always have it.
+                    """)
+                    .font(Typography.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .offRentCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(A11yID.Settings.subscriptionPlan)
+    }
 
-            Section {
-                Button("See Pro options") { router.presentedSheet = .paywall(reason: .settings) }
-                    .minimumTapTarget()
-                Button("Restore purchases") {
-                    Task {
-                        await dependencies.subscriptions.restore()
-                        restoreMessage = dependencies.effectiveEntitlement.isPro
-                            ? "Pro is active on this Apple Account."
-                            : "No active subscription was found on this Apple Account."
-                    }
-                }
-                .minimumTapTarget()
-                if let url = AppConfiguration.manageSubscriptionsURL {
-                    Button("Manage subscription") { openURL(url) }.minimumTapTarget()
+    // MARK: - What Pro adds
+
+    private var whatProAdds: some View {
+        VStack(alignment: .leading, spacing: Space.base) {
+            CardHeader(
+                title: entitlement.isPro ? "What Pro gives you" : "What Pro would add",
+                symbol: "sparkles",
+                tint: Palette.accent
+            )
+            // Straight off `ProFeature`, so this list cannot drift from what the entitlement
+            // check actually gates.
+            ForEach(ProFeature.allCases, id: \.self) { feature in
+                HStack(alignment: .firstTextBaseline, spacing: Space.snug) {
+                    Image(systemName: entitlement.isPro ? "checkmark" : "lock")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(entitlement.isPro ? Palette.settled : .secondary)
+                        .frame(width: Layout.symbolInline, alignment: .leading)
+                        .accessibilityHidden(true)
+                    Text(feature.displayName)
+                        .font(Typography.rowDetail)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
-        .offRentFormBackground()
-        .navigationTitle("Subscription")
-        .navigationBarTitleDisplayMode(.inline)
-        .alert(
-            "Restore purchases",
-            isPresented: Binding(
-                get: { restoreMessage != nil }, set: { if !$0 { restoreMessage = nil } }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .offRentCard()
+    }
+
+    // MARK: - Free plan
+
+    private var freePlan: some View {
+        VStack(alignment: .leading, spacing: Space.base) {
+            CardHeader(title: "On the free plan", symbol: "shippingbox", tint: .secondary)
+            DetailRow(
+                label: "Open rentals",
+                value: "\(EntitlementPolicy.freeOpenItemLimit) at a time"
             )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(restoreMessage ?? "")
+            Text(AppCopy.entitlementLossReassurance)
+                .font(Typography.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .offRentCard()
+    }
+
+    // MARK: - Actions
+
+    private var actions: some View {
+        VStack(spacing: Space.snug) {
+            if !entitlement.isPro {
+                Button("See Pro options") {
+                    router.presentedSheet = .paywall(reason: .settings)
+                }
+                .buttonStyle(.offRentPrimary)
+                .accessibilityIdentifier(A11yID.Settings.subscriptionSeePro)
+            }
+
+            Button(isRestoring ? "Restoring…" : "Restore purchases") {
+                guard !isRestoring else { return }
+                isRestoring = true
+                Task {
+                    await dependencies.subscriptions.restore()
+                    isRestoring = false
+                    restoreMessage = dependencies.effectiveEntitlement.isPro
+                        ? "Pro is active on this Apple Account."
+                        : "No active subscription was found on this Apple Account."
+                }
+            }
+            .buttonStyle(.offRentSecondary)
+            .disabled(isRestoring)
+            .accessibilityIdentifier(A11yID.Settings.subscriptionRestore)
+
+            if let url = AppConfiguration.manageSubscriptionsURL {
+                Button("Manage or cancel in your Apple Account") { openURL(url) }
+                    .buttonStyle(.offRentSecondary)
+                    .accessibilityIdentifier(A11yID.Settings.subscriptionManage)
+            }
+
+            // On the actions, not on the screen: an alert sharing a chain with a sheet stops the
+            // sheet presenting in this app, and `See Pro options` presents one through the router.
+            if let restoreMessage {
+                InlineAlert(message: restoreMessage)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .offRentCard()
+    }
+
+    // MARK: - Terms
+
+    private var terms: some View {
+        VStack(alignment: .leading, spacing: Space.snug) {
+            Text(AppCopy.subscriptionTerms)
+                .font(Typography.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: Space.section) {
+                NavigationLink("Privacy Policy", value: SettingsDestination.privacyPolicy)
+                NavigationLink("Terms of Use", value: SettingsDestination.terms)
+            }
+            .font(Typography.caption)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Space.tight)
     }
 }
 
