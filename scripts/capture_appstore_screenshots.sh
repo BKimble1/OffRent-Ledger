@@ -41,10 +41,14 @@ if [ "$(uname -s)" != "Darwin" ]; then
   exit 1
 fi
 
+AVAILABLE=$(xcrun simctl list devices available)
+
 DEVICE_NAME="${1:-}"
 if [ -z "$DEVICE_NAME" ]; then
   for candidate in "${PREFERRED_DEVICES[@]}"; do
-    if xcrun simctl list devices available | grep -q "^ *${candidate} ("; then
+    # `grep -F "<name> ("`, not a regex on the name. A device name is data, and the trailing
+    # " (" is what stops "iPhone 16 Pro" matching the line for "iPhone 16 Pro Max".
+    if printf '%s\n' "$AVAILABLE" | grep -qF "${candidate} ("; then
       DEVICE_NAME="$candidate"
       break
     fi
@@ -58,11 +62,13 @@ if [ -z "$DEVICE_NAME" ]; then
   exit 1
 fi
 
+# The same UDID shape `scripts/ci/find_simulator.sh` matches, for the same reason: pulling the
+# identifier out is more robust than assuming which parenthesised group on the line it is.
 DEVICE_ID=$(
-  xcrun simctl list devices available \
-    | grep "^ *${DEVICE_NAME} (" \
-    | head -1 \
-    | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/'
+  printf '%s\n' "$AVAILABLE" \
+    | grep -F "${DEVICE_NAME} (" \
+    | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' \
+    | tail -n 1
 )
 
 if [ -z "$DEVICE_ID" ]; then

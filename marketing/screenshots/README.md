@@ -130,7 +130,7 @@ The suite walks the screens in this order and photographs each one:
 5. Today → *Scan a contract* → Scan Review
 6. Audit → the Summit Rental Co. invoice
 
-Steps 3's scroll distance is the constant `Scroll.offRentProof` at the top of
+Step 3's scroll distance is the constant `Scroll.offRentProof` at the top of
 `AppStoreCaptureUITests`. If a copy change moves the proof block out of frame, change that number
 — it is the whole adjustment.
 
