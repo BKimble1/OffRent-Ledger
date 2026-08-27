@@ -63,10 +63,15 @@ archive gates in `.github/workflows/testflight.yml` passing, **TestFlight-ready*
 - [ ] Wait for a reminder to fire; tap it; confirm it lands on the right rental item.
 - [ ] Tap "Add current location", deny, and confirm the flow continues.
 - [ ] Tap it again, allow, and confirm one coordinate is stored and no tracking follows.
-- [ ] Add the widget in all three home-screen sizes. Confirm it shows the summary and **no
-      vendor, jobsite or equipment name**.
-- [ ] Add all three Lock Screen widgets — inline, circular and rectangular. Same check, and this
-      is the one that matters most: a lock screen is read by whoever picks the phone up.
+- [ ] Add the widget in every home-screen size. Confirm it names the machines that are on rent,
+      shows each one's own estimate, and shows **no rental company, jobsite, address, agreement
+      number or invoice number**. Tap a row and confirm it opens that rental rather than Today.
+- [ ] Add all three Lock Screen widgets — inline, circular and rectangular. These must show the
+      total, the counts and the date and **name no machine at all**. This is the one that matters
+      most: a lock screen is read by whoever picks the phone up. The build checks it (invariant
+      64), but the build cannot see what actually renders.
+- [ ] Confirm the widget works **without a subscription**. It is not a Pro feature. If it says
+      anything about Pro, something has been reintroduced.
 - [ ] Add the Control Centre button. Confirm it opens the new rental form and **creates nothing**.
 
 ### The on-device model (new)
