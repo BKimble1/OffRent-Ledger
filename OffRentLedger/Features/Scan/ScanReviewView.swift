@@ -67,6 +67,12 @@ struct ScanReviewView: View {
                 }
             }
             .offRentFormBackground()
+            // Before the inset, not after. An accessibility modifier applied over a
+            // `safeAreaInset` is pushed down into the inset's contents, and `commitBar` holds
+            // `scan.saveButton` and `scan.enterManually` — both of which a root identifier
+            // sitting further down this chain would replace. `AttachmentEditorView` shipped that
+            // mistake and cost two UI tests eight seconds each.
+            .accessibilityIdentifier(A11yID.Scan.reviewRoot)
             .safeAreaInset(edge: .bottom) {
                 if model.outcome.hasAnything, model.phase == .reviewing || model.phase == .reading {
                     commitBar
@@ -89,7 +95,6 @@ struct ScanReviewView: View {
             // it fires when the sheet closes, whichever way the user closed it, rather than
             // whenever the object happens to be released.
             .onDisappear { model.cancel() }
-            .accessibilityIdentifier(A11yID.Scan.reviewRoot)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

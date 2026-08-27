@@ -211,39 +211,50 @@ is declared as a second class inside `MapAndEditingUITests.swift`, so a count by
 | `AccessibilityUITests` | 4 | iPhone | Tabs labelled, the estimate spoken as an estimate, disclosure readable, status spoken |
 | `InvoiceAcceptanceUITests` | 4 | iPhone | A valid invoice is accepted and survives a relaunch; an empty one is disabled with a reason and a route that opens the form |
 | `IPadLayoutUITests` | 4 | iPad | The readable-width column, rotation, and the layout at iPad metrics |
-| `AttachmentEditingUITests` | 4 | iPhone | **Never passed. See below.** |
+| `AttachmentEditingUITests` | 4 | iPhone | 2 of 4 green as of run `33019905318`; the other two had a root cause found and fixed — see below |
 | `LayoutObstructionUITests` | 3 | iPhone | The save bar stays above the keyboard on the longest form; Today scrolls clear of the tab bar |
 | `MismatchUITests` | 2 | iPhone | An extra-day mismatch survives a relaunch; **scan review never saves without confirmation** |
 
 ### What is red, and why it is recorded rather than removed
 
-**`AttachmentEditingUITests` — 4 tests, never green.** Written for this change and failed on every
-one of the four runs it has had. Last run (`33004572538`, `1b7a54a`): three timed out at
-`waitForExistence` with "Failed to get matching snapshots: Timed out while evaluating UI query",
-and the fourth reported *"element was found and then went away before it could be tapped, which
-means the screen rebuilt underneath it"* — the message added in `1b7a54a` for exactly this case.
+**`AttachmentEditingUITests` — two faults, both now understood.**
 
-Read together, those say the rental screen is rebuilding continuously while an attachment whose
-file is missing is on it, which is what the fixture deliberately creates. Whether that is a real
-re-render loop in the app or an artefact of a record with no bytes behind it **is not resolved**,
-and it is the first thing to settle when this is picked up. What is known: the same screens are
-exercised by the other 44 iPhone tests without a fixture attachment and they pass.
+The first was the app's, and it was the one the tester hit: `AttachmentEditorView` held a live
+`@Query` built as a closure-based `NavigationLink` destination inside a `ForEach`, so the view
+graph never settled and the main thread span. On a real iPhone that is a watchdog kill,
+`0x8BADF00D`. Fixed in `61affad`, and the effect on this suite is measurable: every 197-second
+snapshot timeout disappeared, the iPhone UI step dropped from 2368s to 1862s, and two of the four
+tests went green. Invariant 63 fails the build if the shape comes back.
 
-The behaviour these four tests were written for is covered at the level that decides what the
-store holds — `AttachmentEditingTests`, 5 tests, green — but nothing currently drives the editor's
-buttons.
+The second was an accessibility identifier in the wrong place, and it is why the other two stayed
+red on run `33019905318`: `.accessibilityIdentifier(A11yID.Attachment.root)` sat on the chain
+*above* `.safeAreaInset(edge: .bottom) { saveBar }`. SwiftUI pushes an accessibility modifier down
+into an inset's contents, so the root identifier landed on the Save button and replaced
+`attachment.save`. The CI accessibility dump is unambiguous —
+`Button, identifier: 'attachment.editor', label: 'Save changes'` — and both failures were
+`app.buttons[A11yUI.Attachment.save]` timing out after 8 seconds on a button that was on screen,
+enabled, and renamed.
+
+`EditRentalView` hit exactly this and carries a note about it; the editor reintroduced it. So the
+note is no longer the only thing holding the rule: invariant 66 fails the build on the ordering,
+and it found a third instance in `ScanReviewView` that nothing had noticed. **The fix is not yet
+verified in CI** — the run that will say is the one on the commit that carries it.
+
+The behaviour these four tests were written for is also covered at the level that decides what the
+store holds — `AttachmentEditingTests`, 5 tests, green.
 
 **`PhotosPicker` is covered by no test.** `-offrent-stub-photo-picker` replaces it in this suite
 because an out-of-process picker service keeps the app from reaching the idle state XCUITest
 needs. It was not covered before that flag existed either. Saying otherwise would be worse than
 the gap.
 
-**`CoreWorkflowUITests` flaked twice, on different tests and different jobs.**
+**`CoreWorkflowUITests` flaked twice and has since stopped.**
 `testTheEvidencePacketSheetOpensFromARental` failed on run `32998916617` (iPhone) and
 `testManuallyCreatedRentalSurvivesRelaunch` on run `33004572538` (iPad), both after passing on the
-runs before, and with nothing in either commit touching the screens involved. Neither has been
-re-run to confirm. This is flakiness in the suite, not in the app, and it is worth fixing before
-it trains anybody to ignore a red run.
+runs before. Neither recurred: on run `33019905318` the whole iPad job was green and the only two
+iPhone failures were the attachment ones above. The likeliest explanation is the re-render loop
+fixed in `61affad`, which was making the whole app slow enough to miss timeouts — but that is a
+plausible story rather than a proved one, and it is written down as such.
 
 ### The build that shipped as TestFlight 21
 

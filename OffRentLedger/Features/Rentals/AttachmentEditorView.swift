@@ -75,6 +75,7 @@ struct AttachmentEditorView: View {
                     actionTitle: "Back to the rental",
                     action: { dismiss() }
                 )
+                .accessibilityIdentifier(A11yID.Attachment.root)
             } else {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -83,7 +84,6 @@ struct AttachmentEditorView: View {
         .offRentFormBackground()
         .navigationTitle("Attachment")
         .navigationBarTitleDisplayMode(.inline)
-        .accessibilityIdentifier(A11yID.Attachment.root)
         .onAppear(perform: fetchOnce)
     }
 
@@ -173,6 +173,15 @@ struct AttachmentEditorView: View {
                 }
             }
         }
+        // The identifier goes on the form, *before* the inset. `EditRentalView` carries the same
+        // note and the same ordering, and it is not a style preference: an accessibility
+        // modifier applied over a `safeAreaInset` is pushed down into the inset's contents, so a
+        // root identifier on the chain above this line lands on the Save button too and replaces
+        // `attachment.save`. It did. The CI dump read
+        // `Button, identifier: 'attachment.editor', label: 'Save changes'`, and two tests spent
+        // eight seconds each waiting for a button that was on screen, enabled, and renamed.
+        // `scripts/verify_repository.py` now fails the build on that ordering.
+        .accessibilityIdentifier(A11yID.Attachment.root)
         .safeAreaInset(edge: .bottom) { saveBar }
         // On the destructive button, not the form: an alert beside a sheet on one chain stops
         // the sheet presenting in this app, and the preview below is a sheet.

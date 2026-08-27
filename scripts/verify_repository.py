@@ -2423,6 +2423,66 @@ def check_widget_palette_matches_the_asset_catalog() -> None:
                     "asset catalog, so the two have to be changed together.",
                 )
 
+
+def check_no_identifier_sits_above_a_safe_area_inset() -> None:
+    """An `.accessibilityIdentifier` applied *after* a `.safeAreaInset` renames the bar's buttons.
+
+    SwiftUI pushes an accessibility modifier down into the contents of a `safeAreaInset` it is
+    applied over. So this:
+
+        Form { ... }
+            .safeAreaInset(edge: .bottom) { saveBar }
+            .accessibilityIdentifier(A11yID.Thing.root)
+
+    gives the Save button inside `saveBar` the identifier `thing.root`, replacing the
+    `thing.save` it was given, and the button becomes unfindable. It is not a crash and not a
+    visual defect: the screen looks right, the button works when a human taps it, and only the
+    test that queries it by identifier notices — after waiting the full timeout.
+
+    This has now cost two screens. `EditRentalView` hit it and carries a note about it;
+    `AttachmentEditorView` reintroduced it four weeks later and two tests spent eight seconds
+    each waiting for a button that was on screen, enabled, and renamed
+    (`Button, identifier: 'attachment.editor', label: 'Save changes'`).
+
+    The rule: put the identifier on the content, *before* the inset. Then the inset's contents
+    are added outside the identifier's subtree and keep their own.
+    """
+    check("No accessibility identifier is applied over a safe-area inset")
+
+    for path in swift_files(APP_SOURCES):
+        source = without_comments(path.read_text())
+        # `[ \t]*` rather than `\s*`: `\s` matches newlines, so on a chain preceded by a blank
+        # line the match starts on the blank line and the captured indent is one character
+        # too long — which silently makes every following modifier look like a different
+        # indentation level, and the check passes on a file that has the defect.
+        for inset in re.finditer(r"^([ \t]*)\.safeAreaInset\s*\(", source, re.M):
+            indent = len(inset.group(1))
+            # Walk forward through the modifier chain at the same indentation. The chain ends at
+            # the first line that is not a continuation of it.
+            position = source.index("\n", inset.end()) + 1 if "\n" in source[inset.end():] else len(source)
+            for line in source[position:].split("\n"):
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                leading = len(line) - len(line.lstrip())
+                if stripped.startswith("."):
+                    if leading != indent:
+                        continue
+                    if stripped.startswith(".accessibilityIdentifier("):
+                        number = source[: inset.start()].count("\n") + 1
+                        fail(
+                            "inset-identifier",
+                            f"{path.relative_to(ROOT).as_posix()}:{number} applies "
+                            ".accessibilityIdentifier after .safeAreaInset on the same chain. "
+                            "SwiftUI pushes it down into the inset's contents, so it replaces "
+                            "the identifier on the button inside the bar and the button becomes "
+                            "unfindable. Put the identifier on the content, before the inset.",
+                        )
+                        break
+                elif leading <= indent and not stripped.startswith(("}", ")", "]")):
+                    # The chain is over.
+                    break
+
 def check_call_sites_resolve() -> None:
     check("Initialiser and static-call sites match their declarations")
     # The app layer has never been compiled. This is the nearest thing available to a type check
@@ -2633,6 +2693,7 @@ def main() -> int:
         check_no_live_query_is_built_once_per_row,
         check_lock_screen_widget_shows_no_machine_names,
         check_widget_palette_matches_the_asset_catalog,
+        check_no_identifier_sits_above_a_safe_area_inset,
         check_nothing_dismisses_and_presents_in_one_turn,
         check_notifications_are_delivered_and_read,
         check_call_sites_resolve,
