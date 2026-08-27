@@ -27,7 +27,8 @@ Run with `swift test` against the root `Package.swift`, which compiles
 `OffRentLedger/Domain` and `OffRentShared` — **the same files the Xcode app target compiles**,
 not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SWIFT_VERSION`.
 
-**421 tests. 421 passed. 0 failed.** Last run 2026-08-26 against commit `1b7a54a`.
+**432 tests. 432 passed. 0 failed.** Last run 2026-08-27, on the working tree that became the
+commit below this line in the log.
 
 | Suite | Tests | Result | What it covers |
 |---|---:|---|---|
@@ -47,11 +48,11 @@ not a copy. Swift language mode is pinned to v5 to match the Xcode project's `SW
 | `CompanyMatchingTests` | 10 | ✅ pass | Case, punctuation and spacing ignored; **a different branch of the same chain is not a duplicate**; a suffix difference is not assumed to be the same company; editing a record does not find itself |
 | `LegalDocumentOutlineTests` | 10 | ✅ pass | Markdown to clauses, preamble, bullets |
 | `ScanOutcomeTests` | 10 | ✅ pass | Invoice fields on a contract do not count as rental details; **the commit button refuses to render a zero**; the empty state names what was not found and offers three ways on |
-| `EntitlementPolicyTests` | 9 | ✅ pass | Free limit; **every guarantee that entitlement never removes access to existing records** |
+| `EntitlementPolicyTests` | 10 | ✅ pass | Free limit; **every guarantee that entitlement never removes access to existing records**; the widget is not among the gated features |
 | `CSVExportTests` | 8 | ✅ pass | RFC 4180 quoting, formula-injection neutralisation, blank-not-zero for incomplete estimates |
 | `EvidencePacketTests` | 6 | ✅ pass | Disclaimer denies every prohibited claim; completeness reporting |
 | `MoneyParsingTests` | 6 | ✅ pass | Accepted and rejected forms; banker's rounding; cent-level equality |
-| `SnapshotBuilderTests` | 6 | ✅ pass | Aggregation; **the widget snapshot cannot carry identifying detail** |
+| `SnapshotBuilderTests` | 16 | ✅ pass | Aggregation; per-rental rows, their ranking and their cap; **the widget snapshot carries the machine and nothing else identifying** |
 | `SafePathTests` | 5 | ✅ pass | Filename sanitisation: traversal contained to one component, ordinary names unmangled, no input yields an unusable name |
 | `DateTextParserTests` | 4 | ✅ pass | US paperwork formats; noon anchoring; implausible years rejected |
 | `DeepLinkTests` | 4 | ✅ pass | Round trip of every case; foreign schemes and malformed IDs rejected |
@@ -71,7 +72,7 @@ could not have: that the walkthrough ends.
 
 | Check | Result |
 |---|---|
-| `python3 scripts/verify_repository.py` | ✅ 62 invariant checks, 0 problems |
+| `python3 scripts/verify_repository.py` | ✅ 65 invariant checks, 0 problems |
 | `python3 scripts/check_swift_call_sites.py` | ✅ 404 types parsed, 123 with initialisers checked and 198 static functions; **every call site in the repository resolves, by label and by arity**, across typealiases, extension initialisers and `@Model` classes. 0 findings. |
 | `python3 scripts/generate_xcodeproj.py --check` | ✅ project.pbxproj matches its generator |
 | `swift run offrent-docgen . --check` | ✅ generated docs current |
@@ -144,7 +145,7 @@ because they are current.
 | `EvidencePDFTests` | 5 | The packet is not blank and its text is not clipped — pages are rasterised and the pixels read back |
 | `LaunchScreenTests` | 5 | The shipping Info.plist declares a launch screen and names both keys; the splash draws the mark at the size the launch image does |
 | `NotificationSchedulerTests` | 5 | Add/cancel diffing; no authorisation request from synchronising; a test reminder survives a reschedule |
-| `EntitlementBehaviourTests` | 4 | Free limit against a real store; resolving frees the slot; lapsed Pro keeps everything working |
+| `EntitlementBehaviourTests` | 5 | Free limit against a real store; resolving frees the slot; lapsed Pro keeps everything working; a free user's widget snapshot still carries their rentals |
 | `ScanIntelligenceTests` | 4 | The model guardrail: a value not printed on the page is dropped; a rule-based suggestion always wins |
 
 Two historic failures are worth keeping, because each was a real defect the suite caught before

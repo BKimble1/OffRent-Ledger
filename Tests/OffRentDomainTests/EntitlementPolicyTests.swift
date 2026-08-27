@@ -88,7 +88,20 @@ final class EntitlementPolicyTests: XCTestCase {
 
     func testBillingRetryDoesNotSilentlyKeepProWhenTheTierSaysFree() {
         let retry = EntitlementState(tier: .free, reason: .inBillingRetry)
-        XCTAssertFalse(EntitlementPolicy.isAllowed(.widget, entitlement: retry))
+        XCTAssertFalse(EntitlementPolicy.isAllowed(.invoiceAudit, entitlement: retry))
         XCTAssertTrue(EntitlementPolicy.canEditExistingRecords(entitlement: retry))
+    }
+
+    /// The widget is not a Pro feature, and this is the test that says so.
+    ///
+    /// It was one. The gate contradicted the rule this whole type is built around — entitlement
+    /// gates creating rentals, never seeing the ones already recorded — and in practice it meant
+    /// a free user's Home Screen said "Open the app to start tracking a rental" over a phone with
+    /// four machines on rent. If somebody adds `case widget` back, this fails.
+    func testTheHomeScreenWidgetIsNotBehindTheSubscription() {
+        XCTAssertFalse(
+            ProFeature.allCases.contains { $0.rawValue.lowercased().contains("widget") },
+            "the widget shows records the user already created, so it is not gated"
+        )
     }
 }

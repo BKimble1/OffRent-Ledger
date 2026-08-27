@@ -414,14 +414,29 @@ shown once to an existing user and never again.
 
 ### 8.1 What the Home Screen and Lock Screen can show
 
-`RentalSummarySnapshot` carries counts, one aggregate figure and one date, and has **no field**
-for a machine, a jobsite, a rental company or an invoice amount. That is what makes the accessory
-(Lock Screen) widget families safe: a lock screen is read by whoever picks the phone up, and the
-guarantee is structural rather than a rule to remember while writing a new layout.
+`RentalSummarySnapshot` carries counts, one aggregate figure, one date, and — since schema
+version 2 — up to eight `Row`s naming the open rentals: the machine, its status, its own estimate
+and how long it has been out. It still has **no field** for a jobsite, a rental company, an
+address, an agreement number, an invoice number or a confirmation number, and `SnapshotBuilder`
+is the only thing that constructs it.
 
-Supported: `systemSmall`, `systemMedium`, `systemLarge`, `accessoryRectangular`,
-`accessoryCircular`, `accessoryInline`, plus a Control Centre `ControlWidget` that opens the new
-rental form and creates nothing.
+The split matters because the two surfaces are not equally private:
+
+| Surface | What it draws |
+| --- | --- |
+| `systemSmall/Medium/Large/ExtraLarge` (Home Screen, behind Face ID) | the aggregate, the counts, and the rentals by name |
+| `accessoryRectangular/Circular/Inline` (Lock Screen) | the aggregate and the counts only — **never** `rows` |
+
+The lock-screen half of that used to be guaranteed by the model having nowhere to put a name.
+It now has somewhere, so the guarantee moved into the render path: `SummaryWidgetView`'s three
+accessory branches read only the counts, and `scripts/verify_repository.py` fails the build if one
+of them starts reading `rows`, names the row type, or reads a machine name.
+
+Supported: `systemSmall`, `systemMedium`, `systemLarge`, `systemExtraLarge`,
+`accessoryRectangular`, `accessoryCircular`, `accessoryInline`, plus a Control Centre
+`ControlWidget` that opens the new rental form and creates nothing. On the families where
+WidgetKit honours it, each row is a `Link` to that rental; `.systemSmall` is a single tap target
+and falls back to the root `widgetURL`, which opens Today.
 
 ---
 
@@ -430,8 +445,16 @@ rental form and creates nothing.
 Free: **one open (unresolved) rental item**, full manual workflow on it, and unrestricted editing,
 resolving, deleting and viewing of everything that already exists.
 
-Pro: unlimited open items, invoice-audit workflow, full evidence PDF export, widget, advanced
-reminders, complete history export.
+Pro: unlimited open items, invoice-audit workflow, full evidence PDF export, advanced reminders,
+complete history export.
+
+**The widget is not a Pro feature.** It was, and the gate was wrong on both counts. It
+contradicted the rule this section rests on — entitlement gates *creating* records, never *seeing*
+the ones already recorded — and a widget is nothing but seeing. And with no subscription
+purchasable yet, it meant no user could see a single rental on their Home Screen: the widget read
+"Open the app to start tracking a rental" over a phone with four machines on rent.
+`RootView.publishSnapshot` now takes no entitlement at all, so there is no longer a parameter to
+get wrong, and `EntitlementPolicyTests` fails if `ProFeature` grows a `widget` case again.
 
 Products: `com.idlery.offrent.pro.monthly` ($14.99) and `com.idlery.offrent.pro.annual` ($119.99),
 one subscription group, annual marked as the better value without countdowns, pre-selection, or

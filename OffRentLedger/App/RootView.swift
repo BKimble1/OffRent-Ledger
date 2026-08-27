@@ -196,16 +196,15 @@ struct RootView: View {
         await rescheduleReminders(items: items)
     }
 
+    /// Publishes the widget snapshot, at every subscription tier.
+    ///
+    /// This used to be gated on `ProFeature.widget` and the gate was wrong twice over. It
+    /// contradicted `EntitlementPolicy`'s governing rule — entitlement gates *creating* rentals,
+    /// never *seeing* the ones already recorded — and a widget is nothing but seeing. And with
+    /// nobody able to subscribe yet, it meant the widget could not show a single rental to a
+    /// single user. What Pro still buys is in `ProFeature`: more than one open rental at a time,
+    /// the invoice audit, the evidence packet, the advanced reminders, the full history export.
     private func publishSnapshot(items: [RentalItem]) {
-        let entitlement = dependencies.effectiveEntitlement
-        // The widget is a Pro feature, so a free user's snapshot is withheld rather than
-        // published. `withhold`, not `clear`: clearing produced a widget that read "No rentals
-        // yet" on a phone with four machines on rent, which is the app misreporting the user's
-        // own data back to them rather than saying the feature is behind a subscription.
-        guard EntitlementPolicy.isAllowed(.widget, entitlement: entitlement) else {
-            dependencies.snapshotPublisher.withhold()
-            return
-        }
         var inputs: [SnapshotItemInput] = []
         for item in items {
             let invoices: [VendorInvoice] = item.agreement?.invoices ?? []
@@ -219,6 +218,8 @@ struct RootView: View {
             }
             inputs.append(
                 SnapshotItemInput(
+                    id: item.id,
+                    equipmentName: item.equipmentName,
                     status: item.status,
                     terms: item.terms,
                     hasInvoiceAwaitingReview: awaitingReview

@@ -2279,6 +2279,150 @@ def check_no_live_query_is_built_once_per_row() -> None:
                         "watchdog kill on device. Fetch once instead, or navigate by value.",
                     )
 
+
+def check_lock_screen_widget_shows_no_machine_names() -> None:
+    """The accessory families draw counts, never `snapshot.rows`.
+
+    `RentalSummarySnapshot` used to guarantee this by having nowhere to put a machine name. It
+    now has somewhere — `rows` — because a widget that says "3 open" without saying which three
+    is a number rather than a tool, and that was the complaint that produced it.
+
+    So the guarantee moved from the model to the render path, and this is what holds it there. A
+    Home Screen widget is behind Face ID; a lock screen accessory is legible to whoever picks the
+    phone up off a bench. `SummaryWidgetView`'s three accessory branches must therefore read only
+    the counts, the aggregate figure and the date. If one of them starts reading `rows` — or the
+    row type, or a machine name — this fails, and it fails at the only moment anybody would think
+    to add it.
+    """
+    check("The lock screen widget cannot name a machine")
+
+    path = ROOT / "OffRentLedgerWidget" / "OffRentSummaryWidget.swift"
+    if not path.exists():
+        fail("widget-privacy", "OffRentSummaryWidget.swift is missing")
+        return
+    source = without_comments(path.read_text())
+
+    def body_of(function: str) -> str | None:
+        match = re.search(rf"func {function}\s*\([^)]*\)\s*->[^{{]*\{{", source)
+        if not match:
+            return None
+        depth, index = 0, match.end() - 1
+        for position in range(index, len(source)):
+            if source[position] == "{":
+                depth += 1
+            elif source[position] == "}":
+                depth -= 1
+                if depth == 0:
+                    return source[index : position + 1]
+        return source[index:]
+
+    accessories = ["inlineAccessory", "circularAccessory", "rectangularAccessory"]
+    found_any = False
+    for function in accessories:
+        body = body_of(function)
+        if body is None:
+            continue
+        found_any = True
+        for pattern, what in [
+            (r"\.rows\b", "reads snapshot.rows"),
+            (r"\bRentalSummarySnapshot\.Row\b", "names the row type"),
+            (r"\.machine\b", "reads a machine name"),
+        ]:
+            if re.search(pattern, body):
+                fail(
+                    "widget-privacy",
+                    f"SummaryWidgetView.{function} {what}. The accessory families render on a "
+                    "lock screen, which is legible to anyone holding the phone; only the Home "
+                    "Screen families may name a machine. Keep the accessory branches to the "
+                    "counts, the aggregate figure and the date.",
+                )
+
+    if not found_any:
+        fail(
+            "widget-privacy",
+            "none of the accessory render functions "
+            f"({', '.join(accessories)}) were found in OffRentSummaryWidget.swift — either they "
+            "were renamed, in which case rename them here too, or the lock-screen families no "
+            "longer have a dedicated render path and this guarantee is no longer enforced.",
+        )
+
+    # And the capacity table has to say zero for them, because that is what the branches above
+    # rely on to stay honest if somebody later routes an accessory through `content`.
+    capacity = re.search(r"var rowCapacity: Int \{(.*?)\n    \}", source, re.S)
+    if capacity and not re.search(r"default:\s*0", capacity.group(1)):
+        fail(
+            "widget-privacy",
+            "SummaryWidgetView.rowCapacity no longer defaults to 0. Every family not listed "
+            "there is an accessory family, and a non-zero default would give one of them rows.",
+        )
+
+
+def check_widget_palette_matches_the_asset_catalog() -> None:
+    """`WidgetPalette`'s components are the ones in `Assets.xcassets`.
+
+    The widget extension does not compile the app's asset catalog — a named colour that is not in
+    the extension's bundle draws black at render time and fails nowhere at build time. So the
+    four colours the widget needs are restated as literals in `WidgetFormatters.swift`, and the
+    cost of that is two copies that drift until the widget and the app disagree about what the
+    product looks like. This is what stops them drifting.
+    """
+    check("The widget's palette matches the app's asset catalog")
+
+    palette_path = ROOT / "OffRentLedgerWidget" / "WidgetFormatters.swift"
+    catalog = ROOT / "OffRentLedger" / "Resources" / "Assets.xcassets"
+    if not palette_path.exists():
+        fail("widget-palette", "WidgetFormatters.swift is missing")
+        return
+
+    source = palette_path.read_text()
+    pairs = {
+        "accent": "AccentColor",
+        "attention": "AttentionColor",
+        "waiting": "WaitingColor",
+        "settled": "SettledColor",
+    }
+
+    for name, colorset in pairs.items():
+        declared = re.search(
+            rf"static let {name} = dynamic\(\s*light: \(([^)]*)\),\s*dark: \(([^)]*)\)\s*\)",
+            source,
+        )
+        if not declared:
+            fail("widget-palette", f"WidgetPalette.{name} is not declared in the expected shape")
+            continue
+
+        contents = catalog / f"{colorset}.colorset" / "Contents.json"
+        if not contents.exists():
+            fail("widget-palette", f"{colorset}.colorset is missing from the asset catalog")
+            continue
+
+        try:
+            entries = json.loads(contents.read_text())["colors"]
+        except (ValueError, KeyError):
+            fail("widget-palette", f"{colorset}.colorset does not parse")
+            continue
+
+        for appearance, group in (("light", 0), ("dark", 1)):
+            wanted = [
+                entry for entry in entries
+                if bool(entry.get("appearances")) == (appearance == "dark")
+            ]
+            if not wanted:
+                fail("widget-palette", f"{colorset} has no {appearance} variant")
+                continue
+            components = wanted[0].get("color", {}).get("components", {})
+            catalog_values = [
+                round(float(components.get(channel, 0)), 3) for channel in ("red", "green", "blue")
+            ]
+            code_values = [round(float(part), 3) for part in declared.group(group + 1).split(",")]
+            if catalog_values != code_values:
+                fail(
+                    "widget-palette",
+                    f"WidgetPalette.{name} {appearance} is {code_values} but "
+                    f"{colorset}.colorset says {catalog_values}. The widget cannot read the "
+                    "asset catalog, so the two have to be changed together.",
+                )
+
 def check_call_sites_resolve() -> None:
     check("Initialiser and static-call sites match their declarations")
     # The app layer has never been compiled. This is the nearest thing available to a type check
@@ -2487,6 +2631,8 @@ def main() -> int:
         check_result_failures_are_errors,
         check_main_actor_work_is_isolated,
         check_no_live_query_is_built_once_per_row,
+        check_lock_screen_widget_shows_no_machine_names,
+        check_widget_palette_matches_the_asset_catalog,
         check_nothing_dismisses_and_presents_in_one_turn,
         check_notifications_are_delivered_and_read,
         check_call_sites_resolve,

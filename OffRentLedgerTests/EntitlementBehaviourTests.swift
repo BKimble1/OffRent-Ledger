@@ -74,10 +74,41 @@ struct EntitlementBehaviourTests {
         #expect(try context.fetch(StoreQueries.allItems()).count == 1)
     }
 
-    @Test func theWidgetSnapshotIsClearedRatherThanStaleForFreeUsers() {
+    @Test func clearingTheWidgetSnapshotLeavesNothingStaleBehind() {
         let publisher = InMemorySnapshotPublisher()
         publisher.publish(.placeholder(now: Date()))
         publisher.clear()
         #expect(publisher.published == nil)
+    }
+
+    /// The widget is not gated, so a free user's snapshot carries their real rentals.
+    ///
+    /// It used to be withheld, which meant that with no subscription purchasable yet the widget
+    /// could not show a rental to anybody. `SnapshotBuilder` is what `RootView` publishes, and it
+    /// does not take an entitlement at all — there is no longer a parameter to get wrong.
+    @Test func aFreeUsersSnapshotStillCarriesTheirRentals() throws {
+        let (context, clock) = try setUp()
+        let publisher = InMemorySnapshotPublisher()
+        _ = context
+
+        let terms = RentalTerms(
+            deliveryDate: clock.now.addingTimeInterval(-3 * 86_400),
+            rateCard: RateCard(
+                daily: Decimal(string: "285.00", locale: Locale(identifier: "en_US_POSIX"))
+            ),
+            billingBasis: .daily
+        )
+
+        publisher.publish(
+            SnapshotBuilder.build(
+                items: [
+                    SnapshotItemInput(equipmentName: "Skid Steer", status: .active, terms: terms)
+                ],
+                now: clock.now,
+                calendar: clock.calendar
+            )
+        )
+        #expect(publisher.published?.rows.map(\.machine) == ["Skid Steer"])
+        #expect(publisher.published?.rows.first?.state == .accruing)
     }
 }

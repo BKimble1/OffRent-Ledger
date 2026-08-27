@@ -208,7 +208,6 @@ enum PaywallReason: String, Hashable {
     case openItemLimit
     case invoiceAudit
     case evidenceExport
-    case widget
     case advancedReminders
     case historyExport
     case settings
@@ -218,7 +217,6 @@ enum PaywallReason: String, Hashable {
         case .openItemLimit: "You already have an open rental"
         case .invoiceAudit: "Invoice audit is part of Pro"
         case .evidenceExport: "Evidence packets are part of Pro"
-        case .widget: "The widget is part of Pro"
         case .advancedReminders: "These reminders are part of Pro"
         case .historyExport: "Full history export is part of Pro"
         case .settings: "\(AppConfiguration.displayName) Pro"

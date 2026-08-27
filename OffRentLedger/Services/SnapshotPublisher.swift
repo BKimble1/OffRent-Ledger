@@ -5,15 +5,8 @@ import WidgetKit
 /// Publishes the widget's summary snapshot.
 protocol SnapshotPublishing: Sendable {
     func publish(_ snapshot: RentalSummarySnapshot)
-    /// No rentals to show, or no App Group. The widget shows its "nothing here yet" state.
+    /// No rentals to show. The widget shows its "nothing here yet" state.
     func clear()
-    /// There *are* rentals, and the subscription that shows them has lapsed.
-    ///
-    /// Distinct from `clear()` on purpose. Before this, a free user's widget was cleared and
-    /// therefore read exactly like an empty one: "No rentals yet" over a phone with four
-    /// machines on rent. The widget is sold as a Pro feature, so its unpaid state has to say
-    /// that rather than misreport the user's own data back to them.
-    func withhold()
 }
 
 /// Writes the snapshot to the App Group and asks WidgetKit to reload.
@@ -22,38 +15,59 @@ protocol SnapshotPublishing: Sendable {
 /// which means a widget timeline refresh cannot migrate the store, cannot lock it against the
 /// app, and cannot fail in a way the user would have to debug. It also means the widget is
 /// structurally incapable of seeing anything `RentalSummarySnapshot` cannot carry — no vendor, no
-/// jobsite, no equipment, no invoice amount.
+/// jobsite, no address, no agreement number, no invoice amount.
+///
+/// Nothing here is gated on the subscription. It used to be, and the result was a widget that
+/// could not work: `EntitlementPolicy`'s governing rule is that entitlement gates *creating*
+/// rentals and never *seeing* the ones you already have, and a widget is nothing but seeing.
 struct AppGroupSnapshotPublisher: SnapshotPublishing {
 
     private static let logger = Logger(subsystem: "com.idlery.offrent", category: "widget")
 
     func publish(_ snapshot: RentalSummarySnapshot) {
-        guard let defaults = UserDefaults(suiteName: SharedIdentifiers.appGroupIdentifier) else {
-            // Missing App Group entitlement. The app works; the widget shows its placeholder.
-            Self.logger.error("App Group unavailable — widget will not update")
-            return
-        }
+        guard let defaults = sharedDefaults(for: "publish") else { return }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        guard let data = try? encoder.encode(snapshot) else { return }
+        guard let data = try? encoder.encode(snapshot) else {
+            Self.logger.error("Could not encode the widget snapshot")
+            return
+        }
         defaults.set(data, forKey: SharedIdentifiers.snapshotDefaultsKey)
-        defaults.removeObject(forKey: SharedIdentifiers.snapshotWithheldDefaultsKey)
-        WidgetCenter.shared.reloadTimelines(ofKind: SharedIdentifiers.widgetKind)
+        removeRetiredKeys(from: defaults)
+        reload()
     }
 
     func clear() {
-        guard let defaults = UserDefaults(suiteName: SharedIdentifiers.appGroupIdentifier) else { return }
+        guard let defaults = sharedDefaults(for: "clear") else { return }
         defaults.removeObject(forKey: SharedIdentifiers.snapshotDefaultsKey)
-        defaults.removeObject(forKey: SharedIdentifiers.snapshotWithheldDefaultsKey)
-        WidgetCenter.shared.reloadTimelines(ofKind: SharedIdentifiers.widgetKind)
+        removeRetiredKeys(from: defaults)
+        reload()
     }
 
-    func withhold() {
-        guard let defaults = UserDefaults(suiteName: SharedIdentifiers.appGroupIdentifier) else { return }
-        // The snapshot goes, and only a flag stays. Nothing the entitlement was protecting is
-        // left in the App Group for the widget to render by mistake.
-        defaults.removeObject(forKey: SharedIdentifiers.snapshotDefaultsKey)
-        defaults.set(true, forKey: SharedIdentifiers.snapshotWithheldDefaultsKey)
+    /// Logs when the App Group is missing instead of returning quietly.
+    ///
+    /// `clear()` and its since-removed sibling used to `guard ... else { return }` with nothing
+    /// written anywhere, so an App Group the build was not entitled to produced a widget stuck on
+    /// "Open the app to start tracking a rental" and no evidence anywhere of why.
+    private func sharedDefaults(for operation: String) -> UserDefaults? {
+        guard let defaults = UserDefaults(suiteName: SharedIdentifiers.appGroupIdentifier) else {
+            Self.logger.error(
+                "App Group \(SharedIdentifiers.appGroupIdentifier, privacy: .public) unavailable — widget \(operation, privacy: .public) did nothing"
+            )
+            return nil
+        }
+        return defaults
+    }
+
+    /// Blobs older builds wrote. Left behind they are only wasted bytes, but they are also the
+    /// kind of thing that makes a stale-data bug take a day to find.
+    private func removeRetiredKeys(from defaults: UserDefaults) {
+        for key in SharedIdentifiers.retiredSnapshotDefaultsKeys {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    private func reload() {
         WidgetCenter.shared.reloadTimelines(ofKind: SharedIdentifiers.widgetKind)
     }
 }
@@ -80,25 +94,15 @@ final class InMemorySnapshotPublisher: SnapshotPublishing, @unchecked Sendable {
     private let lock = NSLock()
     private(set) var published: RentalSummarySnapshot?
     private(set) var publishCount = 0
-    /// True after `withhold()`, so a test can tell "nothing to show" from "not entitled".
-    private(set) var isWithheld = false
 
     func publish(_ snapshot: RentalSummarySnapshot) {
         lock.lock(); defer { lock.unlock() }
         published = snapshot
         publishCount += 1
-        isWithheld = false
     }
 
     func clear() {
         lock.lock(); defer { lock.unlock() }
         published = nil
-        isWithheld = false
-    }
-
-    func withhold() {
-        lock.lock(); defer { lock.unlock() }
-        published = nil
-        isWithheld = true
     }
 }

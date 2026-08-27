@@ -76,16 +76,18 @@ enum ProFeature: String, CaseIterable, Sendable {
     case unlimitedOpenItems
     case invoiceAudit
     case evidencePDFExport
-    case widget
     case advancedReminders
     case fullHistoryExport
+
+    // The Home Screen widget was once a case here. It is not a Pro feature any more: it only
+    // shows rentals the user already recorded, and the rule below is that entitlement gates
+    // creating records and never seeing them. See `RootView.publishSnapshot`.
 
     var displayName: String {
         switch self {
         case .unlimitedOpenItems: "Unlimited open rentals"
         case .invoiceAudit: "Invoice audit"
         case .evidencePDFExport: "Evidence packet PDF"
-        case .widget: "Home Screen widget"
         case .advancedReminders: "Advanced reminders"
         case .fullHistoryExport: "Complete history export"
         }
@@ -99,8 +101,6 @@ enum ProFeature: String, CaseIterable, Sendable {
             "Compare a final invoice against the terms you confirmed, line by line."
         case .evidencePDFExport:
             "Assemble one PDF with the timeline, confirmation number, photos and invoice summary."
-        case .widget:
-            "See estimated rent running and what needs attention from the Home Screen."
         case .advancedReminders:
             "Reminders for rate changes, pickup, invoice review and your dispute window."
         case .fullHistoryExport:
