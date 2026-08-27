@@ -454,19 +454,30 @@ extension XCUIApplication {
 
         // The container rather than the window — see `scrollableContainer`. Re-resolved on each
         // swipe because revealing a row can change which container is frontmost.
+        //
+        // `.slow` rather than the default velocity, and this is the whole of the second half of
+        // the "screen rebuilt underneath it" failure. A default `swipeUp` is a flick: it hands
+        // the list momentum and the list keeps travelling after the gesture ends. `exists` was
+        // true at the instant the swipe finished and false a moment later because the row the
+        // check found had been carried off the top of the screen — not because anything rebuilt.
+        // The teardown dump from run `33036865836` is a rental detail screen scrolled to its
+        // rate rows, several sections past the row the test was reaching for.
+        //
+        // A slow swipe travels roughly what it drags and stops there. `settle` below covers what
+        // is left.
         let scroller = { self.scrollableContainer() ?? self }
         let first = direction == .below
-            ? { scroller().swipeUp() } : { scroller().swipeDown() }
+            ? { scroller().swipeUp(velocity: .slow) } : { scroller().swipeDown(velocity: .slow) }
         let second = direction == .below
-            ? { scroller().swipeDown() } : { scroller().swipeUp() }
-        for _ in 0..<8 {
+            ? { scroller().swipeDown(velocity: .slow) } : { scroller().swipeUp(velocity: .slow) }
+        for _ in 0..<12 {
             first()
-            if element.exists { return element }
+            if element.exists { return settle(element) }
         }
         // The other way, far enough to cross back over the whole screen and past it.
-        for _ in 0..<12 {
+        for _ in 0..<16 {
             second()
-            if element.exists { return element }
+            if element.exists { return settle(element) }
         }
         XCTFail(
             """
@@ -476,6 +487,27 @@ extension XCUIApplication {
             """,
             file: file, line: line
         )
+        return element
+    }
+
+    /// Hands back the element once it has stopped moving.
+    ///
+    /// Not a delay, and not a retry. Each `frame` read is a snapshot round-trip to the app, so
+    /// this polls the thing that actually matters — whether the list is still travelling — and
+    /// returns the moment two consecutive reads agree. It never swipes again: once the row is on
+    /// screen, another swipe is what carries it off.
+    ///
+    /// If it never settles, the element is handed back anyway. `tapInContent` re-checks and says
+    /// so in its own words, which is a better failure than this one inventing a message about a
+    /// row it did find.
+    private func settle(_ element: XCUIElement) -> XCUIElement {
+        var previous = CGRect.null
+        for _ in 0..<25 {
+            guard element.exists else { return element }
+            let current = element.frame
+            if current == previous { return element }
+            previous = current
+        }
         return element
     }
 

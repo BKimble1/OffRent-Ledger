@@ -237,8 +237,22 @@ enabled, and renamed.
 
 `EditRentalView` hit exactly this and carries a note about it; the editor reintroduced it. So the
 note is no longer the only thing holding the rule: invariant 66 fails the build on the ordering,
-and it found a third instance in `ScanReviewView` that nothing had noticed. **The fix is not yet
-verified in CI** — the run that will say is the one on the commit that carries it.
+and it found a third instance in `ScanReviewView` that nothing had noticed. **Verified**: on run
+`33036865836` the suite went from two failures to one, and `testABlankNameCannotBeSaved` — which
+had never passed — is green.
+
+The third fault is the one still red, and it is a third distinct thing rather than a return of
+either of the first two. `testTheNameAndCaptionSurviveLeavingAndComingBack` failed at line 31,
+inside `openTheAttachment`, with *"element was found and then went away before it could be
+tapped"*. The teardown dump is a rental detail screen scrolled to its **rate** rows — several
+sections past the attachments row the test was reaching for. Nothing rebuilt: `reveal` swiped,
+`exists` was true at the instant the gesture ended, and the flick's momentum then carried the row
+off the top of the screen before anything could tap it.
+
+`reveal` now swipes at `.slow` velocity, stops swiping the moment the row is on screen rather
+than checking and swiping again, and waits for the row's frame to stop changing before handing it
+back. None of that is a delay: the wait polls the frame and returns as soon as two reads agree.
+**Not yet verified in CI.**
 
 The behaviour these four tests were written for is also covered at the level that decides what the
 store holds — `AttachmentEditingTests`, 5 tests, green.
