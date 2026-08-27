@@ -248,13 +248,28 @@ because an out-of-process picker service keeps the app from reaching the idle st
 needs. It was not covered before that flag existed either. Saying otherwise would be worse than
 the gap.
 
-**`CoreWorkflowUITests` flaked twice and has since stopped.**
-`testTheEvidencePacketSheetOpensFromARental` failed on run `32998916617` (iPhone) and
-`testManuallyCreatedRentalSurvivesRelaunch` on run `33004572538` (iPad), both after passing on the
-runs before. Neither recurred: on run `33019905318` the whole iPad job was green and the only two
-iPhone failures were the attachment ones above. The likeliest explanation is the re-render loop
-fixed in `61affad`, which was making the whole app slow enough to miss timeouts — but that is a
-plausible story rather than a proved one, and it is written down as such.
+**`CoreWorkflowUITests` on iPad was not flaky. It was a bug in the test harness.**
+
+`testManuallyCreatedRentalSurvivesRelaunch` failed on runs `33004572538` and `33035640186` and
+passed in between, which is the shape that gets a test written off. Run `33035640186` printed the
+actual value and ended the argument:
+
+    XCTAssertEqual failed: ("Optional("Mini Excavatorh410.00")")
+                        is not equal to ("Optional("Mini Excavator")")
+
+The daily rate went into the equipment field, behind a stray `h`. Both come from the same place.
+`reveal` swipes to bring a row on screen, and after the company sheet closes the keyboard is
+back up with focus restored to the field that had it before. `swipeUp` starts at the horizontal
+centre of the screen — which, with a keyboard up, is the middle of the home row, where `h` is.
+iPad reads the swipe as QuickPath and types it. The swipe never reaches the form, so the rate
+row is never revealed, and the `typeText` that follows goes to the field that still has focus.
+
+`reveal` now puts the keyboard away before it swipes, and `fillMinimalRental` types through a
+helper that asserts the characters landed in the field they were aimed at rather than finding
+out three lines later. **Not yet verified in CI.**
+
+`testTheEvidencePacketSheetOpensFromARental` failed once on run `32998916617` (iPhone) and has
+not recurred. That one is still unexplained.
 
 ### The build that shipped as TestFlight 21
 

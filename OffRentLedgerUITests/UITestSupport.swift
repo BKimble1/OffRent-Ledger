@@ -437,6 +437,21 @@ extension XCUIApplication {
         line: UInt = #line
     ) -> XCUIElement {
         if element.exists { return element }
+
+        // Put the keyboard away before swiping anything.
+        //
+        // A swipe that starts on a live keyboard is not a scroll. iPad reads it as QuickPath and
+        // types, and the home row sits under the horizontal centre of the screen — which is
+        // exactly where `swipeUp` begins, so the letter it types is usually "h". Meanwhile the
+        // swipe never reaches the form, so the row is not revealed and the next `typeText` goes
+        // to whatever the keyboard was still attached to rather than to the field just tapped.
+        //
+        // Run `33035640186` failed with the equipment field reading `Mini Excavatorh410.00`:
+        // the "h" from the swipe, then the daily rate, both in the field the company sheet had
+        // restored focus to. Twice before that, the same test failed on iPad and was written off
+        // as flakiness. It was this.
+        dismissKeyboard()
+
         // The container rather than the window — see `scrollableContainer`. Re-resolved on each
         // swipe because revealing a row can change which container is frontmost.
         let scroller = { self.scrollableContainer() ?? self }
@@ -738,17 +753,58 @@ extension XCUIApplication {
     }
 
     /// Fills in the minimum a rental needs: a machine, a company, a daily rate.
-    func fillMinimalRental(equipment: String, company: String, dailyRate: String) {
-        expect(textFields[A11yUI.AddRental.equipmentName]).tap()
-        typeText(equipment)
-        dismissKeyboard()
+    func fillMinimalRental(
+        equipment: String,
+        company: String,
+        dailyRate: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        type(equipment, into: textFields[A11yUI.AddRental.equipmentName], file: file, line: line)
 
         addCompanyFromDraft(named: company)
 
         // Revealed, not merely waited for: the rate lives below the fold on this form and the
         // row does not exist until the form scrolls to it.
-        revealAndTap(textFields[A11yUI.AddRental.dailyRate])
-        typeText(dailyRate)
+        type(dailyRate, into: textFields[A11yUI.AddRental.dailyRate], file: file, line: line)
+    }
+
+    /// Types into one specific field, and proves that is where it went.
+    ///
+    /// `typeText` on the application goes to whatever holds keyboard focus, which is not always
+    /// the field just tapped — dismissing a sheet restores focus to the field that had it before
+    /// the sheet opened, and the tap that should have moved focus can be swallowed by the
+    /// keyboard that came back up with it. The failure that produced was a rate typed into the
+    /// equipment field, and it read as an app bug in the assertion three lines later.
+    ///
+    /// This asserts at the point the mistake happens rather than at the point it becomes
+    /// visible. It is not a retry and not a wait: one tap, one type, one check.
+    func type(
+        _ text: String,
+        into element: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        // Start from a screen with no keyboard on it. One left up by the previous field covers
+        // the row this one is on, so the tap meant to focus it lands on the keyboard instead and
+        // the text goes to whatever still holds focus.
+        dismissKeyboard()
+        let field = reveal(element)
+        tapWhenHittable(field)
+        typeText(text)
+        // Checked before the keyboard goes away: `CurrencyField` reformats its text on blur, so
+        // after `dismissKeyboard` a rate typed as "410.00" reads back as whatever
+        // `MoneyMath.rounded` prints. What this is asserting is that the characters went into
+        // this field, not what the field chooses to display once it is done with them.
+        XCTAssertEqual(
+            field.value as? String, text,
+            """
+            typing went somewhere other than the field it was aimed at. \
+            Identified elements on screen:
+            \(identifiedElements())
+            """,
+            file: file, line: line
+        )
         dismissKeyboard()
     }
 }
