@@ -252,7 +252,28 @@ off the top of the screen before anything could tap it.
 `reveal` now swipes at `.slow` velocity, stops swiping the moment the row is on screen rather
 than checking and swiping again, and waits for the row's frame to stop changing before handing it
 back. None of that is a delay: the wait polls the frame and returns as soon as two reads agree.
-**Not yet verified in CI.**
+**Not yet verified in CI, and cannot be until the blocker below clears.**
+
+### CI cannot run at all: the GitHub account is billing-locked
+
+Run `33039141442` failed both jobs in four seconds with no steps executed and no logs. The
+check-run annotation says it outright:
+
+> The job was not started because your account is locked due to a billing issue.
+
+Re-running the failed jobs produced the same thing. A dispatch of `testflight-status.yml`, which
+is `ubuntu-latest` and free on a public repository, failed identically — so this is account-wide,
+not a macOS capacity problem and not specific to this repository.
+
+**This corrects an earlier entry in this document's history.** When Actions stalled on 26 August I
+recorded the cause as macOS runner capacity and explicitly ruled billing out on the grounds that
+the repository is public and therefore free. That inference was wrong: a locked account blocks
+free minutes as surely as paid ones. The ubuntu probe is the check that would have settled it
+then, and it is the check to run first next time.
+
+Nothing in the repository can clear this. It needs the account owner at
+<https://github.com/settings/billing>. Once it clears, `verify.yml` takes a `workflow_dispatch`,
+so no commit is needed to get a run.
 
 The behaviour these four tests were written for is also covered at the level that decides what the
 store holds — `AttachmentEditingTests`, 5 tests, green.
