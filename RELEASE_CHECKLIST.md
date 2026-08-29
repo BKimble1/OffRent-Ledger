@@ -338,6 +338,25 @@ accepted. Leaving them listed buried the ones that still matter.
 | 3 | Nothing has run on real hardware. | Repository owner | Camera, OCR against real contracts, notification delivery and the tap that follows it, widget and Lock Screen rendering, sharing a PDF out. A simulator cannot do these. |
 | 4 | `offrent.idlery.com` does not exist. | Repository owner | The app claims nothing — `legalURLsAreLive` is `false` and the legal screens render bundled Markdown. App Store Connect still wants a live privacy policy URL at submission. |
 | 5 | App Store screenshots. | Designer | Required by App Store Connect; not required for TestFlight. |
+| 6 | **CI cannot run: the GitHub account is billing-locked.** | Repository owner | Every `verify.yml` and `testflight.yml` job fails in four seconds with no steps executed — *"The job was not started because your account is locked due to a billing issue."* An `ubuntu-latest` probe, free on a public repository, fails identically, so it is account-wide. This blocks **everything**: the app layer, the widget and the UI suite have no type check without a macOS runner, and no build can be archived or uploaded. Clear it at <https://github.com/settings/billing>; `verify.yml` then takes a `workflow_dispatch`, so no commit is needed to get a run. |
+
+### What the app itself is ready for
+
+Blockers 1–5 are all App Store Connect records, real hardware, or artwork. None of them is code,
+and none can be closed from this repository. What *is* code has been audited to the limit of what
+this machine can check:
+
+| Requirement | State |
+|---|---|
+| Subscription disclosure on the paywall — name, duration, price, auto-renew terms, Privacy Policy, Terms of Use, Restore | ✅ present and read against Apple's wording |
+| Paywall behaviour when StoreKit returns no products | ✅ says so, offers a retry in the sticky bar, and never shows a purchase control there is nothing behind |
+| Export-compliance key (`ITSAppUsesNonExemptEncryption`) | ✅ `NO`, so TestFlight processing does not stop to ask |
+| Camera and location usage strings | ✅ specific about when and why, and both say nothing is uploaded |
+| Photo library usage string | ✅ correctly absent — `PhotosPicker` is out-of-process and no direct `PHPhotoLibrary` API is used |
+| iPad orientations and multitasking | ✅ all four, no `UIRequiresFullScreen` |
+| `FoundationModels` (iOS 26) against an iOS 18 target | ✅ `#if canImport` plus `@available(iOS 26.0, *)` |
+| Force unwraps, `try!`, `fatalError` on a user path, `print`, `Double` money, stuck loading flags, swallowed errors, sheets with no way out | ✅ swept; none found |
+| Text contrast, colour-only status, Dynamic Type | ✅ held by invariants; `.system(size:)` appears only on symbols |
 | 6 | "OffRent Ledger" trademark clearance unknown. | Counsel | |
 | 7 | Terms of Use sections 10, 11 and 13 need legal review. | Counsel | |
 
