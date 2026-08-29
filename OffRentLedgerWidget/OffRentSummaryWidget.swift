@@ -110,6 +110,16 @@ struct SummaryWidgetView: View {
         }
     }
 
+    /// Whether there is height left for anything after the rentals.
+    ///
+    /// `.systemSmall` is 155pt square, and 14 of padding on each side leaves 127. The header is
+    /// about 35 of that and two stacked rows about 61, which with the divider and the gaps is
+    /// already 113. A "+2 more" line and a "Next rate change" line under that do not fit — they
+    /// push the last row into the edge of the widget, and what a small widget then shows is a
+    /// clipped rental. The small family gets the figure and the machines and stops there, which
+    /// is what a small widget is for.
+    private var showsSecondaryLines: Bool { family != .systemSmall }
+
     var body: some View {
         Group {
             if let snapshot = entry.snapshot {
@@ -244,7 +254,7 @@ struct SummaryWidgetView: View {
             }
 
             let hidden = snapshot.openItemCount - shown.count
-            if hidden > 0 {
+            if hidden > 0, showsSecondaryLines {
                 Text("+\(hidden) more in the app")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -261,7 +271,7 @@ struct SummaryWidgetView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-            } else if let next = snapshot.nextRateChangeDate {
+            } else if let next = snapshot.nextRateChangeDate, showsSecondaryLines {
                 Text("Next rate change \(next.formatted(.dateTime.month(.abbreviated).day()))")
                     .font(.caption2)
                     .foregroundStyle(.secondary)

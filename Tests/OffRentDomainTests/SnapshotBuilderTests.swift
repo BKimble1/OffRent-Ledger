@@ -220,6 +220,33 @@ final class SnapshotBuilderTests: XCTestCase {
         XCTAssertTrue(snapshot.rows[0].machine.hasSuffix("\u{2026}"))
     }
 
+    /// The widget's idea of "still running" is the domain's idea of it.
+    ///
+    /// Two definitions of the same fact, in two modules, because `OffRentShared` compiles into
+    /// the widget extension and `RentalItemStatus` does not. This is the only thing holding them
+    /// together. They disagreed on the day `rows` was added — the widget had Contact vendor not
+    /// accruing, which is wrong (the meter does not stop because the call has not been made) and
+    /// Draft accruing, which is also wrong — and the visible symptom was one missing "3 days"
+    /// on one row, which nobody would have found by looking.
+    func testTheWidgetAgreesWithTheDomainAboutWhatIsStillRunning() {
+        for status in RentalItemStatus.allCases where status.isOpen {
+            let snapshot = SnapshotBuilder.build(
+                items: [item(status, machine: status.rawValue)], now: now, calendar: calendar()
+            )
+            guard let row = snapshot.rows.first else {
+                return XCTFail("\(status) is open, so it must produce a row")
+            }
+            XCTAssertEqual(
+                row.state.isAccruing, status.accruesRent,
+                "the widget and the domain disagree about whether \(status) is accruing"
+            )
+            // And the row only carries the figures when it is running, because a "5 days" beside
+            // a rental that came off rent last week is a lie the widget tells at a glance.
+            XCTAssertEqual(row.estimate != nil, status.accruesRent, "\(status) estimate")
+            XCTAssertEqual(row.daysOnRent != nil, status.accruesRent, "\(status) daysOnRent")
+        }
+    }
+
     /// Every widget row state has a label. A blank one would render as an empty status.
     func testEveryRowStateHasBothLabels() {
         for state in RentalSummarySnapshot.Row.State.allCases {

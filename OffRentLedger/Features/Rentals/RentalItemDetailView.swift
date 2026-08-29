@@ -263,6 +263,16 @@ struct RentalItemDetailView: View {
             .accessibilityIdentifier(A11yID.ItemDetail.reopen)
     }
 
+    /// The statuses this item can be reopened into: reopenable, and earlier than where it is.
+    ///
+    /// Sorted so the last element is the nearest previous stage, which is what somebody reopening
+    /// a resolved rental almost always means — one step back, not all the way to Active.
+    private func reopenOptions(for item: RentalItem) -> [RentalItemStatus] {
+        StatusTransitionService.reopenTargets
+            .filter { $0.order < item.status.order }
+            .sorted { $0.order < $1.order }
+    }
+
     // MARK: - Sections
 
     /// The way out of a rental you should not have created.
@@ -620,12 +630,7 @@ struct RentalItemDetailView: View {
             Form {
                 Section {
                     Picker("Reopen to", selection: $reopenTarget) {
-                        ForEach(
-                            StatusTransitionService.reopenTargets
-                                .filter { $0.order < item.status.order }
-                                .sorted(by: { $0.order < $1.order }),
-                            id: \.self
-                        ) { status in
+                        ForEach(reopenOptions(for: item), id: \.self) { status in
                             Text(status.displayName).tag(status)
                         }
                     }
@@ -636,11 +641,33 @@ struct RentalItemDetailView: View {
                 }
             }
             .offRentFormBackground()
+            // The selection is clamped to something the picker is actually offering.
+            //
+            // `reopenTarget` starts at `.invoiceReview` and holds whatever was picked last, while
+            // the options are only the statuses *before* this item's own. Today those two cannot
+            // disagree — Reopen is offered on `.resolved` and `.archived` only, and every reopen
+            // target is below both — so this changes nothing that ships. It is here because the
+            // failure if they ever do disagree is silent and ugly: a SwiftUI `Picker` whose
+            // selection is not among its tags draws blank, and the Reopen button then submits a
+            // target the service refuses, so the screen looks broken and says nothing. Adding
+            // `reopenButton` to any status at or below Invoice review would do it.
+            .onAppear {
+                let options = reopenOptions(for: item)
+                if !options.contains(reopenTarget), let nearest = options.last {
+                    reopenTarget = nearest
+                }
+            }
             .navigationTitle("Reopen")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { presentedSheet = nil }
+                    // Cancel clears the reason too. It used to survive, so a user who thought
+                    // better of a reopen and came back later found their abandoned sentence
+                    // already typed into the box.
+                    Button("Cancel") {
+                        presentedSheet = nil
+                        reopenReason = ""
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Reopen") {

@@ -112,8 +112,18 @@ struct RentalSummarySnapshot: Codable, Sendable, Equatable {
                 }
             }
 
-            /// True while the meter is still running, which is what the widget colours differently.
-            var isAccruing: Bool { self == .accruing || self == .draft }
+            /// True while the meter is still running, which is what the widget colours
+            /// differently and what lets a row say how many days it has been out.
+            ///
+            /// Must agree with `RentalItemStatus.accruesRent`, which is the domain's answer and
+            /// covers Active *and* Contact vendor — the meter does not stop because the user has
+            /// not made the call yet; that is the entire premise of the app. This said
+            /// `.accruing || .draft` for its first day, which had it both ways round: a rental
+            /// waiting on a vendor call had its days counted by `SnapshotBuilder` and then
+            /// dropped by the row that was supposed to draw them, and a draft that has never
+            /// been delivered claimed to be running. `SnapshotBuilderTests` now checks the two
+            /// definitions against each other for every status, so they cannot drift again.
+            var isAccruing: Bool { self == .accruing || self == .contactVendor }
         }
     }
 

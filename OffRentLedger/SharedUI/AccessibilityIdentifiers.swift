@@ -273,6 +273,9 @@ enum A11yID {
         static let dismiss = "paywall.dismiss"
         static let entitlementStatus = "paywall.entitlementStatus"
         static let dataReassurance = "paywall.dataReassurance"
+        /// Shown when the product fetch finished and returned nothing.
+        static let productsUnavailable = "paywall.productsUnavailable"
+        static let retryProducts = "paywall.retryProducts"
     }
 
     enum Onboarding {

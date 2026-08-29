@@ -149,17 +149,22 @@ struct PaywallView: View {
         if service.isLoadingProducts {
             ProgressView("Loading options…").frame(maxWidth: .infinity)
         } else if service.products.isEmpty {
+            // The retry lives in the sticky bar rather than here. A button inside a card two
+            // thirds of the way down a scrolling screen is a button somebody has to find, and
+            // this is the one state where it is the only thing left to do.
             VStack(alignment: .leading, spacing: 8) {
-                Text("Subscription options could not be loaded.")
+                Label("Subscription options could not be loaded", systemImage: "wifi.exclamationmark")
                     .font(.subheadline.weight(.medium))
-                Text("Check your connection and try again. Nothing you already have is affected.")
+                    .foregroundStyle(Palette.attentionText)
+                Text(AppCopy.entitlementLossReassurance)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("Try again") { Task { await service.loadProducts() } }
-                    .buttonStyle(.bordered)
-                    .minimumTapTarget()
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .offRentCard()
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(A11yID.Paywall.productsUnavailable)
         } else {
             VStack(spacing: 10) {
                 ForEach(service.products) { product in
@@ -247,29 +252,52 @@ struct PaywallView: View {
         // taps. App Review opens both.
         StickyActionBar {
             VStack(spacing: Space.snug) {
-                Button {
-                    Task { await purchase() }
-                } label: {
-                    HStack(spacing: Space.snug) {
-                        if isPurchasing { ProgressView().tint(Palette.onAccent) }
-                        Text(isPurchasing ? "Working…" : "Subscribe")
-                    }
-                }
-                // `.borderedProminent` painted white on the accent orange: 2.4:1, which fails at
-                // any size. The house style puts graphite on orange at 7.4:1.
-                .buttonStyle(.offRentPrimary)
-                .accessibilityIdentifier(A11yID.Paywall.purchase)
-                // Nothing is preselected, so this stays disabled until the user chooses. A
-                // default selection on a purchase button is a nudge toward a charge they did
-                // not pick.
-                .disabled(selectedProductID == nil || isPurchasing)
-                if selectedProductID == nil {
-                    Text("Choose a plan above.")
+                // A disabled "Subscribe" over "Choose a plan above" when there are no plans above
+                // is the app telling the user to do something it has not offered. App Review
+                // reaches this screen on a network it controls and reads that as a broken
+                // purchase flow, which is a 2.1 rejection over what is really a failed fetch.
+                if hasNothingToBuy {
+                    Button("Try again") { Task { await service.loadProducts() } }
+                        .buttonStyle(.offRentPrimary)
+                        .accessibilityIdentifier(A11yID.Paywall.retryProducts)
+                    Text("Nothing you have recorded is affected.")
                         .font(Typography.micro)
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                } else {
+                    Button {
+                        Task { await purchase() }
+                    } label: {
+                        HStack(spacing: Space.snug) {
+                            if isPurchasing { ProgressView().tint(Palette.onAccent) }
+                            Text(isPurchasing ? "Working…" : "Subscribe")
+                        }
+                    }
+                    // `.borderedProminent` painted white on the accent orange: 2.4:1, which fails
+                    // at any size. The house style puts graphite on orange at 7.4:1.
+                    .buttonStyle(.offRentPrimary)
+                    .accessibilityIdentifier(A11yID.Paywall.purchase)
+                    // Nothing is preselected, so this stays disabled until the user chooses. A
+                    // default selection on a purchase button is a nudge toward a charge they did
+                    // not pick.
+                    .disabled(selectedProductID == nil || isPurchasing)
+                    if selectedProductID == nil {
+                        Text("Choose a plan above.")
+                            .font(Typography.micro)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
+    }
+
+    /// True when the fetch has finished and produced nothing, so there is no plan to select.
+    ///
+    /// Deliberately not `products.isEmpty` alone: while the fetch is still running the bar keeps
+    /// showing Subscribe, because a button that changes identity mid-load is worse than one that
+    /// is briefly disabled.
+    private var hasNothingToBuy: Bool {
+        !service.isLoadingProducts && service.products.isEmpty
     }
 
     private var secondaryActions: some View {
